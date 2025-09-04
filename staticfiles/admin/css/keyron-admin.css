@@ -1,0 +1,108 @@
+/* KEYRON BIMカラーパレット */
+:root {
+    --keyron-primary: #2563eb;
+    --keyron-primary-dark: #1d4ed8;
+    --keyron-success: #10b981;
+    --keyron-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+/* ヘッダーのカスタマイズ */
+#header {
+    background: var(--keyron-gradient) !important;
+    color: white !important;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+
+#branding h1,
+#branding h1 a:link,
+#branding h1 a:visited {
+    color: white !important;
+    font-weight: 700 !important;
+}
+
+/* ナビゲーションの改善 */
+.module h2,
+.module caption,
+.inline-group h2 {
+    background: var(--keyron-primary) !important;
+    color: white !important;
+    border-radius: 0.5rem 0.5rem 0 0 !important;
+    font-weight: 600 !important;
+}
+
+/* ボタンスタイル */
+.default,
+input[type=submit].default,
+.submit-row input.default {
+    background: var(--keyron-success) !important;
+    border: none !important;
+    border-radius: 0.5rem !important;
+    font-weight: 600 !important;
+    transition: all 0.3s ease !important;
+}
+
+.default:hover,
+input[type=submit].default:hover {
+    background: #059669 !important;
+    transform: translateY(-1px) !important;
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4) !important;
+}
+
+/* カードスタイル */
+.module {
+    border-radius: 1rem !important;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1) !important;
+    border: none !important;
+    overflow: hidden !important;
+}
+
+/* テーブルの改善 */
+table thead th {
+    background: var(--keyron-primary) !important;
+    color: white !important;
+    font-weight: 600 !important;
+}
+
+.results table tbody tr:hover {
+    background: rgba(37, 99, 235, 0.05) !important;
+}
+
+/* フォームフィールド */
+input[type="text"],
+input[type="password"],
+input[type="email"],
+input[type="url"],
+input[type="number"],
+input[type="date"],
+input[type="datetime-local"],
+select,
+textarea {
+    border: 2px solid #e5e7eb !important;
+    border-radius: 0.5rem !important;
+    transition: all 0.3s ease !important;
+}
+
+input[type="text"]:focus,
+input[type="password"]:focus,
+input[type="email"]:focus,
+input[type="url"]:focus,
+input[type="number"]:focus,
+input[type="date"]:focus,
+input[type="datetime-local"]:focus,
+select:focus,
+textarea:focus {
+    border-color: var(--keyron-primary) !important;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1) !important;
+}
+
+/* 背景色の調整 */
+body.login {
+    background: var(--keyron-gradient) !important;
+}
+
+.login #container {
+    background: rgba(255, 255, 255, 0.95) !important;
+    border-radius: 1rem !important;
+    backdrop-filter: blur(10px) !important;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1) !important;
+}

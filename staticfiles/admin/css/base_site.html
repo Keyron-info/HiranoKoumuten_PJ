@@ -1,0 +1,39 @@
+{# invoices/templates/admin/base_site.html 
+   このファイルを invoices/templates/admin/base_site.html として保存してください #}{% extends "admin/base.html" %}
+{% load static %}
+
+{% block title %}{{ title }} | KEYRON BIM 管理画面{% endblock %}
+
+{% block branding %}
+<div id="site-name">
+    <a href="{% url 'admin:index' %}">
+        <i class="fas fa-receipt" style="margin-right: 0.5rem;"></i>
+        KEYRON BIM 管理画面
+    </a>
+</div>
+{% endblock %}
+
+{% block nav-global %}
+<div style="float: right; margin-top: 0.5rem;">
+    <a href="{% url 'invoice_list' %}" style="color: white; text-decoration: none; margin-right: 1rem;">
+        <i class="fas fa-home"></i> メインサイト
+    </a>
+    <a href="{% url 'upload_invoice' %}" style="color: white; text-decoration: none; margin-right: 1rem;">
+        <i class="fas fa-upload"></i> アップロード
+    </a>
+</div>
+{% endblock %}
+
+{% block extrahead %}
+    {{ block.super }}
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link rel="stylesheet" type="text/css" href="{% static 'admin/css/keyron-admin.css' %}">
+{% endblock %}
+
+{% block footer %}
+<div id="footer" style="text-align: center; padding: 1rem; background: #f8fafc; border-top: 1px solid #e5e7eb; margin-top: 2rem;">
+    <p style="margin: 0; color: #64748b;">
+        © 2025 KEYRON BIM 管理システム - Powered by Django
+    </p>
+</div>
+{% endblock %}

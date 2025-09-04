@@ -1,0 +1,46 @@
+{% extends 'invoices/base.html' %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h4>請求書一覧</h4>
+                <a href="{% url 'upload_invoice' %}" class="btn btn-primary">新規アップロード</a>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>請求書番号</th>
+                                <th>顧客会社</th>
+                                <th>金額</th>
+                                <th>ステータス</th>
+                                <th>発行日</th>
+                                <th>作成日</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for invoice in invoices %}
+                            <tr>
+                                <td>{{ invoice.invoice_number }}</td>
+                                <td>{{ invoice.customer_company.name }}</td>
+                                <td>{{ invoice.amount|floatformat:0 }}円</td>
+                                <td>{{ invoice.get_status_display }}</td>
+                                <td>{{ invoice.issue_date }}</td>
+                                <td>{{ invoice.created_at|date:"Y/m/d" }}</td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="6">請求書がありません。</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

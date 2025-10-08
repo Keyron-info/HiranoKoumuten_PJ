@@ -1,0 +1,318 @@
+{% extends 'invoices/base.html' %}
+
+{% block title %}ダッシュボード - KEYRON BIM{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2><i class="fas fa-chart-line"></i> ダッシュボード</h2>
+            <small class="text-muted">最終更新: {{ "now"|date:"Y年m月d日 H:i" }}</small>
+        </div>
+    </div>
+</div>
+
+<!-- 統計カード -->
+<div class="row mb-4">
+    <div class="col-xl-3 col-md-6">
+        <div class="card card-stats">
+            <div class="card-body">
+                <div class="row">
+                    <div class="col">
+                        <h5 class="card-title text-uppercase text-muted mb-0">総請求書数</h5>
+                        <span class="h2 font-weight-bold mb-0">{{ total_invoices }}</span>
+                    </div>
+                    <div class="col-auto">
+                        <div class="icon icon-shape bg-primary text-white rounded-circle shadow">
+                            <i class="fas fa-file-invoice"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-xl-3 col-md-6">
+        <div class="card card-stats">
+            <div class="card-body">
+                <div class="row">
+                    <div class="col">
+                        <h5 class="card-title text-uppercase text-muted mb-0">承認待ち</h5>
+                        <span class="h2 font-weight-bold mb-0 text-warning">{{ pending_approval }}</span>
+                    </div>
+                    <div class="col-auto">
+                        <div class="icon icon-shape bg-warning text-white rounded-circle shadow">
+                            <i class="fas fa-clock"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-xl-3 col-md-6">
+        <div class="card card-stats">
+            <div class="card-body">
+                <div class="row">
+                    <div class="col">
+                        <h5 class="card-title text-uppercase text-muted mb-0">総金額</h5>
+                        <span class="h2 font-weight-bold mb-0 text-success">{{ total_amount|floatformat:0 }}円</span>
+                    </div>
+                    <div class="col-auto">
+                        <div class="icon icon-shape bg-success text-white rounded-circle shadow">
+                            <i class="fas fa-yen-sign"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-xl-3 col-md-6">
+        <div class="card card-stats">
+            <div class="card-body">
+                <div class="row">
+                    <div class="col">
+                        <h5 class="card-title text-uppercase text-muted mb-0">今月</h5>
+                        <span class="h2 font-weight-bold mb-0">{{ this_month_count }}</span>
+                        <p class="mt-0 mb-0 text-sm">
+                            <span class="text-success mr-2">{{ this_month_amount|floatformat:0 }}円</span>
+                        </p>
+                    </div>
+                    <div class="col-auto">
+                        <div class="icon icon-shape bg-info text-white rounded-circle shadow">
+                            <i class="fas fa-calendar"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- メインコンテンツ -->
+<div class="row">
+    <!-- ステータス分布 -->
+    <div class="col-xl-8 col-lg-7">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title"><i class="fas fa-chart-pie"></i> ステータス別分布</h5>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table align-items-center">
+                        <thead class="thead-light">
+                            <tr>
+                                <th scope="col">ステータス</th>
+                                <th scope="col">件数</th>
+                                <th scope="col">金額</th>
+                                <th scope="col">割合</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for status in status_distribution %}
+                            <tr>
+                                <td>
+                                    {% if status.status == 'submitted' %}
+                                        <span class="badge badge-pill bg-primary">送付済み</span>
+                                    {% elif status.status == 'pending_approval' %}
+                                        <span class="badge badge-pill bg-warning">承認待ち</span>
+                                    {% elif status.status == 'approved' %}
+                                        <span class="badge badge-pill bg-success">承認済み</span>
+                                    {% elif status.status == 'rejected' %}
+                                        <span class="badge badge-pill bg-danger">却下</span>
+                                    {% elif status.status == 'returned' %}
+                                        <span class="badge badge-pill bg-info">差し戻し</span>
+                                    {% else %}
+                                        <span class="badge badge-pill bg-secondary">{{ status.status }}</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ status.count }}件</td>
+                                <td>{{ status.amount|default:0|floatformat:0 }}円</td>
+                                <td>
+                                    <div class="d-flex align-items-center">
+                                        <span class="me-2">{% widthratio status.count total_invoices 100 %}%</span>
+                                        <div class="progress" style="width: 100px;">
+                                            <div class="progress-bar bg-gradient-primary" 
+                                                 style="width: {% widthratio status.count total_invoices 100 %}%"></div>
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="4" class="text-center">データがありません</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- クイック アクション -->
+    <div class="col-xl-4 col-lg-5">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title"><i class="fas fa-bolt"></i> クイックアクション</h5>
+            </div>
+            <div class="card-body">
+                <div class="d-grid gap-2">
+                    <a href="{% url 'upload_invoice' %}" class="btn btn-primary">
+                        <i class="fas fa-plus"></i> 新規請求書アップロード
+                    </a>
+                    <a href="{% url 'invoice_list' %}" class="btn btn-outline-primary">
+                        <i class="fas fa-list"></i> 請求書一覧
+                    </a>
+                    {% if pending_approval > 0 %}
+                    <a href="{% url 'invoice_list' %}?status=pending_approval" class="btn btn-outline-warning">
+                        <i class="fas fa-exclamation-triangle"></i> 承認待ち ({{ pending_approval }}件)
+                    </a>
+                    {% endif %}
+                    {% if submitted_invoices > 0 %}
+                    <a href="{% url 'invoice_list' %}?status=submitted" class="btn btn-outline-info">
+                        <i class="fas fa-paper-plane"></i> 送付済み ({{ submitted_invoices }}件)
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 支払期日が近い請求書 & 最近の活動 -->
+<div class="row mt-4">
+    <!-- 支払期日が近い請求書 -->
+    <div class="col-xl-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title">
+                    <i class="fas fa-exclamation-circle text-danger"></i> 
+                    支払期日が近い請求書（7日以内）
+                </h5>
+            </div>
+            <div class="card-body">
+                {% if upcoming_due %}
+                <div class="table-responsive">
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>請求書番号</th>
+                                <th>会社</th>
+                                <th>金額</th>
+                                <th>期日</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for invoice in upcoming_due %}
+                            <tr>
+                                <td>
+                                    <a href="{% url 'invoice_detail' invoice.id %}" class="text-decoration-none">
+                                        {{ invoice.invoice_number }}
+                                    </a>
+                                </td>
+                                <td>{{ invoice.customer_company.name|truncatechars:15 }}</td>
+                                <td>{{ invoice.amount|floatformat:0 }}円</td>
+                                <td class="text-danger">{{ invoice.due_date }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <p class="text-muted">支払期日が近い請求書はありません。</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <!-- 最近の活動 -->
+    <div class="col-xl-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title">
+                    <i class="fas fa-history"></i> 
+                    最近の活動
+                </h5>
+            </div>
+            <div class="card-body">
+                {% if recent_invoices %}
+                <div class="table-responsive">
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>請求書番号</th>
+                                <th>会社</th>
+                                <th>ステータス</th>
+                                <th>作成日</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for invoice in recent_invoices %}
+                            <tr>
+                                <td>
+                                    <a href="{% url 'invoice_detail' invoice.id %}" class="text-decoration-none">
+                                        {{ invoice.invoice_number }}
+                                    </a>
+                                </td>
+                                <td>{{ invoice.customer_company.name|truncatechars:15 }}</td>
+                                <td>
+                                    <span class="badge badge-sm 
+                                        {% if invoice.status == 'submitted' %}bg-primary
+                                        {% elif invoice.status == 'approved' %}bg-success
+                                        {% elif invoice.status == 'pending_approval' %}bg-warning
+                                        {% else %}bg-secondary{% endif %}">
+                                        {{ invoice.get_status_display }}
+                                    </span>
+                                </td>
+                                <td>{{ invoice.created_at|date:"m/d" }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <p class="text-muted">最近の活動がありません。</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<style>
+.card-stats {
+    transition: transform 0.3s ease;
+}
+
+.card-stats:hover {
+    transform: translateY(-2px);
+}
+
+.icon {
+    width: 3rem;
+    height: 3rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.icon-shape {
+    padding: 12px;
+    text-align: center;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.badge-pill {
+    border-radius: 50px;
+}
+
+.progress {
+    height: 8px;
+}
+</style>
+{% endblock %}

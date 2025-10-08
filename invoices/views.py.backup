@@ -1,0 +1,233 @@
+from django.shortcuts import render, redirect, get_object_or_404
+from django.contrib.auth.decorators import login_required  # この行を追加
+from django.contrib import messages
+from django.core.paginator import Paginator
+from django.http import JsonResponse  # この行も追加
+from django.utils import timezone  # この行も追加
+from .models import Invoice, Company, CustomerCompany, ApprovalHistory, InvoiceComment  # ApprovalHistory, InvoiceCommentを追加
+from .forms import InvoiceUploadForm
+
+@login_required
+def approve_invoice(request, invoice_id):
+    """請求書承認"""
+    if request.method != 'POST':
+        return JsonResponse({'error': '無効なリクエストです'}, status=400)
+    
+    invoice = get_object_or_404(Invoice, id=invoice_id)
+    
+    # 権限チェック：社内ユーザーのみ
+    if request.user.user_type != 'internal':
+        return JsonResponse({'error': '承認権限がありません'}, status=403)
+    
+    # 会社チェック
+    if invoice.receiving_company != request.user.company:
+        return JsonResponse({'error': 'アクセス権限がありません'}, status=403)
+    
+    # ステータスチェック
+    if invoice.status not in ['submitted', 'pending_approval']:
+        return JsonResponse({'error': '承認できないステータスです'}, status=400)
+    
+    # 承認処理
+    comment = request.POST.get('comment', '')
+    
+    # ステータス更新
+    invoice.status = 'approved'
+    invoice.save()
+    
+    # 承認履歴追加
+    ApprovalHistory.objects.create(
+        invoice=invoice,
+        user=request.user,
+        action='approved',
+        comment=comment
+    )
+    
+    # コメントがある場合は追加
+    if comment:
+        InvoiceComment.objects.create(
+            invoice=invoice,
+            user=request.user,
+            comment_type='approval',
+            comment=f'承認時コメント: {comment}',
+            is_private=False
+        )
+    
+    messages.success(request, f'請求書 {invoice.invoice_number} を承認しました。')
+    return JsonResponse({'success': True})
+
+
+@login_required
+def reject_invoice(request, invoice_id):
+    """請求書却下"""
+    if request.method != 'POST':
+        return JsonResponse({'error': '無効なリクエストです'}, status=400)
+    
+    invoice = get_object_or_404(Invoice, id=invoice_id)
+    
+    # 権限チェック
+    if request.user.user_type != 'internal':
+        return JsonResponse({'error': '却下権限がありません'}, status=403)
+    
+    if invoice.receiving_company != request.user.company:
+        return JsonResponse({'error': 'アクセス権限がありません'}, status=403)
+    
+    if invoice.status not in ['submitted', 'pending_approval']:
+        return JsonResponse({'error': '却下できないステータスです'}, status=400)
+    
+    # 却下理由は必須
+    comment = request.POST.get('comment', '').strip()
+    if not comment:
+        return JsonResponse({'error': '却下理由を入力してください'}, status=400)
+    
+    # 却下処理
+    invoice.status = 'rejected'
+    invoice.save()
+    
+    # 承認履歴追加
+    ApprovalHistory.objects.create(
+        invoice=invoice,
+        user=request.user,
+        action='rejected',
+        comment=comment
+    )
+    
+    # コメント追加
+    InvoiceComment.objects.create(
+        invoice=invoice,
+        user=request.user,
+        comment_type='approval',
+        comment=f'却下理由: {comment}',
+        is_private=False
+    )
+    
+    messages.success(request, f'請求書 {invoice.invoice_number} を却下しました。')
+    return JsonResponse({'success': True})
+
+
+@login_required
+def return_invoice(request, invoice_id):
+    """請求書差し戻し"""
+    if request.method != 'POST':
+        return JsonResponse({'error': '無効なリクエストです'}, status=400)
+    
+    invoice = get_object_or_404(Invoice, id=invoice_id)
+    
+    # 権限チェック
+    if request.user.user_type != 'internal':
+        return JsonResponse({'error': '差し戻し権限がありません'}, status=403)
+    
+    if invoice.receiving_company != request.user.company:
+        return JsonResponse({'error': 'アクセス権限がありません'}, status=403)
+    
+    if invoice.status not in ['submitted', 'pending_approval']:
+        return JsonResponse({'error': '差し戻しできないステータスです'}, status=400)
+    
+    # 差し戻し理由は必須
+    comment = request.POST.get('comment', '').strip()
+    if not comment:
+        return JsonResponse({'error': '差し戻し理由を入力してください'}, status=400)
+    
+    # 差し戻し処理
+    invoice.status = 'returned'
+    invoice.save()
+    
+    # 承認履歴追加
+    ApprovalHistory.objects.create(
+        invoice=invoice,
+        user=request.user,
+        action='returned',
+        comment=comment
+    )
+    
+    # コメント追加
+    InvoiceComment.objects.create(
+        invoice=invoice,
+        user=request.user,
+        comment_type='approval',
+        comment=f'差し戻し理由: {comment}',
+        is_private=False
+    )
+    
+    messages.success(request, f'請求書 {invoice.invoice_number} を差し戻しました。')
+    return JsonResponse({'success': True})
+
+
+@login_required
+def add_comment(request, invoice_id):
+    """コメント追加"""
+    if request.method != 'POST':
+        return JsonResponse({'error': '無効なリクエストです'}, status=400)
+    
+    invoice = get_object_or_404(Invoice, id=invoice_id)
+    
+    # アクセス権限チェック
+    if request.user.user_type == 'customer':
+        if invoice.customer_company != request.user.customer_company:
+            return JsonResponse({'error': 'アクセス権限がありません'}, status=403)
+    else:
+        if invoice.receiving_company != request.user.company:
+            return JsonResponse({'error': 'アクセス権限がありません'}, status=403)
+    
+    comment_text = request.POST.get('comment', '').strip()
+    comment_type = request.POST.get('comment_type', 'general')
+    is_private = request.POST.get('is_private') == 'on'
+    
+    if not comment_text:
+        return JsonResponse({'error': 'コメントを入力してください'}, status=400)
+    
+    # コメント追加
+    comment = InvoiceComment.objects.create(
+        invoice=invoice,
+        user=request.user,
+        comment_type=comment_type,
+        comment=comment_text,
+        is_private=is_private
+    )
+    
+    messages.success(request, 'コメントを追加しました。')
+    return JsonResponse({
+        'success': True,
+        'comment': {
+            'user': request.user.get_full_name() or request.user.username,
+            'comment_type': comment.get_comment_type_display(),
+            'comment': comment.comment,
+            'timestamp': comment.timestamp.strftime('%Y/%m/%d %H:%M'),
+            'is_private': comment.is_private
+        }
+    })
+
+
+@login_required
+def invoice_detail(request, invoice_id):
+    """請求書詳細表示（更新版）"""
+    invoice = get_object_or_404(Invoice, id=invoice_id)
+    
+    # アクセス権限チェック
+    if request.user.user_type == 'customer':
+        if invoice.customer_company != request.user.customer_company:
+            messages.error(request, 'アクセス権限がありません。')
+            return redirect('invoice_list')
+    else:
+        if invoice.receiving_company != request.user.company:
+            messages.error(request, 'アクセス権限がありません。')
+            return redirect('invoice_list')
+    
+    # コメント取得（プライベートコメントの表示制御）
+    if request.user.user_type == 'internal':
+        comments = invoice.comments.all()
+    else:
+        comments = invoice.comments.filter(is_private=False)
+    
+    # 承認履歴取得
+    approval_history = invoice.approval_histories.all()
+    
+    context = {
+        'invoice': invoice,
+        'comments': comments,
+        'approval_history': approval_history,
+        'can_approve': (
+            request.user.user_type == 'internal' and 
+            invoice.status in ['submitted', 'pending_approval']
+        )
+    }
+    return render(request, 'invoices/invoice_detail.html', context)

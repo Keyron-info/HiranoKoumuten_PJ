@@ -1,0 +1,534 @@
+{% extends 'invoices/base.html' %}
+
+{% block title %}請求書詳細 - {{ invoice.invoice_number }} - KEYRON BIM{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <!-- 戻るボタン -->
+        <div class="mb-3">
+            <a href="{% url 'invoice_list' %}" class="btn btn-outline-primary">
+                <i class="fas fa-arrow-left"></i> 一覧に戻る
+            </a>
+        </div>
+
+        <!-- 請求書情報カード -->
+        <div class="card">
+            <div class="card-header">
+                <h4>
+                    <i class="fas fa-file-invoice"></i>
+                    請求書詳細: {{ invoice.invoice_number }}
+                </h4>
+                <div class="badge bg-{{ invoice.status|yesno:'success,warning,secondary' }} fs-6">
+                    {{ invoice.get_status_display }}
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <!-- 基本情報 -->
+                    <div class="col-md-6">
+                        <h5><i class="fas fa-info-circle"></i> 基本情報</h5>
+                        <table class="table table-borderless">
+                            <tr>
+                                <th width="40%">請求書番号:</th>
+                                <td>{{ invoice.invoice_number }}</td>
+                            </tr>
+                            <tr>
+                                <th>管理番号:</th>
+                                <td>{{ invoice.unique_number }}</td>
+                            </tr>
+                            <tr>
+                                <th>請求元会社:</th>
+                                <td>{{ invoice.customer_company.name }}</td>
+                            </tr>
+                            <tr>
+                                <th>請求先会社:</th>
+                                <td>{{ invoice.receiving_company.name }}</td>
+                            </tr>
+                            <tr>
+                                <th>ステータス:</th>
+                                <td>
+                                    <span class="badge bg-{{ invoice.status|yesno:'success,warning,secondary' }}">
+                                        {{ invoice.get_status_display }}
+                                    </span>
+                                </td>
+                            </tr>
+                        </table>
+                    </div>
+
+                    <!-- 金額・日付情報 -->
+                    <div class="col-md-6">
+                        <h5><i class="fas fa-yen-sign"></i> 金額・日付</h5>
+                        <table class="table table-borderless">
+                            <tr>
+                                <th width="40%">請求金額:</th>
+                                <td class="text-end">
+                                    <span class="h5 text-primary">{{ invoice.amount|floatformat:0 }}円</span>
+                                </td>
+                            </tr>
+                            <tr>
+                                <th>税額:</th>
+                                <td class="text-end">{{ invoice.tax_amount|floatformat:0 }}円</td>
+                            </tr>
+                            <tr>
+                                <th>発行日:</th>
+                                <td>{{ invoice.issue_date }}</td>
+                            </tr>
+                            <tr>
+                                <th>支払期日:</th>
+                                <td class="text-danger">{{ invoice.due_date }}</td>
+                            </tr>
+                            <tr>
+                                <th>作成日時:</th>
+                                <td>{{ invoice.created_at|date:"Y年m月d日 H:i" }}</td>
+                            </tr>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- プロジェクト情報 -->
+                {% if invoice.project_name or invoice.project_code or invoice.department_code %}
+                <hr>
+                <div class="row">
+                    <div class="col-12">
+                        <h5><i class="fas fa-project-diagram"></i> プロジェクト情報</h5>
+                        <table class="table table-borderless">
+                            {% if invoice.project_name %}
+                            <tr>
+                                <th width="20%">工事名:</th>
+                                <td>{{ invoice.project_name }}</td>
+                            </tr>
+                            {% endif %}
+                            {% if invoice.project_code %}
+                            <tr>
+                                <th>工事コード:</th>
+                                <td>{{ invoice.project_code }}</td>
+                            </tr>
+                            {% endif %}
+                            {% if invoice.department_code %}
+                            <tr>
+                                <th>部門コード:</th>
+                                <td>{{ invoice.department_code }}</td>
+                            </tr>
+                            {% endif %}
+                        </table>
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- ファイル表示 -->
+                {% if invoice.file %}
+                <hr>
+                <div class="row">
+                    <div class="col-12">
+                        <h5><i class="fas fa-file"></i> 添付ファイル</h5>
+                        <div class="d-flex align-items-center gap-3">
+                            <a href="{{ invoice.file.url }}" class="btn btn-outline-primary" target="_blank">
+                                <i class="fas fa-download"></i> ファイルを開く
+                            </a>
+                            <small class="text-muted">
+                                ファイル名: {{ invoice.file.name|truncatechars:50 }}
+                            </small>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- アクションボタン -->
+                <hr>
+                <div class="row">
+                    <div class="col-12">
+                        <div class="d-flex gap-2 flex-wrap">
+                            {% if invoice.status == 'submitted' and user.user_type == 'internal' %}
+                                <button class="btn btn-success" onclick="approveInvoice({{ invoice.id }})">
+                                    <i class="fas fa-check"></i> 承認
+                                </button>
+                                <button class="btn btn-warning" data-bs-toggle="modal" data-bs-target="#returnModal">
+                                    <i class="fas fa-undo"></i> 差し戻し
+                                </button>
+                                <button class="btn btn-danger" data-bs-toggle="modal" data-bs-target="#rejectModal">
+                                    <i class="fas fa-times"></i> 却下
+                                </button>
+                            {% endif %}
+                            
+                            <button class="btn btn-info" data-bs-toggle="modal" data-bs-target="#commentModal">
+                                <i class="fas fa-comment"></i> コメント追加
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 承認履歴 -->
+        {% if approval_history %}
+        <div class="card mt-4">
+            <div class="card-header">
+                <h5><i class="fas fa-history"></i> 承認履歴</h5>
+            </div>
+            <div class="card-body">
+                <div class="timeline">
+                    {% for history in approval_history %}
+                    <div class="timeline-item">
+                        <div class="timeline-marker 
+                            {% if history.action == 'approved' %}bg-success
+                            {% elif history.action == 'rejected' %}bg-danger
+                            {% elif history.action == 'returned' %}bg-warning
+                            {% elif history.action == 'submitted' %}bg-primary
+                            {% else %}bg-secondary{% endif %}">
+                            {% if history.action == 'approved' %}
+                                <i class="fas fa-check"></i>
+                            {% elif history.action == 'rejected' %}
+                                <i class="fas fa-times"></i>
+                            {% elif history.action == 'returned' %}
+                                <i class="fas fa-undo"></i>
+                            {% elif history.action == 'submitted' %}
+                                <i class="fas fa-paper-plane"></i>
+                            {% else %}
+                                <i class="fas fa-comment"></i>
+                            {% endif %}
+                        </div>
+                        <div class="timeline-content">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div>
+                                    <h6 class="mb-1">
+                                        <span class="badge 
+                                            {% if history.action == 'approved' %}bg-success
+                                            {% elif history.action == 'rejected' %}bg-danger
+                                            {% elif history.action == 'returned' %}bg-warning
+                                            {% elif history.action == 'submitted' %}bg-primary
+                                            {% else %}bg-secondary{% endif %}">
+                                            {{ history.get_action_display }}
+                                        </span>
+                                    </h6>
+                                    <p class="mb-1">
+                                        <strong>{{ history.user.get_full_name|default:history.user.username }}</strong>
+                                        {% if history.user.position %}
+                                            <small class="text-muted">({{ history.user.get_position_display }})</small>
+                                        {% endif %}
+                                    </p>
+                                    {% if history.comment %}
+                                    <p class="mb-0 text-muted">{{ history.comment }}</p>
+                                    {% endif %}
+                                </div>
+                                <small class="text-muted">{{ history.timestamp|date:"Y/m/d H:i" }}</small>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- コメント履歴 -->
+        {% if invoice.comments.all %}
+        <div class="card mt-4">
+            <div class="card-header">
+                <h5><i class="fas fa-comments"></i> コメント履歴</h5>
+            </div>
+            <div class="card-body">
+                {% for comment in invoice.comments.all %}
+                <div class="border-bottom pb-3 mb-3">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <strong>{{ comment.user.get_full_name|default:comment.user.username }}</strong>
+                            <span class="badge bg-secondary ms-2">{{ comment.get_comment_type_display }}</span>
+                        </div>
+                        <small class="text-muted">{{ comment.timestamp|date:"Y/m/d H:i" }}</small>
+                    </div>
+                    <p class="mt-2 mb-0">{{ comment.comment|linebreaks }}</p>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- コメント追加モーダル -->
+<div class="modal fade" id="commentModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">コメント追加</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="commentForm">
+                <div class="modal-body">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label for="comment_type" class="form-label">コメント種別</label>
+                        <select class="form-select" id="comment_type" name="comment_type">
+                            <option value="general">一般コメント</option>
+                            <option value="approval">承認関連</option>
+                            <option value="payment">支払い関連</option>
+                            <option value="correction">修正依頼</option>
+                            <option value="internal_memo">内部メモ</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="comment_text" class="form-label">コメント</label>
+                        <textarea class="form-control" id="comment_text" name="comment" rows="4" required></textarea>
+                    </div>
+                    {% if user.user_type == 'internal' %}
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="is_private" name="is_private">
+                        <label class="form-check-label" for="is_private">
+                            社内限定コメント
+                        </label>
+                    </div>
+                    {% endif %}
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">キャンセル</button>
+                    <button type="submit" class="btn btn-primary">コメント追加</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- 差し戻しモーダル -->
+<div class="modal fade" id="returnModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">請求書差し戻し</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="returnForm">
+                <div class="modal-body">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label for="return_comment" class="form-label">差し戻し理由（必須）</label>
+                        <textarea class="form-control" id="return_comment" name="comment" rows="4" required placeholder="差し戻しの理由を詳しく記入してください"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">キャンセル</button>
+                    <button type="submit" class="btn btn-warning">差し戻し</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- 却下モーダル -->
+<div class="modal fade" id="rejectModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">請求書却下</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form id="rejectForm">
+                <div class="modal-body">
+                    {% csrf_token %}
+                    <div class="alert alert-danger">
+                        <strong>注意:</strong> 却下した請求書は再承認できません。
+                    </div>
+                    <div class="mb-3">
+                        <label for="reject_comment" class="form-label">却下理由（必須）</label>
+                        <textarea class="form-control" id="reject_comment" name="comment" rows="4" required placeholder="却下の理由を詳しく記入してください"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">キャンセル</button>
+                    <button type="submit" class="btn btn-danger">却下</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<style>
+/* タイムライン用CSS */
+.timeline {
+    position: relative;
+    padding-left: 30px;
+}
+
+.timeline::before {
+    content: '';
+    position: absolute;
+    left: 15px;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: #e9ecef;
+}
+
+.timeline-item {
+    position: relative;
+    margin-bottom: 30px;
+}
+
+.timeline-marker {
+    position: absolute;
+    left: -22px;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 12px;
+    border: 3px solid white;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.timeline-content {
+    background: #f8f9fa;
+    padding: 15px;
+    border-radius: 8px;
+    border-left: 4px solid #dee2e6;
+    margin-left: 15px;
+}
+
+.timeline-item:last-child {
+    margin-bottom: 0;
+}
+</style>
+
+<script>
+// CSRF token取得
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+// 承認処理
+function approveInvoice(invoiceId) {
+    if (!confirm('この請求書を承認しますか？')) {
+        return;
+    }
+    
+    fetch(`/invoices/approve/${invoiceId}/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': getCookie('csrftoken'),
+            'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: 'comment='
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            location.reload();
+        } else {
+            alert(data.error || 'エラーが発生しました');
+        }
+    })
+    .catch(error => {
+        alert('エラーが発生しました: ' + error);
+    });
+}
+
+// ページ読み込み完了後にイベントリスナーを設定
+document.addEventListener('DOMContentLoaded', function() {
+    // コメント追加フォーム
+    const commentForm = document.getElementById('commentForm');
+    if (commentForm) {
+        commentForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData(this);
+            const invoiceId = {{ invoice.id }};
+            
+            fetch(`/invoices/comment/${invoiceId}/`, {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCookie('csrftoken'),
+                },
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    location.reload();
+                } else {
+                    alert(data.error || 'エラーが発生しました');
+                }
+            })
+            .catch(error => {
+                alert('エラーが発生しました: ' + error);
+            });
+        });
+    }
+
+    // 差し戻しフォーム
+    const returnForm = document.getElementById('returnForm');
+    if (returnForm) {
+        returnForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData(this);
+            const invoiceId = {{ invoice.id }};
+            
+            fetch(`/invoices/return/${invoiceId}/`, {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCookie('csrftoken'),
+                },
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    location.reload();
+                } else {
+                    alert(data.error || 'エラーが発生しました');
+                }
+            })
+            .catch(error => {
+                alert('エラーが発生しました: ' + error);
+            });
+        });
+    }
+
+    // 却下フォーム
+    const rejectForm = document.getElementById('rejectForm');
+    if (rejectForm) {
+        rejectForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData(this);
+            const invoiceId = {{ invoice.id }};
+            
+            fetch(`/invoices/reject/${invoiceId}/`, {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCookie('csrftoken'),
+                },
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    location.reload();
+                } else {
+                    alert(data.error || 'エラーが発生しました');
+                }
+            })
+            .catch(error => {
+                alert('エラーが発生しました: ' + error);
+            });
+        });
+    }
+});
+</script>
+{% endblock %}

@@ -215,13 +215,39 @@
                 padding: 1rem 0;
             }
         }
+        /* ナビゲーション強化 */
+        .navbar-nav .nav-link.active {
+            background-color: rgba(37, 99, 235, 0.1);
+            color: var(--primary-color) !important;
+            border-radius: 0.5rem;
+        }
+
+        .dropdown-menu {
+            border: none;
+            box-shadow: var(--card-shadow);
+            border-radius: 0.5rem;
+        }
+
+        .dropdown-item {
+            padding: 0.75rem 1rem;
+            transition: all 0.3s ease;
+        }
+
+        .dropdown-item:hover {
+            background-color: rgba(37, 99, 235, 0.1);
+            color: var(--primary-color);
+        }
+
+        .dropdown-divider {
+            margin: 0.5rem 0;
+        }
     </style>
 </head>
 <body>
-    <!-- Navigation -->
+   <!-- Navigation -->
     <nav class="navbar navbar-expand-lg navbar-light">
         <div class="container">
-            <a class="navbar-brand" href="{% url 'invoice_list' %}">
+            <a class="navbar-brand" href="{% url 'dashboard' %}">
                 <i class="fas fa-receipt"></i>
                 KEYRON BIM
             </a>
@@ -230,18 +256,36 @@
             </button>
             <div class="collapse navbar-collapse" id="navbarNav">
                 <div class="navbar-nav ms-auto">
-                    <a class="nav-link" href="{% url 'invoice_list' %}">
+                    <a class="nav-link {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}" 
+                       href="{% url 'dashboard' %}">
+                        <i class="fas fa-chart-line"></i>
+                        ダッシュボード
+                    </a>
+                    <a class="nav-link {% if request.resolver_match.url_name == 'invoice_list' %}active{% endif %}" 
+                       href="{% url 'invoice_list' %}">
                         <i class="fas fa-list"></i>
                         請求書一覧
                     </a>
-                    <a class="nav-link" href="{% url 'upload_invoice' %}">
+                    <a class="nav-link {% if request.resolver_match.url_name == 'upload_invoice' %}active{% endif %}" 
+                       href="{% url 'upload_invoice' %}">
                         <i class="fas fa-upload"></i>
                         アップロード
                     </a>
-                    <a class="nav-link" href="/admin/">
-                        <i class="fas fa-cog"></i>
-                        管理画面
-                    </a>
+                    <div class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">
+                            <i class="fas fa-user"></i>
+                            {{ user.get_full_name|default:user.username }}
+                        </a>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="/admin/">
+                                <i class="fas fa-cog"></i> 管理画面
+                            </a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="{% url 'admin:logout' %}">
+                                <i class="fas fa-sign-out-alt"></i> ログアウト
+                            </a></li>
+                        </ul>
+                    </div>
                 </div>
             </div>
         </div>

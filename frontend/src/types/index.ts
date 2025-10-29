@@ -116,6 +116,7 @@ export interface DashboardStats {
   total_invoices: number;
   pending_approval: number;
   approved: number;
+  rejected: number;  // ← 追加
   paid: number;
   total_amount: number;
 }

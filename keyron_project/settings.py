@@ -144,6 +144,14 @@ MEDIA_ROOT = BASE_DIR / 'media'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
+# Custom User Model
+AUTH_USER_MODEL = 'invoices.User'
+
+# 認証バックエンド
+AUTHENTICATION_BACKENDS = [
+    'invoices.backends.CustomAuthBackend',  # カスタムバックエンド
+    'django.contrib.auth.backends.ModelBackend',  # フォールバック
+]
 
 # Custom User Model
 AUTH_USER_MODEL = 'invoices.User'
@@ -182,6 +190,7 @@ SIMPLE_JWT = {
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",  # React開発サーバー
     "http://127.0.0.1:3000",
+    "http://localhost:3002",  # React開発サーバー (別ポート)
+    "http://127.0.0.1:3002",
 ]
-
 CORS_ALLOW_CREDENTIALS = True

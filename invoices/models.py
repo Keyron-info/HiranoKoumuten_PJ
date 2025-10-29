@@ -2,10 +2,39 @@
 
 import uuid
 from django.db import models
-from django.contrib.auth.models import AbstractUser
+from django.contrib.auth.models import AbstractUser, BaseUserManager
 from django.core.validators import MinValueValidator
 from django.utils import timezone
 from decimal import Decimal
+
+
+class UserManager(BaseUserManager):
+    """カスタムユーザーマネージャー"""
+    
+    def create_user(self, username, email=None, password=None, **extra_fields):
+        """通常ユーザーを作成"""
+        if not username:
+            raise ValueError('ユーザー名は必須です')
+        
+        email = self.normalize_email(email) if email else None
+        user = self.model(username=username, email=email, **extra_fields)
+        user.set_password(password)  # パスワードをハッシュ化
+        user.save(using=self._db)
+        return user
+    
+    def create_superuser(self, username, email=None, password=None, **extra_fields):
+        """スーパーユーザーを作成"""
+        extra_fields.setdefault('is_staff', True)
+        extra_fields.setdefault('is_superuser', True)
+        extra_fields.setdefault('is_active', True)
+        extra_fields.setdefault('user_type', 'internal')
+        
+        if extra_fields.get('is_staff') is not True:
+            raise ValueError('スーパーユーザーはis_staff=Trueである必要があります')
+        if extra_fields.get('is_superuser') is not True:
+            raise ValueError('スーパーユーザーはis_superuser=Trueである必要があります')
+        
+        return self.create_user(username, email, password, **extra_fields)
 
 
 class Company(models.Model):
@@ -144,6 +173,11 @@ class User(AbstractUser):
     is_active_user = models.BooleanField(default=True, verbose_name="アクティブ")
     last_login_ip = models.GenericIPAddressField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
+    
+    objects = UserManager()
+    
+    USERNAME_FIELD = 'username'
+    REQUIRED_FIELDS = ['email']
     
     class Meta:
         verbose_name = "ユーザー"

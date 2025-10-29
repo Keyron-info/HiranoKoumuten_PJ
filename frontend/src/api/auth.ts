@@ -20,25 +20,24 @@ export const authAPI = {
       username: data.username,
       email: data.email,
       password: data.password,
+      password_confirm: data.password_confirm,
       first_name: data.first_name,
       last_name: data.last_name,
-      company_name: data.company_name,
-      phone_number: data.phone_number,
-      user_type: 'customer', // 顧客ユーザーとして登録
-      role: 'partner',
+      user_type: 'customer',
+      phone: data.phone_number,
     });
     return response.data;
   },
 
   // プロフィール取得
   getProfile: async (): Promise<User> => {
-    const response = await apiClient.get<User>('/auth/profile/');
+    const response = await apiClient.get<User>('/users/me/');
     return response.data;
   },
 
   // プロフィール更新
   updateProfile: async (data: Partial<User>): Promise<User> => {
-    const response = await apiClient.patch<User>('/auth/profile/', data);
+    const response = await apiClient.patch<User>('/users/update_profile/', data);
     return response.data;
   },
 
@@ -62,7 +61,7 @@ export const authAPI = {
       throw new Error('No refresh token available');
     }
     
-    const response = await apiClient.post<{ access: string }>('/auth/token/refresh/', {
+    const response = await apiClient.post<{ access: string }>('/auth/refresh/', {
       refresh: refreshToken,
     });
     

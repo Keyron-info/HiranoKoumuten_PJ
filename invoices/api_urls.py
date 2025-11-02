@@ -8,6 +8,7 @@ from .api_views import (
     UserProfileViewSet,
     CustomerCompanyViewSet,
     CompanyViewSet,
+    ConstructionSiteViewSet,
     InvoiceViewSet,
     DashboardViewSet,
 )
@@ -15,6 +16,7 @@ from .api_views import (
 router = DefaultRouter()
 router.register(r'customer-companies', CustomerCompanyViewSet, basename='customer-company')
 router.register(r'companies', CompanyViewSet, basename='company')
+router.register(r'construction-sites', ConstructionSiteViewSet, basename='construction-site')
 router.register(r'invoices', InvoiceViewSet, basename='invoice')
 router.register(r'dashboard', DashboardViewSet, basename='dashboard')
 router.register(r'users', UserProfileViewSet, basename='user')

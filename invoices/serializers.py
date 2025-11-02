@@ -5,7 +5,7 @@ from django.contrib.auth import get_user_model
 from .models import (
     Company, Department, CustomerCompany, User,
     Invoice, ApprovalRoute, ApprovalStep,
-    ApprovalHistory, InvoiceComment
+    ApprovalHistory, InvoiceComment, ConstructionSite, InvoiceItem
 )
 
 User = get_user_model()
@@ -131,9 +131,85 @@ class ApprovalHistorySerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'user', 'timestamp']
 
 
+class ConstructionSiteSerializer(serializers.ModelSerializer):
+    """工事現場シリアライザー"""
+    company_name = serializers.CharField(source='company.name', read_only=True)
+    
+    class Meta:
+        model = ConstructionSite
+        fields = ['id', 'name', 'location', 'company', 'company_name', 'is_active', 'created_at']
+        read_only_fields = ['id', 'created_at']
+
+
+class InvoiceItemSerializer(serializers.ModelSerializer):
+    """請求明細シリアライザー"""
+    
+    class Meta:
+        model = InvoiceItem
+        fields = [
+            'id', 'item_number', 'description', 
+            'quantity', 'unit', 'unit_price', 'amount'
+        ]
+        read_only_fields = ['id', 'amount']
+
+
+class InvoiceCreateSerializer(serializers.ModelSerializer):
+    """請求書作成用シリアライザー"""
+    items = InvoiceItemSerializer(many=True)
+    
+    class Meta:
+        model = Invoice
+        fields = [
+            'construction_site', 'project_name', 'invoice_date',
+            'payment_due_date', 'notes', 'items'
+        ]
+    
+    def create(self, validated_data):
+        items_data = validated_data.pop('items')
+        
+        # リクエストユーザーの情報を取得
+        user = self.context['request'].user
+        
+        # デバッグログ
+        print(f"=== デバッグ ===")
+        print(f"User: {user.username}")
+        print(f"User type: {user.user_type}")
+        print(f"Customer company: {user.customer_company}")
+        print(f"===============")
+        
+        # created_byを設定
+        validated_data['created_by'] = user
+        
+        # customer_companyを自動設定（協力会社ユーザーの場合）
+        if user.user_type == 'customer' and user.customer_company:
+            validated_data['customer_company'] = user.customer_company
+            print(f"✅ customer_company設定: {user.customer_company.name}")
+        
+        # receiving_company を自動設定（最初の Company を使用）
+        from .models import Company
+        receiving_company = Company.objects.first()
+        if receiving_company:
+            validated_data['receiving_company'] = receiving_company
+            print(f"✅ receiving_company設定: {receiving_company.name}")
+        
+        # invoiceを作成
+        invoice = Invoice.objects.create(**validated_data)
+        
+        # 明細を作成
+        for item_data in items_data:
+            InvoiceItem.objects.create(invoice=invoice, **item_data)
+        
+        # 金額計算
+        invoice.calculate_totals()
+        
+        return invoice
+
+
 class InvoiceSerializer(serializers.ModelSerializer):
+    """請求書詳細シリアライザー"""
+    items = InvoiceItemSerializer(many=True, read_only=True)
     customer_company_name = serializers.CharField(source='customer_company.name', read_only=True)
-    receiving_company_name = serializers.CharField(source='receiving_company.name', read_only=True)
+    construction_site_name = serializers.CharField(source='construction_site.name', read_only=True)
     status_display = serializers.CharField(source='get_status_display', read_only=True)
     created_by_name = serializers.CharField(source='created_by.get_full_name', read_only=True)
     comments = InvoiceCommentSerializer(many=True, read_only=True)
@@ -142,31 +218,18 @@ class InvoiceSerializer(serializers.ModelSerializer):
     class Meta:
         model = Invoice
         fields = [
-            'id', 'invoice_number', 'unique_url', 'unique_number',
+            'id', 'invoice_number', 
             'customer_company', 'customer_company_name',
-            'receiving_company', 'receiving_company_name',
-            'amount', 'tax_amount', 'issue_date', 'due_date',
-            'project_name', 'project_code', 'department_code',
-            'file', 'status', 'status_display',
-            'approval_route', 'current_approval_step',
-            'created_by', 'created_by_name', 'created_at', 'updated_at',
+            'construction_site', 'construction_site_name',
+            'project_name', 'invoice_date', 'payment_due_date',
+            'status', 'status_display',
+            'subtotal', 'tax_amount', 'total_amount',
+            'notes', 'items',
+            'created_by', 'created_by_name',
+            'created_at', 'updated_at',
             'comments', 'approval_histories'
         ]
-        read_only_fields = ['id', 'unique_url', 'unique_number', 'created_by', 'created_at', 'updated_at']
-
-
-class InvoiceCreateSerializer(serializers.ModelSerializer):
-    """請求書作成用（顧客向け）"""
-    
-    class Meta:
-        model = Invoice
-        fields = [
-            'invoice_number', 'customer_company', 'receiving_company',
-            'amount', 'tax_amount', 'issue_date', 'due_date',
-            'project_name', 'project_code', 'department_code', 'file'
+        read_only_fields = [
+            'id', 'invoice_number', 'subtotal', 'tax_amount', 'total_amount',
+            'created_by', 'created_at', 'updated_at'
         ]
-    
-    def create(self, validated_data):
-        validated_data['created_by'] = self.context['request'].user
-        validated_data['status'] = 'submitted'
-        return super().create(validated_data)

@@ -4,13 +4,12 @@ from rest_framework import viewsets, status, permissions
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
-from rest_framework_simplejwt.views import TokenObtainPairView
 from django.shortcuts import get_object_or_404
-from django.db.models import Q
+from django.db.models import Q, Sum
 
 from .models import (
-    Company, Department, CustomerCompany, User,
-    Invoice, ApprovalRoute, ApprovalStep,
+    Company, Department, CustomerCompany, User, ConstructionSite,
+    Invoice, InvoiceItem, ApprovalRoute, ApprovalStep,
     ApprovalHistory, InvoiceComment
 )
 from .serializers import (
@@ -18,12 +17,13 @@ from .serializers import (
     UserSerializer, UserRegistrationSerializer,
     InvoiceSerializer, InvoiceCreateSerializer,
     ApprovalRouteSerializer, ApprovalStepSerializer,
-    ApprovalHistorySerializer, InvoiceCommentSerializer
+    ApprovalHistorySerializer, InvoiceCommentSerializer,
+    ConstructionSiteSerializer
 )
 
 
 class IsCustomerUser(permissions.BasePermission):
-    """顧客ユーザーかどうかをチェック"""
+    """顧客ユーザー(協力会社)かどうかをチェック"""
     def has_permission(self, request, view):
         return request.user.is_authenticated and request.user.user_type == 'customer'
 
@@ -58,7 +58,7 @@ class UserProfileViewSet(viewsets.GenericViewSet):
     
     @action(detail=False, methods=['get'])
     def me(self, request):
-        """自分のプロフィール取得"""
+        """現在のユーザー情報を取得"""
         serializer = self.get_serializer(request.user)
         return Response(serializer.data)
     
@@ -72,35 +72,41 @@ class UserProfileViewSet(viewsets.GenericViewSet):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
-class CustomerCompanyViewSet(viewsets.ReadOnlyModelViewSet):
-    """顧客会社一覧API"""
-    queryset = CustomerCompany.objects.filter(is_active=True)
+class CustomerCompanyViewSet(viewsets.ModelViewSet):
+    """顧客会社API"""
+    queryset = CustomerCompany.objects.all()
     serializer_class = CustomerCompanySerializer
     permission_classes = [IsAuthenticated]
 
 
-class CompanyViewSet(viewsets.ReadOnlyModelViewSet):
-    """会社一覧API"""
-    queryset = Company.objects.filter(is_active=True)
+class CompanyViewSet(viewsets.ModelViewSet):
+    """会社API"""
+    queryset = Company.objects.all()
     serializer_class = CompanySerializer
     permission_classes = [IsAuthenticated]
 
 
-class InvoiceViewSet(viewsets.ModelViewSet):
-    """請求書API"""
-    serializer_class = InvoiceSerializer
+class ConstructionSiteViewSet(viewsets.ModelViewSet):
+    """工事現場API"""
+    queryset = ConstructionSite.objects.filter(is_active=True)
+    serializer_class = ConstructionSiteSerializer
     permission_classes = [IsAuthenticated]
     
     def get_queryset(self):
-        """ユーザータイプに応じて請求書をフィルタリング"""
+        """ユーザーに応じた工事現場を返す"""
         user = self.request.user
+        queryset = ConstructionSite.objects.filter(is_active=True)
         
-        if user.user_type == 'customer':
-            # 顧客ユーザーは自社の請求書のみ
-            return Invoice.objects.filter(customer_company=user.customer_company)
-        else:
-            # 社内ユーザーは自社宛の請求書のみ
-            return Invoice.objects.filter(receiving_company=user.company)
+        # 必要に応じてフィルタリング
+        # if user.user_type == 'customer':
+        #     queryset = queryset.filter(company=user.company)
+        
+        return queryset
+
+
+class InvoiceViewSet(viewsets.ModelViewSet):
+    """請求書API"""
+    permission_classes = [IsAuthenticated]
     
     def get_serializer_class(self):
         """作成時は専用シリアライザーを使用"""
@@ -108,32 +114,81 @@ class InvoiceViewSet(viewsets.ModelViewSet):
             return InvoiceCreateSerializer
         return InvoiceSerializer
     
-    @action(detail=False, methods=['get'])
-    def my_invoices(self, request):
-        """自分の請求書一覧"""
-        invoices = self.get_queryset()
+    def get_queryset(self):
+        """ユーザーに応じた請求書を返す"""
+        user = self.request.user
         
-        # ステータスでフィルタリング
-        status_filter = request.query_params.get('status')
-        if status_filter:
+        if user.user_type == 'customer':
+            # 協力会社は自社の請求書のみ
+            invoices = Invoice.objects.filter(customer_company=user.customer_company)
+        else:
+            # 社内ユーザーは全ての請求書
+            invoices = Invoice.objects.filter(receiving_company=user.company)
+        
+        # ステータスフィルター
+        status_filter = self.request.query_params.get('status')
+        if status_filter and status_filter != 'all':
             invoices = invoices.filter(status=status_filter)
         
         # 検索
-        search = request.query_params.get('search')
+        search = self.request.query_params.get('search')
         if search:
             invoices = invoices.filter(
                 Q(invoice_number__icontains=search) |
                 Q(project_name__icontains=search) |
-                Q(unique_number__icontains=search)
+                Q(construction_site_name__icontains=search)
             )
         
-        page = self.paginate_queryset(invoices)
-        if page is not None:
-            serializer = self.get_serializer(page, many=True)
-            return self.get_paginated_response(serializer.data)
+        return invoices.order_by('-created_at')
+    
+    def create(self, request, *args, **kwargs):
+        """請求書作成"""
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
         
-        serializer = self.get_serializer(invoices, many=True)
-        return Response(serializer.data)
+        # シリアライザー内でcreated_by, customer_company, 金額計算が全て行われる
+        invoice = serializer.save()
+        
+        return Response(
+            InvoiceSerializer(invoice).data,
+            status=status.HTTP_201_CREATED
+        )
+    
+    @action(detail=True, methods=['post'])
+    def submit(self, request, pk=None):
+        """請求書を提出"""
+        invoice = self.get_object()
+        
+        # 下書き状態のみ提出可能
+        if invoice.status != 'draft':
+            return Response(
+                {'error': '下書き状態の請求書のみ提出できます'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # 協力会社ユーザーのみ実行可能
+        if request.user.user_type != 'customer':
+            return Response(
+                {'error': '協力会社ユーザーのみ実行できます'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        # ステータスを変更
+        invoice.status = 'submitted'
+        invoice.save()
+        
+        # 提出履歴を記録
+        ApprovalHistory.objects.create(
+            invoice=invoice,
+            user=request.user,
+            action='submitted',
+            comment='請求書を提出しました'
+        )
+        
+        return Response({
+            'message': '請求書を提出しました',
+            'invoice': InvoiceSerializer(invoice).data
+        })
     
     @action(detail=True, methods=['post'], permission_classes=[IsInternalUser])
     def approve(self, request, pk=None):
@@ -242,33 +297,79 @@ class InvoiceViewSet(viewsets.ModelViewSet):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
+# ============================================================
+# backend/invoices/api_views.py の DashboardViewSet を
+# 以下のコードで置き換えてください
+# ============================================================
+
 class DashboardViewSet(viewsets.GenericViewSet):
-    """ダッシュボードAPI"""
+    """ダッシュボードAPI - ユーザー種別対応版"""
     permission_classes = [IsAuthenticated]
     
     @action(detail=False, methods=['get'])
     def stats(self, request):
-        """統計情報取得"""
+        """
+        ユーザー種別に応じたダッシュボード統計を返す
+        
+        社内ユーザー: 全体統計
+        協力会社ユーザー: 自社の統計のみ
+        """
+        from django.utils import timezone
+        from datetime import timedelta
+        
         user = request.user
-        
-        if user.user_type == 'customer':
-            invoices = Invoice.objects.filter(customer_company=user.customer_company)
+        current_month = timezone.now().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        next_month = (current_month + timedelta(days=32)).replace(day=1)
+
+        if user.user_type == 'internal':
+            # 社内ユーザー向け統計
+            stats = {
+                'pending_invoices': Invoice.objects.filter(
+                    status__in=['submitted', 'in_approval']
+                ).count(),
+                
+                'pending_approvals': Invoice.objects.filter(
+                    status='in_approval',
+                    # current_approver=user  # 承認ルート実装時に有効化
+                ).count(),
+                
+                'monthly_payment': Invoice.objects.filter(
+                    payment_due_date__gte=current_month,
+                    payment_due_date__lt=next_month,
+                    status__in=['approved', 'paid']
+                ).aggregate(total=Sum('total_amount'))['total'] or 0,
+                
+                'partner_companies': CustomerCompany.objects.filter(
+                    is_active=True
+                ).count(),
+            }
         else:
-            invoices = Invoice.objects.filter(receiving_company=user.company)
-        
-        # 統計計算
-        total_count = invoices.count()
-        pending_count = invoices.filter(status='pending_approval').count()
-        approved_count = invoices.filter(status='approved').count()
-        total_amount = sum(invoice.amount for invoice in invoices)
-        
-        return Response({
-            'total_invoices': total_count,
-            'pending_approval': pending_count,
-            'approved_invoices': approved_count,
-            'total_amount': float(total_amount),
-            'recent_invoices': InvoiceSerializer(
-                invoices.order_by('-created_at')[:5], 
-                many=True
-            ).data
-        })
+            # 協力会社ユーザー向け統計
+            stats = {
+                'draft_count': Invoice.objects.filter(
+                    customer_company=user.customer_company,
+                    status='draft'
+                ).count(),
+                
+                'submitted_count': Invoice.objects.filter(
+                    customer_company=user.customer_company,
+                    status__in=['submitted', 'in_approval']
+                ).count(),
+                
+                'returned_count': Invoice.objects.filter(
+                    customer_company=user.customer_company,
+                    status='returned'
+                ).count(),
+                
+                'approved_count': Invoice.objects.filter(
+                    customer_company=user.customer_company,
+                    status='approved'
+                ).count(),
+                
+                'total_amount_pending': Invoice.objects.filter(
+                    customer_company=user.customer_company,
+                    status__in=['submitted', 'in_approval', 'approved']
+                ).aggregate(total=Sum('total_amount'))['total'] or 0,
+            }
+
+        return Response(stats, status=status.HTTP_200_OK)

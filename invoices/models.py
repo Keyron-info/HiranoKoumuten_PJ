@@ -240,6 +240,31 @@ class ApprovalStep(models.Model):
         return f"{self.route.name} - Step{self.step_order}: {self.step_name}"
 
 
+# =============================================
+# 🆕 追加: ConstructionSiteモデル
+# =============================================
+class ConstructionSite(models.Model):
+    """工事現場モデル"""
+    name = models.CharField(max_length=100, verbose_name="現場名")
+    location = models.TextField(verbose_name="所在地", blank=True)
+    company = models.ForeignKey(
+        Company,
+        on_delete=models.CASCADE,
+        related_name='construction_sites',
+        verbose_name="発注会社"
+    )
+    is_active = models.BooleanField(default=True, verbose_name="有効")
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="作成日時")
+    
+    class Meta:
+        verbose_name = "工事現場"
+        verbose_name_plural = "工事現場一覧"
+        ordering = ['-created_at']
+    
+    def __str__(self):
+        return f"{self.name}"
+
+
 class Invoice(models.Model):
     """請求書マスター"""
     STATUS_CHOICES = [
@@ -255,9 +280,9 @@ class Invoice(models.Model):
     ]
     
     # 基本情報
-    invoice_number = models.CharField(max_length=50, unique=True, verbose_name="請求書番号")
+    invoice_number = models.CharField(max_length=50, unique=True, verbose_name="請求書番号", blank=True)
     unique_url = models.UUIDField(default=uuid.uuid4, unique=True, verbose_name="固有URL")
-    unique_number = models.CharField(max_length=20, unique=True, verbose_name="管理番号")
+    unique_number = models.CharField(max_length=20, unique=True, verbose_name="管理番号", blank=True)
     
     # 関連会社
     customer_company = models.ForeignKey(
@@ -271,29 +296,67 @@ class Invoice(models.Model):
         verbose_name="請求先会社"
     )
     
+    # 🆕 追加: 工事現場
+    construction_site = models.ForeignKey(
+        ConstructionSite,
+        on_delete=models.CASCADE,
+        verbose_name="工事現場",
+        null=True,
+        blank=True
+    )
+    construction_site_name = models.CharField(
+        max_length=100,
+        verbose_name="工事現場名",
+        blank=True
+    )
+    
     # 金額・日付
     amount = models.DecimalField(
         max_digits=15,
         decimal_places=2,
         validators=[MinValueValidator(Decimal('0.01'))],
-        verbose_name="請求金額"
+        verbose_name="請求金額",
+        default=Decimal('0.00')
+    )
+    
+    # 🆕 追加: 小計・消費税・合計
+    subtotal = models.DecimalField(
+        max_digits=15,
+        decimal_places=0,
+        default=Decimal('0'),
+        verbose_name="小計"
     )
     tax_amount = models.DecimalField(
         max_digits=15,
-        decimal_places=2,
-        default=Decimal('0.00'),
-        verbose_name="税額"
+        decimal_places=0,
+        default=Decimal('0'),
+        verbose_name="消費税"
     )
-    issue_date = models.DateField(verbose_name="発行日")
-    due_date = models.DateField(verbose_name="支払期日")
+    total_amount = models.DecimalField(
+        max_digits=15,
+        decimal_places=0,
+        default=Decimal('0'),
+        verbose_name="合計金額"
+    )
+    
+    # 日付 (既存フィールド維持)
+    issue_date = models.DateField(verbose_name="発行日", null=True, blank=True)
+    due_date = models.DateField(verbose_name="支払期日", null=True, blank=True)
+    
+    # 🆕 追加: フロントエンド用日付フィールド (エイリアス用)
+    invoice_date = models.DateField(verbose_name="請求日", null=True, blank=True)
+    payment_due_date = models.DateField(verbose_name="支払予定日", null=True, blank=True)
     
     # プロジェクト情報
     project_name = models.CharField(max_length=100, verbose_name="工事名", blank=True)
     project_code = models.CharField(max_length=50, verbose_name="工事コード", blank=True)
     department_code = models.CharField(max_length=20, verbose_name="部門コード", blank=True)
     
+    # 🆕 追加: 備考
+    notes = models.TextField(verbose_name="備考", blank=True)
+    
     # ファイル
-    file = models.FileField(upload_to='invoices/', verbose_name="請求書ファイル")
+    file = models.FileField(upload_to='invoices/', verbose_name="請求書ファイル", blank=True)
     
     # ステータス・承認
     status = models.CharField(
@@ -335,14 +398,114 @@ class Invoice(models.Model):
     def __str__(self):
         return f"{self.invoice_number} - {self.customer_company.name}"
     
+    # 🆕 追加: 金額計算メソッド
+    def calculate_totals(self):
+        """小計・消費税・合計金額を計算"""
+        # 明細の合計を計算
+        self.subtotal = sum(int(item.amount) for item in self.items.all())
+        
+        # 消費税を計算 (10%)
+        self.tax_amount = int(self.subtotal * Decimal('0.1'))
+        
+        # 合計金額
+        self.total_amount = self.subtotal + self.tax_amount
+        
+        self.save()
+        return self.total_amount
+    
     def save(self, *args, **kwargs):
+        # 請求書番号の自動生成 (初回保存時のみ)
+        if not self.invoice_number:
+            import datetime
+            today = datetime.date.today()
+            year = today.year
+            
+            # 今年の最後の番号を取得
+            last_invoice = Invoice.objects.filter(
+                invoice_number__startswith=f'INV-{year}-'
+            ).order_by('-invoice_number').first()
+            
+            if last_invoice:
+                try:
+                    last_number = int(last_invoice.invoice_number.split('-')[-1])
+                    new_number = last_number + 1
+                except (ValueError, IndexError):
+                    new_number = 1
+            else:
+                new_number = 1
+            
+            self.invoice_number = f'INV-{year}-{new_number:04d}'
+        
+        # 管理番号の自動生成
         if not self.unique_number:
-            # 管理番号の自動生成（例: INV-2024-001）
             year = self.created_at.year if self.created_at else timezone.now().year
             last_number = Invoice.objects.filter(
                 unique_number__startswith=f'INV-{year}-'
             ).count()
             self.unique_number = f'INV-{year}-{str(last_number + 1).zfill(3)}'
+        
+        # construction_site_nameを自動設定
+        if self.construction_site and not self.construction_site_name:
+            self.construction_site_name = self.construction_site.name
+        
+        # 日付フィールドの同期 (どちらかが設定されていれば同期)
+        if self.invoice_date and not self.issue_date:
+            self.issue_date = self.invoice_date
+        elif self.issue_date and not self.invoice_date:
+            self.invoice_date = self.issue_date
+            
+        if self.payment_due_date and not self.due_date:
+            self.due_date = self.payment_due_date
+        elif self.due_date and not self.payment_due_date:
+            self.payment_due_date = self.due_date
+        
+        super().save(*args, **kwargs)
+
+
+# =============================================
+# 🆕 追加: InvoiceItemモデル
+# =============================================
+class InvoiceItem(models.Model):
+    """請求明細モデル"""
+    invoice = models.ForeignKey(
+        Invoice,
+        on_delete=models.CASCADE,
+        related_name='items',
+        verbose_name="請求書"
+    )
+    item_number = models.IntegerField(verbose_name="項番")
+    description = models.CharField(max_length=200, verbose_name="品名・摘要")
+    quantity = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        validators=[MinValueValidator(Decimal('0.01'))],
+        verbose_name="数量"
+    )
+    unit = models.CharField(max_length=20, default='式', verbose_name="単位")
+    unit_price = models.DecimalField(
+        max_digits=15,
+        decimal_places=0,
+        validators=[MinValueValidator(Decimal('0'))],
+        verbose_name="単価"
+    )
+    amount = models.DecimalField(
+        max_digits=15,
+        decimal_places=0,
+        default=Decimal('0'),
+        verbose_name="金額"
+    )
+    
+    class Meta:
+        verbose_name = "請求明細"
+        verbose_name_plural = "請求明細一覧"
+        ordering = ['item_number']
+    
+    def __str__(self):
+        return f"{self.invoice.invoice_number} - {self.item_number}: {self.description}"
+    
+    def save(self, *args, **kwargs):
+        """保存時に金額を自動計算"""
+        self.amount = int(self.quantity * self.unit_price)
         super().save(*args, **kwargs)
 
 

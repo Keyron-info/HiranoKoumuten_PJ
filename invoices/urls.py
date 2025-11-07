@@ -1,26 +1,36 @@
-# invoices/urls.py - 完全版（このファイル全体を置き換えてください）
+from django.shortcuts import render, redirect
+from django.http import HttpResponse
 
-from django.urls import path
-from . import views
+# --- 基本ページ ---
+def invoice_list(request):
+    return HttpResponse("請求書一覧ページ（invoice_list）")
 
-urlpatterns = [
-    # 基本的なページ
-    path('', views.invoice_list, name='invoice_list'),
-    path('dashboard/', views.dashboard, name='dashboard'),
-    path('upload/', views.upload_invoice, name='upload_invoice'),
-    
-    # 請求書詳細（IDベース）
-    path('detail/<int:invoice_id>/', views.invoice_detail, name='invoice_detail'),
-    
-    # 承認関連（IDベース）
-    path('approve/<int:invoice_id>/', views.approve_invoice, name='approve_invoice'),
-    path('reject/<int:invoice_id>/', views.reject_invoice, name='reject_invoice'),
-    path('return/<int:invoice_id>/', views.return_invoice, name='return_invoice'),
-    
-    # コメント追加（IDベース）
-    path('comment/<int:invoice_id>/', views.add_comment, name='add_comment'),
-    
-    # デバッグ用
-    path('debug/', views.debug_invoices, name='debug_invoices'),
-    path('debug/create-test/', views.create_test_data, name='create_test_data'),
-]
+def dashboard(request):
+    return HttpResponse("ダッシュボード（dashboard）")
+
+def upload_invoice(request):
+    return HttpResponse("請求書アップロード（upload_invoice）")
+
+# --- 詳細・承認系 ---
+def invoice_detail(request, invoice_id):
+    return HttpResponse(f"請求書詳細ページ ID={invoice_id}")
+
+def approve_invoice(request, invoice_id):
+    return HttpResponse(f"請求書 ID={invoice_id} を承認しました")
+
+def reject_invoice(request, invoice_id):
+    return HttpResponse(f"請求書 ID={invoice_id} を却下しました")
+
+def return_invoice(request, invoice_id):
+    return HttpResponse(f"請求書 ID={invoice_id} を差し戻しました")
+
+# --- コメント ---
+def add_comment(request, invoice_id):
+    return HttpResponse(f"請求書 ID={invoice_id} にコメントを追加しました")
+
+# --- デバッグ用 ---
+def debug_invoices(request):
+    return HttpResponse("デバッグ用請求書リスト（debug_invoices）")
+
+def create_test_data(request):
+    return HttpResponse("テストデータを作成しました（create_test_data）")

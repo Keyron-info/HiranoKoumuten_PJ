@@ -1,633 +1,661 @@
-# invoices/views.py - 完全統合版（改良版create_test_data含む）
+# invoices/api_views.py
 
-from django.http import HttpResponse, JsonResponse
-from django.shortcuts import render, redirect, get_object_or_404
-from django.contrib.auth.decorators import login_required
-from django.contrib import messages
-from django.core.paginator import Paginator
-from django.utils import timezone
-from django.db.models import Sum, Count, Q
-from datetime import timedelta
-import uuid
+from rest_framework import viewsets, status, permissions
+from rest_framework.decorators import action
+from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated, AllowAny
+from django.shortcuts import get_object_or_404
+from django.db.models import Q, Sum
+from django.core.mail import send_mail
+from django.conf import settings
 
-# モデルのインポート（存在しないものはコメントアウト）
-try:
-    from .models import Invoice, Company, CustomerCompany, ApprovalHistory, InvoiceComment
-except ImportError:
-    from .models import Invoice
-    # 他のモデルが存在しない場合のダミー
-    Company = None
-    CustomerCompany = None
-    ApprovalHistory = None
-    InvoiceComment = None
-
-# フォームのインポート（存在しない場合のダミー）
-try:
-    from .forms import InvoiceUploadForm
-except ImportError:
-    InvoiceUploadForm = None
+from .models import (
+    Company, Department, CustomerCompany, User, ConstructionSite,
+    Invoice, InvoiceItem, ApprovalRoute, ApprovalStep,
+    ApprovalHistory, InvoiceComment
+)
+from .serializers import (
+    CompanySerializer, DepartmentSerializer, CustomerCompanySerializer,
+    UserSerializer, UserRegistrationSerializer,
+    InvoiceSerializer, InvoiceListSerializer, InvoiceCreateSerializer,
+    ApprovalRouteSerializer, ApprovalStepSerializer,
+    ApprovalHistorySerializer, InvoiceCommentSerializer,
+    ConstructionSiteSerializer
+)
 
 
-def invoice_list(request):
-    """請求書一覧表示（ログイン不要版）"""
-    try:
-        # ユーザーがログインしているかチェック
-        if hasattr(request, 'user') and request.user.is_authenticated:
-            # ログインユーザーの場合の処理
-            if hasattr(request.user, 'user_type'):
-                if request.user.user_type == 'customer':
-                    invoices = Invoice.objects.filter(customer_company=request.user.customer_company)
-                else:
-                    invoices = Invoice.objects.filter(receiving_company=request.user.company)
-            else:
-                invoices = Invoice.objects.all()
+class IsCustomerUser(permissions.BasePermission):
+    """顧客ユーザー(協力会社)かどうかをチェック"""
+    def has_permission(self, request, view):
+        return request.user.is_authenticated and request.user.user_type == 'customer'
+
+
+class IsInternalUser(permissions.BasePermission):
+    """社内ユーザーかどうかをチェック"""
+    def has_permission(self, request, view):
+        return request.user.is_authenticated and request.user.user_type == 'internal'
+
+
+class UserRegistrationViewSet(viewsets.GenericViewSet):
+    """ユーザー登録API"""
+    permission_classes = [AllowAny]
+    serializer_class = UserRegistrationSerializer
+    
+    @action(detail=False, methods=['post'])
+    def register(self, request):
+        serializer = self.get_serializer(data=request.data)
+        if serializer.is_valid():
+            user = serializer.save()
+            return Response({
+                'message': '登録が完了しました。承認までお待ちください。',
+                'user': UserSerializer(user).data
+            }, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class UserProfileViewSet(viewsets.GenericViewSet):
+    """ユーザープロフィールAPI"""
+    permission_classes = [IsAuthenticated]
+    serializer_class = UserSerializer
+    
+    @action(detail=False, methods=['get'])
+    def me(self, request):
+        """現在のユーザー情報を取得"""
+        serializer = self.get_serializer(request.user)
+        return Response(serializer.data)
+    
+    @action(detail=False, methods=['patch'])
+    def update_profile(self, request):
+        """プロフィール更新"""
+        serializer = self.get_serializer(request.user, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class CustomerCompanyViewSet(viewsets.ModelViewSet):
+    """顧客会社API"""
+    queryset = CustomerCompany.objects.all()
+    serializer_class = CustomerCompanySerializer
+    permission_classes = [IsAuthenticated]
+
+
+class CompanyViewSet(viewsets.ModelViewSet):
+    """会社API"""
+    queryset = Company.objects.all()
+    serializer_class = CompanySerializer
+    permission_classes = [IsAuthenticated]
+
+
+class ConstructionSiteViewSet(viewsets.ModelViewSet):
+    """工事現場API"""
+    queryset = ConstructionSite.objects.filter(is_active=True)
+    serializer_class = ConstructionSiteSerializer
+    permission_classes = [IsAuthenticated]
+    
+    def get_queryset(self):
+        """ユーザーに応じた工事現場を返す"""
+        queryset = ConstructionSite.objects.filter(is_active=True)
+        return queryset.select_related('company', 'supervisor')
+
+
+class InvoiceViewSet(viewsets.ModelViewSet):
+    """請求書API"""
+    permission_classes = [IsAuthenticated]
+    
+    def get_serializer_class(self):
+        """アクションに応じたシリアライザーを使用"""
+        if self.action == 'create':
+            return InvoiceCreateSerializer
+        elif self.action == 'list':
+            return InvoiceListSerializer
+        return InvoiceSerializer
+    
+    def get_queryset(self):
+        """ユーザーに応じた請求書を返す"""
+        user = self.request.user
+        
+        if user.user_type == 'customer':
+            # 協力会社は自社の請求書のみ
+            invoices = Invoice.objects.filter(customer_company=user.customer_company)
         else:
-            # ログインしていない場合は全ての請求書を表示
-            invoices = Invoice.objects.all()
+            # 社内ユーザーは全ての請求書
+            invoices = Invoice.objects.filter(receiving_company=user.company)
         
-        # フィルタリング処理
-        status_filter = request.GET.get('status')
-        company_filter = request.GET.get('company')
-        date_from = request.GET.get('date_from')
-        date_to = request.GET.get('date_to')
-        amount_min = request.GET.get('amount_min')
-        amount_max = request.GET.get('amount_max')
-        search_query = request.GET.get('search')
-        
-        if status_filter:
+        # ステータスフィルター
+        status_filter = self.request.query_params.get('status')
+        if status_filter and status_filter != 'all':
             invoices = invoices.filter(status=status_filter)
         
-        if search_query:
-            # 検索フィールドを動的に決定
-            search_fields = []
-            for field in ['invoice_number', 'unique_number', 'project_name', 'project_code']:
-                if hasattr(Invoice, field):
-                    search_fields.append(Q(**{f"{field}__icontains": search_query}))
-            
-            if search_fields:
-                query = search_fields[0]
-                for field in search_fields[1:]:
-                    query |= field
-                invoices = invoices.filter(query)
+        # 自分の承認待ちフィルター
+        if status_filter == 'my_approval':
+            invoices = invoices.filter(current_approver=user)
         
-        if amount_min:
-            try:
-                invoices = invoices.filter(amount__gte=float(amount_min))
-            except (ValueError, TypeError):
-                pass
-        
-        if amount_max:
-            try:
-                invoices = invoices.filter(amount__lte=float(amount_max))
-            except (ValueError, TypeError):
-                pass
-        
-        # 並び替え
-        sort_by = request.GET.get('sort', '-created_at')
-        valid_sorts = ['created_at', '-created_at', 'amount', '-amount', 'status']
-        if hasattr(Invoice, 'due_date'):
-            valid_sorts.extend(['due_date', '-due_date'])
-        
-        if sort_by in valid_sorts:
-            invoices = invoices.order_by(sort_by)
-        
-        # ページネーション
-        paginator = Paginator(invoices, 10)
-        page_number = request.GET.get('page')
-        page_obj = paginator.get_page(page_number)
-        
-        # フィルタ用の選択肢を取得
-        all_invoices = Invoice.objects.all()
-        status_choices = all_invoices.values_list('status', flat=True).distinct()
-        
-        context = {
-            'page_obj': page_obj,
-            'invoices': page_obj,
-            'status_choices': status_choices,
-            'current_filters': {
-                'status': status_filter,
-                'company': company_filter,
-                'date_from': date_from,
-                'date_to': date_to,
-                'amount_min': amount_min,
-                'amount_max': amount_max,
-                'sort': sort_by,
-                'search': search_query,
-            }
-        }
-        return render(request, 'invoices/invoice_list.html', context)
-        
-    except Exception as e:
-        # エラーが発生した場合のフォールバック
-        return HttpResponse(f"""
-        <html>
-        <body>
-        <h1>請求書一覧</h1>
-        <p>エラーが発生しました: {e}</p>
-        <p><a href="/invoices/debug/">デバッグページ</a></p>
-        </body>
-        </html>
-        """)
-
-
-def upload_invoice(request):
-    """請求書アップロード"""
-    if InvoiceUploadForm and hasattr(request, 'user') and request.user.is_authenticated:
-        # フォームが存在し、ユーザーがログインしている場合
-        if request.method == 'POST':
-            form = InvoiceUploadForm(request.POST, request.FILES, user=request.user)
-            if form.is_valid():
-                invoice = form.save(commit=False)
-                invoice.created_by = request.user
-                
-                if hasattr(request.user, 'user_type'):
-                    if request.user.user_type == 'customer':
-                        invoice.customer_company = request.user.customer_company
-                        invoice.status = 'submitted'
-                    else:
-                        invoice.receiving_company = request.user.company
-                        invoice.status = 'received'
-                
-                invoice.save()
-                messages.success(request, '請求書がアップロードされました。')
-                return redirect('invoice_list')
-        else:
-            form = InvoiceUploadForm(user=request.user)
-        
-        return render(request, 'invoices/upload_invoice.html', {'form': form})
-    else:
-        # 簡易版アップロードページ
-        return HttpResponse("""
-        <html>
-        <body>
-        <h1>請求書アップロード</h1>
-        <p>この機能は準備中です。</p>
-        <a href="/invoices/">一覧に戻る</a><br>
-        <a href="/invoices/debug/">デバッグページ</a>
-        </body>
-        </html>
-        """)
-
-
-def invoice_detail(request, invoice_id):
-    """請求書詳細表示"""
-    try:
-        invoice = get_object_or_404(Invoice, id=invoice_id)
-        
-        # アクセス権限チェック（ログインしている場合のみ）
-        if hasattr(request, 'user') and request.user.is_authenticated:
-            if hasattr(request.user, 'user_type'):
-                if request.user.user_type == 'customer':
-                    if hasattr(invoice, 'customer_company') and invoice.customer_company != request.user.customer_company:
-                        messages.error(request, 'アクセス権限がありません。')
-                        return redirect('invoice_list')
-                else:
-                    if hasattr(invoice, 'receiving_company') and invoice.receiving_company != request.user.company:
-                        messages.error(request, 'アクセス権限がありません。')
-                        return redirect('invoice_list')
-        
-        # コメント取得（モデルが存在する場合のみ）
-        comments = []
-        if InvoiceComment:
-            try:
-                if hasattr(request, 'user') and request.user.is_authenticated and hasattr(request.user, 'user_type'):
-                    if request.user.user_type == 'internal':
-                        comments = invoice.comments.all()
-                    else:
-                        comments = invoice.comments.filter(is_private=False)
-                else:
-                    comments = []
-            except:
-                comments = []
-        
-        # 承認履歴取得（モデルが存在する場合のみ）
-        approval_history = []
-        if ApprovalHistory:
-            try:
-                approval_history = invoice.approval_histories.all()
-            except:
-                approval_history = []
-        
-        context = {
-            'invoice': invoice,
-            'comments': comments,
-            'approval_history': approval_history,
-            'can_approve': (
-                hasattr(request, 'user') and 
-                request.user.is_authenticated and 
-                hasattr(request.user, 'user_type') and
-                request.user.user_type == 'internal' and 
-                hasattr(invoice, 'status') and
-                invoice.status in ['submitted', 'pending_approval']
+        # 検索
+        search = self.request.query_params.get('search')
+        if search:
+            invoices = invoices.filter(
+                Q(invoice_number__icontains=search) |
+                Q(project_name__icontains=search) |
+                Q(construction_site_name__icontains=search)
             )
-        }
-        return render(request, 'invoices/invoice_detail.html', context)
         
-    except Exception as e:
-        return HttpResponse(f"""
-        <html>
-        <body>
-        <h1>請求書詳細エラー</h1>
-        <p>エラー: {e}</p>
-        <a href="/invoices/">一覧に戻る</a>
-        </body>
-        </html>
-        """)
-
-
-def approve_invoice(request, invoice_id):
-    """請求書承認"""
-    if request.method != 'POST':
-        return JsonResponse({'error': '無効なリクエストです'}, status=400)
+        return invoices.select_related(
+            'customer_company', 
+            'construction_site', 
+            'created_by',
+            'current_approver',
+            'current_approval_step'
+        ).order_by('-created_at')
     
-    invoice = get_object_or_404(Invoice, id=invoice_id)
+    def create(self, request, *args, **kwargs):
+        """請求書作成"""
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        
+        # シリアライザー内でcreated_by, customer_company, 金額計算が全て行われる
+        invoice = serializer.save()
+        
+        return Response(
+            InvoiceSerializer(invoice).data,
+            status=status.HTTP_201_CREATED
+        )
     
-    # 権限チェック
-    if not (hasattr(request, 'user') and request.user.is_authenticated):
-        return JsonResponse({'error': 'ログインが必要です'}, status=403)
-    
-    if hasattr(request.user, 'user_type') and request.user.user_type != 'internal':
-        return JsonResponse({'error': '承認権限がありません'}, status=403)
-    
-    # 承認処理
-    comment = request.POST.get('comment', '')
-    
-    # ステータス更新
-    if hasattr(invoice, 'status'):
-        invoice.status = 'approved'
+    @action(detail=True, methods=['post'])
+    def submit(self, request, pk=None):
+        """
+        請求書を提出
+        - 協力会社ユーザーのみ実行可能
+        - 自動で承認フローを開始
+        """
+        invoice = self.get_object()
+        
+        # 下書き状態のみ提出可能
+        if invoice.status != 'draft':
+            return Response(
+                {'error': '下書き状態の請求書のみ提出できます'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # 協力会社ユーザーのみ実行可能
+        if request.user.user_type != 'customer':
+            return Response(
+                {'error': '協力会社ユーザーのみ実行できます'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        # 工事現場の確認
+        if not invoice.construction_site:
+            return Response(
+                {'error': '工事現場が設定されていません'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # 現場監督の確認
+        if not invoice.construction_site.supervisor:
+            return Response(
+                {'error': 'この工事現場には現場監督が設定されていません。システム管理者にお問い合わせください。'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # デフォルトの承認ルートを取得
+        approval_route = ApprovalRoute.objects.filter(
+            company=invoice.receiving_company,
+            is_default=True,
+            is_active=True
+        ).first()
+        
+        if not approval_route:
+            return Response(
+                {'error': '承認ルートが設定されていません'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # 承認ルートを設定
+        invoice.approval_route = approval_route
+        
+        # 最初の承認ステップを取得
+        first_step = approval_route.steps.filter(step_order=1).first()
+        if not first_step:
+            return Response(
+                {'error': '承認ステップが設定されていません'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # 現在の承認ステップと承認者を設定
+        invoice.current_approval_step = first_step
+        
+        # 現場監督を承認者として設定
+        invoice.current_approver = invoice.construction_site.supervisor
+        
+        # ステータスを「承認待ち」に変更
+        invoice.status = 'pending_approval'
         invoice.save()
-    
-    # 承認履歴追加（モデルが存在する場合のみ）
-    if ApprovalHistory:
-        try:
-            ApprovalHistory.objects.create(
-                invoice=invoice,
-                user=request.user,
-                action='approved',
-                comment=comment
-            )
-        except:
-            pass
-    
-    # コメント追加（モデルが存在する場合のみ）
-    if InvoiceComment and comment:
-        try:
-            InvoiceComment.objects.create(
-                invoice=invoice,
-                user=request.user,
-                comment_type='approval',
-                comment=f'承認時コメント: {comment}',
-                is_private=False
-            )
-        except:
-            pass
-    
-    messages.success(request, f'請求書を承認しました。')
-    return JsonResponse({'success': True})
-
-
-def reject_invoice(request, invoice_id):
-    """請求書却下"""
-    if request.method != 'POST':
-        return JsonResponse({'error': '無効なリクエストです'}, status=400)
-    
-    invoice = get_object_or_404(Invoice, id=invoice_id)
-    
-    # 権限チェック
-    if not (hasattr(request, 'user') and request.user.is_authenticated):
-        return JsonResponse({'error': 'ログインが必要です'}, status=403)
-    
-    if hasattr(request.user, 'user_type') and request.user.user_type != 'internal':
-        return JsonResponse({'error': '却下権限がありません'}, status=403)
-    
-    # 却下理由チェック
-    comment = request.POST.get('comment', '').strip()
-    if not comment:
-        return JsonResponse({'error': '却下理由を入力してください'}, status=400)
-    
-    # 却下処理
-    if hasattr(invoice, 'status'):
-        invoice.status = 'rejected'
-        invoice.save()
-    
-    messages.success(request, f'請求書を却下しました。')
-    return JsonResponse({'success': True})
-
-
-def return_invoice(request, invoice_id):
-    """請求書差し戻し"""
-    if request.method != 'POST':
-        return JsonResponse({'error': '無効なリクエストです'}, status=400)
-    
-    invoice = get_object_or_404(Invoice, id=invoice_id)
-    
-    # 権限チェック
-    if not (hasattr(request, 'user') and request.user.is_authenticated):
-        return JsonResponse({'error': 'ログインが必要です'}, status=403)
-    
-    # 差し戻し理由チェック
-    comment = request.POST.get('comment', '').strip()
-    if not comment:
-        return JsonResponse({'error': '差し戻し理由を入力してください'}, status=400)
-    
-    # 差し戻し処理
-    if hasattr(invoice, 'status'):
-        invoice.status = 'returned'
-        invoice.save()
-    
-    messages.success(request, f'請求書を差し戻しました。')
-    return JsonResponse({'success': True})
-
-
-def add_comment(request, invoice_id):
-    """コメント追加"""
-    if request.method != 'POST':
-        return JsonResponse({'error': '無効なリクエストです'}, status=400)
-    
-    invoice = get_object_or_404(Invoice, id=invoice_id)
-    
-    comment_text = request.POST.get('comment', '').strip()
-    if not comment_text:
-        return JsonResponse({'error': 'コメントを入力してください'}, status=400)
-    
-    # コメント追加（モデルが存在する場合のみ）
-    if InvoiceComment:
-        try:
-            comment_type = request.POST.get('comment_type', 'general')
-            is_private = request.POST.get('is_private') == 'on'
-            
-            comment = InvoiceComment.objects.create(
-                invoice=invoice,
-                user=request.user if hasattr(request, 'user') and request.user.is_authenticated else None,
-                comment_type=comment_type,
-                comment=comment_text,
-                is_private=is_private
-            )
-            
-            messages.success(request, 'コメントを追加しました。')
-            return JsonResponse({'success': True})
-        except Exception as e:
-            return JsonResponse({'error': f'コメント追加エラー: {e}'}, status=500)
-    else:
-        return JsonResponse({'error': 'コメント機能は利用できません'}, status=400)
-
-
-def dashboard(request):
-    """ダッシュボード表示"""
-    try:
-        # ユーザーの種別に応じてデータを取得
-        if hasattr(request, 'user') and request.user.is_authenticated and hasattr(request.user, 'user_type'):
-            if request.user.user_type == 'customer':
-                invoices = Invoice.objects.filter(customer_company=request.user.customer_company)
-            else:
-                invoices = Invoice.objects.filter(receiving_company=request.user.company)
-        else:
-            invoices = Invoice.objects.all()
         
-        # 統計データ計算
-        today = timezone.now().date()
-        current_month = today.replace(day=1)
-        
-        # 基本統計
-        total_invoices = invoices.count()
-        pending_approval = invoices.filter(status='pending_approval').count()
-        submitted_invoices = invoices.filter(status='submitted').count()
-        approved_invoices = invoices.filter(status='approved').count()
-        
-        # 金額統計
-        total_amount = invoices.aggregate(total=Sum('amount'))['total'] or 0
-        pending_amount = invoices.filter(
-            status__in=['submitted', 'pending_approval']
-        ).aggregate(total=Sum('amount'))['total'] or 0
-        
-        # 今月の統計
-        this_month_invoices = invoices.filter(created_at__gte=current_month)
-        this_month_count = this_month_invoices.count()
-        this_month_amount = this_month_invoices.aggregate(total=Sum('amount'))['total'] or 0
-        
-        # 支払期日が近い請求書（7日以内）
-        upcoming_due = []
-        if hasattr(Invoice, 'due_date'):
-            upcoming_due = invoices.filter(
-                due_date__lte=today + timedelta(days=7),
-                status__in=['approved', 'payment_preparing']
-            ).order_by('due_date')[:5]
-        
-        # 最近の活動（最新5件）
-        recent_invoices = invoices.order_by('-created_at')[:5]
-        
-        # ステータス別分布
-        status_distribution = invoices.values('status').annotate(
-            count=Count('id'),
-            amount=Sum('amount')
+        # 提出履歴を記録
+        ApprovalHistory.objects.create(
+            invoice=invoice,
+            user=request.user,
+            action='submitted',
+            comment='請求書を提出しました'
         )
         
-        context = {
-            'total_invoices': total_invoices,
-            'pending_approval': pending_approval,
-            'submitted_invoices': submitted_invoices,
-            'approved_invoices': approved_invoices,
-            'total_amount': total_amount,
-            'pending_amount': pending_amount,
-            'this_month_count': this_month_count,
-            'this_month_amount': this_month_amount,
-            'upcoming_due': upcoming_due,
-            'recent_invoices': recent_invoices,
-            'status_distribution': status_distribution,
-        }
-        
-        return render(request, 'invoices/dashboard.html', context)
-        
-    except Exception as e:
-        return HttpResponse(f"""
-        <html>
-        <body>
-        <h1>ダッシュボードエラー</h1>
-        <p>エラー: {e}</p>
-        <a href="/invoices/">請求書一覧</a>
-        </body>
-        </html>
-        """)
+        # 通知メール送信（コンソール出力）
+        self._send_notification_email(
+            recipient=invoice.current_approver,
+            subject=f'【請求書承認依頼】{invoice.invoice_number}',
+            message=f'''
+{invoice.current_approver.get_full_name()} 様
 
+請求書の承認依頼が届いています。
 
-def debug_invoices(request):
-    """デバッグ用：請求書データの確認"""
-    try:
-        invoices = Invoice.objects.all()
+請求書番号: {invoice.invoice_number}
+協力会社: {invoice.customer_company.name}
+工事現場: {invoice.construction_site.name}
+金額: ¥{invoice.total_amount:,}
+
+システムにログインして確認してください。
+            '''.strip()
+        )
         
-        # モデルのフィールド情報を取得
-        model_fields = [f.name for f in Invoice._meta.get_fields()]
-        
-        debug_info = f"""
-        <html>
-        <head><title>デバッグ情報</title></head>
-        <body>
-        <h1>デバッグ情報</h1>
-        <h2>請求書データ総数: {invoices.count()}</h2>
-        
-        <h3>Invoiceモデルのフィールド:</h3>
-        <p>{', '.join(model_fields)}</p>
-        
-        <h3>請求書一覧:</h3>
-        <ul>
+        return Response({
+            'message': '請求書を提出しました。承認をお待ちください。',
+            'invoice': InvoiceSerializer(invoice).data
+        })
+    
+    @action(detail=True, methods=['post'], permission_classes=[IsInternalUser])
+    def approve(self, request, pk=None):
         """
-        
-        for invoice in invoices:
-            # 各フィールドの値を安全に取得
-            invoice_number = getattr(invoice, 'invoice_number', 'N/A')
-            vendor_name = getattr(invoice, 'vendor_name', 
-                                getattr(invoice, 'customer_company', 'Unknown'))
-            status = getattr(invoice, 'status', 'N/A')
-            amount = getattr(invoice, 'amount', 0)
-            created_at = getattr(invoice, 'created_at', 'N/A')
-            unique_url = getattr(invoice, 'unique_url', 'N/A')
-            
-            debug_info += f"""
-            <li>
-                <strong>ID:</strong> {invoice.id}<br>
-                <strong>請求書番号:</strong> {invoice_number}<br>
-                <strong>請求元:</strong> {vendor_name}<br>
-                <strong>ステータス:</strong> {status}<br>
-                <strong>金額:</strong> ¥{amount}<br>
-                <strong>作成日:</strong> {created_at}<br>
-                <strong>UUID:</strong> {unique_url}<br>
-                <strong>詳細URL:</strong> <a href="/invoices/detail/{invoice.id}/">詳細ページ</a><br>
-                ---<br><br>
-            </li>
-            """
-        
-        debug_info += f"""
-        </ul>
-        
-        <h3>URLテスト:</h3>
-        <a href="/invoices/">請求書一覧へ</a><br>
-        <a href="/invoices/upload/">アップロードページへ</a><br>
-        <a href="/invoices/dashboard/">ダッシュボードへ</a><br>
-        
-        <h3>テストデータ作成:</h3>
-        <a href="/invoices/debug/create-test/">テストデータを作成</a>
-        
-        <h3>システム情報:</h3>
-        <p>利用可能なモデル: {[cls.__name__ for cls in [Invoice, Company, CustomerCompany, ApprovalHistory, InvoiceComment] if cls is not None]}</p>
-        
-        </body>
-        </html>
+        請求書承認
+        - 現在の承認ステップの担当者のみ実行可能
+        - 経理は全ステップで実行可能
         """
+        invoice = self.get_object()
+        user = request.user
+        comment = request.data.get('comment', '')
         
-        return HttpResponse(debug_info)
+        # 承認待ち状態のみ承認可能
+        if invoice.status != 'pending_approval':
+            return Response(
+                {'error': '承認待ち状態の請求書のみ承認できます'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
         
-    except Exception as e:
-        import traceback
-        return HttpResponse(f"""
-        <html>
-        <body>
-        <h1>デバッグエラー</h1>
-        <p>エラー: {e}</p>
-        <pre>{traceback.format_exc()}</pre>
-        <a href="/invoices/">請求書一覧に戻る</a>
-        </body>
-        </html>
-        """)
-
-
-# invoices/views.py の create_test_data 関数を以下に置き換えてください
-
-def create_test_data(request):
-    """テストデータを作成（修正版）"""
-    try:
-        # 基本的なテストデータを直接定義（安全確実な方法）
-        today = timezone.now().date()
-        now = timezone.now()
+        # 承認権限チェック
+        can_approve = False
         
-        # 確実に設定するべき基本フィールド
-        test_data = {
-            'invoice_number': f"TEST-{now.strftime('%Y%m%d%H%M%S')}",
-            'amount': 150000,  # 確実に設定
-            'tax_amount': 15000,
-            'status': 'draft',
-            'issue_date': today,
-            'due_date': today,
-            'unique_url': uuid.uuid4(),
-            'project_name': "テストプロジェクト",
-            'department_code': "TEST-DEPT",
-        }
+        # 現在の承認者である
+        if invoice.current_approver == user:
+            can_approve = True
         
-        # モデルの実際のフィールドを確認
-        model_fields = [f.name for f in Invoice._meta.get_fields() if not hasattr(f, 'related_model')]
+        # 経理は全ステップで承認可能
+        if user.position == 'accountant':
+            can_approve = True
         
-        # 存在しないフィールドを除去
-        final_test_data = {}
-        for key, value in test_data.items():
-            if key in model_fields:
-                final_test_data[key] = value
+        if not can_approve:
+            return Response(
+                {'error': 'この請求書を承認する権限がありません'},
+                status=status.HTTP_403_FORBIDDEN
+            )
         
-        # デバッグ情報をHTMLで表示
-        debug_html = f"""
-        <html>
-        <body>
-        <h1>テストデータ作成情報</h1>
+        # 承認履歴を記録
+        ApprovalHistory.objects.create(
+            invoice=invoice,
+            approval_step=invoice.current_approval_step,
+            user=user,
+            action='approved',
+            comment=comment or f'{user.get_position_display()}が承認しました'
+        )
         
-        <h2>利用可能なモデルフィールド:</h2>
-        <p>{', '.join(model_fields)}</p>
+        # 次の承認ステップへ進む
+        current_step_order = invoice.current_approval_step.step_order
+        next_step = invoice.approval_route.steps.filter(
+            step_order=current_step_order + 1
+        ).first()
         
-        <h2>作成予定のテストデータ:</h2>
-        <pre>{final_test_data}</pre>
-        
-        <h2>除外されたフィールド:</h2>
-        <p>{[key for key in test_data.keys() if key not in model_fields]}</p>
-        
-        <p><a href="?execute=true">実際にテストデータを作成する</a></p>
-        
-        <a href="/invoices/debug/">デバッグページに戻る</a>
-        </body>
-        </html>
-        """
-        
-        # 実際の作成処理
-        if request.GET.get('execute') == 'true':
-            test_invoice = Invoice.objects.create(**final_test_data)
+        if next_step:
+            # 次のステップがある場合
+            invoice.current_approval_step = next_step
             
-            return HttpResponse(f"""
-            <html>
-            <body>
-            <h1>テストデータ作成完了</h1>
-            <p>請求書ID: {test_invoice.id}</p>
-            <p>請求書番号: {test_invoice.invoice_number}</p>
-            <p>金額: ¥{test_invoice.amount}</p>
-            <p>使用したフィールド: {list(final_test_data.keys())}</p>
+            # 次の承認者を設定
+            if next_step.approver_user:
+                invoice.current_approver = next_step.approver_user
+            else:
+                # 役職から承認者を検索
+                next_approver = User.objects.filter(
+                    user_type='internal',
+                    company=invoice.receiving_company,
+                    position=next_step.approver_position,
+                    is_active=True
+                ).first()
+                
+                if next_approver:
+                    invoice.current_approver = next_approver
+                else:
+                    return Response(
+                        {'error': f'次の承認者（{next_step.get_approver_position_display()}）が見つかりません'},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
             
-            <h3>作成されたデータの詳細:</h3>
-            <ul>
-                <li>ID: {test_invoice.id}</li>
-                <li>請求書番号: {getattr(test_invoice, 'invoice_number', 'N/A')}</li>
-                <li>金額: ¥{getattr(test_invoice, 'amount', 'N/A')}</li>
-                <li>ステータス: {getattr(test_invoice, 'status', 'N/A')}</li>
-                <li>発行日: {getattr(test_invoice, 'issue_date', 'N/A')}</li>
-                <li>支払期日: {getattr(test_invoice, 'due_date', 'N/A')}</li>
-            </ul>
+            invoice.save()
             
-            <a href="/invoices/">一覧に戻る</a><br>
-            <a href="/invoices/detail/{test_invoice.id}/">この請求書の詳細</a><br>
-            <a href="/invoices/debug/">デバッグページに戻る</a>
-            </body>
-            </html>
-            """)
+            # 次の承認者に通知
+            self._send_notification_email(
+                recipient=invoice.current_approver,
+                subject=f'【請求書承認依頼】{invoice.invoice_number}',
+                message=f'''
+{invoice.current_approver.get_full_name()} 様
+
+請求書の承認依頼が届いています。
+
+請求書番号: {invoice.invoice_number}
+協力会社: {invoice.customer_company.name}
+工事現場: {invoice.construction_site.name}
+金額: ¥{invoice.total_amount:,}
+
+前承認者: {user.get_full_name()} ({user.get_position_display()})
+
+システムにログインして確認してください。
+                '''.strip()
+            )
+            
+            message = f'{next_step.step_name}に進みました'
         else:
-            return HttpResponse(debug_html)
+            # 全ての承認ステップが完了
+            invoice.status = 'approved'
+            invoice.current_approval_step = None
+            invoice.current_approver = None
+            invoice.save()
+            
+            # 協力会社に承認完了通知
+            self._send_notification_email(
+                recipient=invoice.created_by,
+                subject=f'【承認完了】{invoice.invoice_number}',
+                message=f'''
+{invoice.created_by.get_full_name()} 様
+
+請求書が承認されました。
+
+請求書番号: {invoice.invoice_number}
+工事現場: {invoice.construction_site.name}
+金額: ¥{invoice.total_amount:,}
+
+お支払いまでしばらくお待ちください。
+                '''.strip()
+            )
+            
+            message = '全ての承認が完了しました'
         
-    except Exception as e:
-        import traceback
-        return HttpResponse(f"""
-        <html>
-        <body>
-        <h1>テストデータ作成エラー</h1>
-        <p>エラー: {e}</p>
-        <pre>{traceback.format_exc()}</pre>
+        return Response({
+            'message': message,
+            'invoice': InvoiceSerializer(invoice).data
+        })
+    
+    @action(detail=True, methods=['post'], permission_classes=[IsInternalUser])
+    def reject(self, request, pk=None):
+        """
+        請求書却下
+        - 現在の承認ステップの担当者のみ実行可能
+        - 経理は全ステップで実行可能
+        """
+        invoice = self.get_object()
+        user = request.user
+        comment = request.data.get('comment', '')
         
-        <h3>デバッグ情報:</h3>
-        <p>利用可能なフィールド: {[f.name for f in Invoice._meta.get_fields() if not hasattr(f, 'related_model')]}</p>
+        if invoice.status != 'pending_approval':
+            return Response(
+                {'error': '承認待ち状態の請求書のみ却下できます'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
         
-        <a href="/invoices/debug/">デバッグページに戻る</a>
-        </body>
-        </html>
-        """)
+        # 却下権限チェック
+        can_reject = False
+        
+        if invoice.current_approver == user:
+            can_reject = True
+        
+        if user.position == 'accountant':
+            can_reject = True
+        
+        if not can_reject:
+            return Response(
+                {'error': 'この請求書を却下する権限がありません'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        # ステータス更新
+        invoice.status = 'rejected'
+        invoice.current_approval_step = None
+        invoice.current_approver = None
+        invoice.save()
+        
+        # 承認履歴追加
+        ApprovalHistory.objects.create(
+            invoice=invoice,
+            approval_step=invoice.current_approval_step,
+            user=user,
+            action='rejected',
+            comment=comment or '却下されました'
+        )
+        
+        # 協力会社に通知
+        self._send_notification_email(
+            recipient=invoice.created_by,
+            subject=f'【却下】{invoice.invoice_number}',
+            message=f'''
+{invoice.created_by.get_full_name()} 様
+
+申し訳ございませんが、請求書が却下されました。
+
+請求書番号: {invoice.invoice_number}
+却下理由: {comment}
+
+詳細はシステムでご確認ください。
+            '''.strip()
+        )
+        
+        return Response({
+            'message': '請求書を却下しました',
+            'invoice': InvoiceSerializer(invoice).data
+        })
+    
+    @action(detail=True, methods=['post'], permission_classes=[IsInternalUser])
+    def return_invoice(self, request, pk=None):
+        """
+        請求書差し戻し
+        - 現在の承認ステップの担当者のみ実行可能
+        - 経理は全ステップで実行可能
+        """
+        invoice = self.get_object()
+        user = request.user
+        comment = request.data.get('comment', '')
+        
+        if invoice.status != 'pending_approval':
+            return Response(
+                {'error': '承認待ち状態の請求書のみ差し戻しできます'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # 差し戻し権限チェック
+        can_return = False
+        
+        if invoice.current_approver == user:
+            can_return = True
+        
+        if user.position == 'accountant':
+            can_return = True
+        
+        if not can_return:
+            return Response(
+                {'error': 'この請求書を差し戻す権限がありません'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        # ステータス更新
+        invoice.status = 'returned'
+        invoice.current_approval_step = None
+        invoice.current_approver = None
+        invoice.save()
+        
+        # 承認履歴追加
+        ApprovalHistory.objects.create(
+            invoice=invoice,
+            approval_step=invoice.current_approval_step,
+            user=user,
+            action='returned',
+            comment=comment or '差し戻されました'
+        )
+        
+        # 協力会社に通知
+        self._send_notification_email(
+            recipient=invoice.created_by,
+            subject=f'【差し戻し】{invoice.invoice_number}',
+            message=f'''
+{invoice.created_by.get_full_name()} 様
+
+請求書が差し戻されました。修正して再提出してください。
+
+請求書番号: {invoice.invoice_number}
+差し戻し理由: {comment}
+
+システムにログインして内容を確認してください。
+            '''.strip()
+        )
+        
+        return Response({
+            'message': '請求書を差し戻しました',
+            'invoice': InvoiceSerializer(invoice).data
+        })
+    
+    @action(detail=True, methods=['get'])
+    def comments(self, request, pk=None):
+        """請求書のコメント一覧"""
+        invoice = self.get_object()
+        
+        # 社内ユーザーは全てのコメント、顧客は非プライベートのみ
+        if request.user.user_type == 'internal':
+            comments = invoice.comments.all()
+        else:
+            comments = invoice.comments.filter(is_private=False)
+        
+        serializer = InvoiceCommentSerializer(comments, many=True)
+        return Response(serializer.data)
+    
+    @action(detail=True, methods=['post'])
+    def add_comment(self, request, pk=None):
+        """コメント追加"""
+        invoice = self.get_object()
+        
+        comment_text = request.data.get('comment', '')
+        comment_type = request.data.get('comment_type', 'general')
+        is_private = request.data.get('is_private', False)
+        
+        # 顧客はプライベートコメント不可
+        if request.user.user_type == 'customer':
+            is_private = False
+        
+        comment = InvoiceComment.objects.create(
+            invoice=invoice,
+            user=request.user,
+            comment=comment_text,
+            comment_type=comment_type,
+            is_private=is_private
+        )
+        
+        serializer = InvoiceCommentSerializer(comment)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+    
+    def _send_notification_email(self, recipient, subject, message):
+        """
+        通知メール送信（開発環境ではコンソール出力）
+        """
+        print(f"\n{'='*60}")
+        print(f"📧 メール通知")
+        print(f"{'='*60}")
+        print(f"宛先: {recipient.email} ({recipient.get_full_name()})")
+        print(f"件名: {subject}")
+        print(f"\n{message}")
+        print(f"{'='*60}\n")
+        
+        # 本番環境では実際にメール送信
+        # send_mail(
+        #     subject=subject,
+        #     message=message,
+        #     from_email=settings.DEFAULT_FROM_EMAIL,
+        #     recipient_list=[recipient.email],
+        #     fail_silently=True,
+        # )
+
+
+class DashboardViewSet(viewsets.GenericViewSet):
+    """ダッシュボードAPI - ユーザー種別対応版"""
+    permission_classes = [IsAuthenticated]
+    
+    @action(detail=False, methods=['get'])
+    def stats(self, request):
+        """
+        ユーザー種別に応じたダッシュボード統計を返す
+        
+        社内ユーザー: 全体統計
+        協力会社ユーザー: 自社の統計のみ
+        """
+        from django.utils import timezone
+        from datetime import timedelta
+        
+        user = request.user
+        current_month = timezone.now().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        next_month = (current_month + timedelta(days=32)).replace(day=1)
+
+        if user.user_type == 'internal':
+            # 社内ユーザー向け統計
+            stats = {
+                'pending_invoices': Invoice.objects.filter(
+                    status='pending_approval'
+                ).count(),
+                
+                'my_pending_approvals': Invoice.objects.filter(
+                    status='pending_approval',
+                    current_approver=user
+                ).count(),
+                
+                'monthly_payment': Invoice.objects.filter(
+                    payment_due_date__gte=current_month,
+                    payment_due_date__lt=next_month,
+                    status__in=['approved', 'paid']
+                ).aggregate(total=Sum('total_amount'))['total'] or 0,
+                
+                'partner_companies': CustomerCompany.objects.filter(
+                    is_active=True
+                ).count(),
+            }
+        else:
+            # 協力会社ユーザー向け統計
+            stats = {
+                'draft_count': Invoice.objects.filter(
+                    customer_company=user.customer_company,
+                    status='draft'
+                ).count(),
+                
+                'submitted_count': Invoice.objects.filter(
+                    customer_company=user.customer_company,
+                    status__in=['submitted', 'pending_approval']
+                ).count(),
+                
+                'returned_count': Invoice.objects.filter(
+                    customer_company=user.customer_company,
+                    status='returned'
+                ).count(),
+                
+                'approved_count': Invoice.objects.filter(
+                    customer_company=user.customer_company,
+                    status='approved'
+                ).count(),
+                
+                'total_amount_pending': Invoice.objects.filter(
+                    customer_company=user.customer_company,
+                    status__in=['submitted', 'pending_approval', 'approved']
+                ).aggregate(total=Sum('total_amount'))['total'] or 0,
+            }
+
+        return Response(stats, status=status.HTTP_200_OK)

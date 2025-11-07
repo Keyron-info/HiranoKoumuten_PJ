@@ -18,7 +18,7 @@ class UserManager(BaseUserManager):
         
         email = self.normalize_email(email) if email else None
         user = self.model(username=username, email=email, **extra_fields)
-        user.set_password(password)  # パスワードをハッシュ化
+        user.set_password(password)
         user.save(using=self._db)
         return user
     
@@ -116,13 +116,17 @@ class User(AbstractUser):
         ('customer', '顧客ユーザー'),
     ]
     
+    # 🆕 更新: 役職に承認フロー用の役職を追加
     POSITION_CHOICES = [
-        ('president', '社長'),
+        ('site_supervisor', '現場監督'),
+        ('managing_director', '常務取締役'),
+        ('senior_managing_director', '専務取締役'),
+        ('president', '代表取締役社長'),
+        ('accountant', '経理担当'),
         ('director', '取締役'),
         ('manager', '部長'),
         ('supervisor', '課長'),
         ('staff', '一般社員'),
-        ('accountant', '経理担当'),
         ('admin', 'システム管理者'),
     ]
     
@@ -149,7 +153,7 @@ class User(AbstractUser):
         verbose_name="所属部署"
     )
     position = models.CharField(
-        max_length=20,
+        max_length=30,
         choices=POSITION_CHOICES,
         blank=True,
         verbose_name="役職"
@@ -185,7 +189,8 @@ class User(AbstractUser):
     
     def __str__(self):
         if self.user_type == 'internal':
-            return f"{self.last_name} {self.first_name} ({self.company})"
+            position_display = self.get_position_display() if self.position else ''
+            return f"{self.last_name} {self.first_name} ({position_display})"
         else:
             return f"{self.last_name} {self.first_name} ({self.customer_company})"
 
@@ -195,6 +200,7 @@ class ApprovalRoute(models.Model):
     company = models.ForeignKey(Company, on_delete=models.CASCADE)
     name = models.CharField(max_length=100, verbose_name="承認ルート名")
     description = models.TextField(verbose_name="説明", blank=True)
+    is_default = models.BooleanField(default=False, verbose_name="デフォルトルート")
     is_active = models.BooleanField(default=True, verbose_name="有効")
     created_at = models.DateTimeField(auto_now_add=True)
     
@@ -216,7 +222,7 @@ class ApprovalStep(models.Model):
     step_order = models.IntegerField(verbose_name="ステップ順序")
     step_name = models.CharField(max_length=50, verbose_name="ステップ名")
     approver_position = models.CharField(
-        max_length=20,
+        max_length=30,
         choices=User.POSITION_CHOICES,
         verbose_name="承認者役職"
     )
@@ -225,7 +231,8 @@ class ApprovalStep(models.Model):
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
-        verbose_name="指定承認者"
+        verbose_name="指定承認者",
+        help_text="特定のユーザーを指定する場合（オプション）"
     )
     is_required = models.BooleanField(default=True, verbose_name="必須ステップ")
     timeout_days = models.IntegerField(default=7, verbose_name="承認期限（日数）")
@@ -240,9 +247,6 @@ class ApprovalStep(models.Model):
         return f"{self.route.name} - Step{self.step_order}: {self.step_name}"
 
 
-# =============================================
-# 🆕 追加: ConstructionSiteモデル
-# =============================================
 class ConstructionSite(models.Model):
     """工事現場モデル"""
     name = models.CharField(max_length=100, verbose_name="現場名")
@@ -253,6 +257,16 @@ class ConstructionSite(models.Model):
         related_name='construction_sites',
         verbose_name="発注会社"
     )
+    # 🆕 追加: 現場監督フィールド
+    supervisor = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='supervised_sites',
+        verbose_name="現場監督",
+        limit_choices_to={'position': 'site_supervisor', 'user_type': 'internal'}
+    )
     is_active = models.BooleanField(default=True, verbose_name="有効")
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="作成日時")
     
@@ -262,15 +276,15 @@ class ConstructionSite(models.Model):
         ordering = ['-created_at']
     
     def __str__(self):
-        return f"{self.name}"
+        supervisor_name = f" ({self.supervisor.get_full_name()})" if self.supervisor else ""
+        return f"{self.name}{supervisor_name}"
 
 
 class Invoice(models.Model):
     """請求書マスター"""
     STATUS_CHOICES = [
         ('draft', '下書き'),
-        ('submitted', '送付済み'),
-        ('received', '受付済み'),
+        ('submitted', '提出済み'),
         ('pending_approval', '承認待ち'),
         ('approved', '承認済み'),
         ('rejected', '却下'),
@@ -296,7 +310,7 @@ class Invoice(models.Model):
         verbose_name="請求先会社"
     )
     
-    # 🆕 追加: 工事現場
+    # 工事現場
     construction_site = models.ForeignKey(
         ConstructionSite,
         on_delete=models.CASCADE,
@@ -310,16 +324,7 @@ class Invoice(models.Model):
         blank=True
     )
     
-    # 金額・日付
-    amount = models.DecimalField(
-        max_digits=15,
-        decimal_places=2,
-        validators=[MinValueValidator(Decimal('0.01'))],
-        verbose_name="請求金額",
-        default=Decimal('0.00')
-    )
-    
-    # 🆕 追加: 小計・消費税・合計
+    # 金額
     subtotal = models.DecimalField(
         max_digits=15,
         decimal_places=0,
@@ -339,11 +344,9 @@ class Invoice(models.Model):
         verbose_name="合計金額"
     )
     
-    # 日付 (既存フィールド維持)
+    # 日付
     issue_date = models.DateField(verbose_name="発行日", null=True, blank=True)
     due_date = models.DateField(verbose_name="支払期日", null=True, blank=True)
-    
-    # 🆕 追加: フロントエンド用日付フィールド (エイリアス用)
     invoice_date = models.DateField(verbose_name="請求日", null=True, blank=True)
     payment_due_date = models.DateField(verbose_name="支払予定日", null=True, blank=True)
     
@@ -351,8 +354,6 @@ class Invoice(models.Model):
     project_name = models.CharField(max_length=100, verbose_name="工事名", blank=True)
     project_code = models.CharField(max_length=50, verbose_name="工事コード", blank=True)
     department_code = models.CharField(max_length=20, verbose_name="部門コード", blank=True)
-    
-    # 🆕 追加: 備考
     notes = models.TextField(verbose_name="備考", blank=True)
     
     # ファイル
@@ -379,6 +380,15 @@ class Invoice(models.Model):
         blank=True,
         verbose_name="現在の承認ステップ"
     )
+    # 🆕 追加: 現在の承認者
+    current_approver = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='pending_approvals',
+        verbose_name="現在の承認者"
+    )
     
     # 作成・更新情報
     created_by = models.ForeignKey(
@@ -398,29 +408,21 @@ class Invoice(models.Model):
     def __str__(self):
         return f"{self.invoice_number} - {self.customer_company.name}"
     
-    # 🆕 追加: 金額計算メソッド
     def calculate_totals(self):
         """小計・消費税・合計金額を計算"""
-        # 明細の合計を計算
         self.subtotal = sum(int(item.amount) for item in self.items.all())
-        
-        # 消費税を計算 (10%)
         self.tax_amount = int(self.subtotal * Decimal('0.1'))
-        
-        # 合計金額
         self.total_amount = self.subtotal + self.tax_amount
-        
         self.save()
         return self.total_amount
     
     def save(self, *args, **kwargs):
-        # 請求書番号の自動生成 (初回保存時のみ)
+        # 請求書番号の自動生成
         if not self.invoice_number:
             import datetime
             today = datetime.date.today()
             year = today.year
             
-            # 今年の最後の番号を取得
             last_invoice = Invoice.objects.filter(
                 invoice_number__startswith=f'INV-{year}-'
             ).order_by('-invoice_number').first()
@@ -448,7 +450,7 @@ class Invoice(models.Model):
         if self.construction_site and not self.construction_site_name:
             self.construction_site_name = self.construction_site.name
         
-        # 日付フィールドの同期 (どちらかが設定されていれば同期)
+        # 日付フィールドの同期
         if self.invoice_date and not self.issue_date:
             self.issue_date = self.invoice_date
         elif self.issue_date and not self.invoice_date:
@@ -462,9 +464,6 @@ class Invoice(models.Model):
         super().save(*args, **kwargs)
 
 
-# =============================================
-# 🆕 追加: InvoiceItemモデル
-# =============================================
 class InvoiceItem(models.Model):
     """請求明細モデル"""
     invoice = models.ForeignKey(
@@ -512,7 +511,7 @@ class InvoiceItem(models.Model):
 class ApprovalHistory(models.Model):
     """承認履歴"""
     ACTION_CHOICES = [
-        ('submitted', '送付'),
+        ('submitted', '提出'),
         ('approved', '承認'),
         ('rejected', '却下'),
         ('returned', '差し戻し'),

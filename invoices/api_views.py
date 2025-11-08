@@ -6,6 +6,8 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from django.shortcuts import get_object_or_404
 from django.db.models import Q, Sum
+from django.core.mail import send_mail
+from django.conf import settings
 
 from .models import (
     Company, Department, CustomerCompany, User, ConstructionSite,
@@ -15,7 +17,7 @@ from .models import (
 from .serializers import (
     CompanySerializer, DepartmentSerializer, CustomerCompanySerializer,
     UserSerializer, UserRegistrationSerializer,
-    InvoiceSerializer, InvoiceCreateSerializer,
+    InvoiceSerializer, InvoiceListSerializer, InvoiceCreateSerializer,
     ApprovalRouteSerializer, ApprovalStepSerializer,
     ApprovalHistorySerializer, InvoiceCommentSerializer,
     ConstructionSiteSerializer
@@ -94,14 +96,8 @@ class ConstructionSiteViewSet(viewsets.ModelViewSet):
     
     def get_queryset(self):
         """ユーザーに応じた工事現場を返す"""
-        user = self.request.user
         queryset = ConstructionSite.objects.filter(is_active=True)
-        
-        # 必要に応じてフィルタリング
-        # if user.user_type == 'customer':
-        #     queryset = queryset.filter(company=user.company)
-        
-        return queryset
+        return queryset.select_related('company', 'supervisor')
 
 
 class InvoiceViewSet(viewsets.ModelViewSet):
@@ -109,9 +105,11 @@ class InvoiceViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
     
     def get_serializer_class(self):
-        """作成時は専用シリアライザーを使用"""
+        """アクションに応じたシリアライザーを使用"""
         if self.action == 'create':
             return InvoiceCreateSerializer
+        elif self.action == 'list':
+            return InvoiceListSerializer
         return InvoiceSerializer
     
     def get_queryset(self):
@@ -130,6 +128,10 @@ class InvoiceViewSet(viewsets.ModelViewSet):
         if status_filter and status_filter != 'all':
             invoices = invoices.filter(status=status_filter)
         
+        # 自分の承認待ちフィルター
+        if status_filter == 'my_approval':
+            invoices = invoices.filter(current_approver=user)
+        
         # 検索
         search = self.request.query_params.get('search')
         if search:
@@ -139,7 +141,13 @@ class InvoiceViewSet(viewsets.ModelViewSet):
                 Q(construction_site_name__icontains=search)
             )
         
-        return invoices.order_by('-created_at')
+        return invoices.select_related(
+            'customer_company', 
+            'construction_site', 
+            'created_by',
+            'current_approver',
+            'current_approval_step'
+        ).order_by('-created_at')
     
     def create(self, request, *args, **kwargs):
         """請求書作成"""
@@ -156,7 +164,11 @@ class InvoiceViewSet(viewsets.ModelViewSet):
     
     @action(detail=True, methods=['post'])
     def submit(self, request, pk=None):
-        """請求書を提出"""
+        """
+        請求書を提出
+        - 協力会社ユーザーのみ実行可能
+        - 自動で承認フローを開始
+        """
         invoice = self.get_object()
         
         # 下書き状態のみ提出可能
@@ -173,8 +185,52 @@ class InvoiceViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_403_FORBIDDEN
             )
         
-        # ステータスを変更
-        invoice.status = 'submitted'
+        # 工事現場の確認
+        if not invoice.construction_site:
+            return Response(
+                {'error': '工事現場が設定されていません'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # 現場監督の確認
+        if not invoice.construction_site.supervisor:
+            return Response(
+                {'error': 'この工事現場には現場監督が設定されていません。システム管理者にお問い合わせください。'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # デフォルトの承認ルートを取得
+        approval_route = ApprovalRoute.objects.filter(
+            company=invoice.receiving_company,
+            is_default=True,
+            is_active=True
+        ).first()
+        
+        if not approval_route:
+            return Response(
+                {'error': '承認ルートが設定されていません'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # 承認ルートを設定
+        invoice.approval_route = approval_route
+        
+        # 最初の承認ステップを取得
+        first_step = approval_route.steps.filter(step_order=1).first()
+        if not first_step:
+            return Response(
+                {'error': '承認ステップが設定されていません'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # 現在の承認ステップと承認者を設定
+        invoice.current_approval_step = first_step
+        
+        # 現場監督を承認者として設定
+        invoice.current_approver = invoice.construction_site.supervisor
+        
+        # ステータスを「承認待ち」に変更
+        invoice.status = 'pending_approval'
         invoice.save()
         
         # 提出履歴を記録
@@ -185,56 +241,218 @@ class InvoiceViewSet(viewsets.ModelViewSet):
             comment='請求書を提出しました'
         )
         
+        # 通知メール送信（コンソール出力）
+        self._send_notification_email(
+            recipient=invoice.current_approver,
+            subject=f'【請求書承認依頼】{invoice.invoice_number}',
+            message=f'''
+{invoice.current_approver.get_full_name()} 様
+
+請求書の承認依頼が届いています。
+
+請求書番号: {invoice.invoice_number}
+協力会社: {invoice.customer_company.name}
+工事現場: {invoice.construction_site.name}
+金額: ¥{invoice.total_amount:,}
+
+システムにログインして確認してください。
+            '''.strip()
+        )
+        
         return Response({
-            'message': '請求書を提出しました',
+            'message': '請求書を提出しました。承認をお待ちください。',
             'invoice': InvoiceSerializer(invoice).data
         })
     
     @action(detail=True, methods=['post'], permission_classes=[IsInternalUser])
     def approve(self, request, pk=None):
-        """請求書承認"""
+        """
+        請求書承認
+        - 現在の承認ステップの担当者のみ実行可能
+        - 経理は全ステップで実行可能
+        """
         invoice = self.get_object()
+        user = request.user
         comment = request.data.get('comment', '')
         
-        # ステータス更新
-        invoice.status = 'approved'
-        invoice.save()
+        # 承認待ち状態のみ承認可能
+        if invoice.status != 'pending_approval':
+            return Response(
+                {'error': '承認待ち状態の請求書のみ承認できます'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
         
-        # 承認履歴追加
+        # 承認権限チェック
+        can_approve = False
+        
+        # 現在の承認者である
+        if invoice.current_approver == user:
+            can_approve = True
+        
+        # 経理は全ステップで承認可能
+        if user.position == 'accountant':
+            can_approve = True
+        
+        if not can_approve:
+            return Response(
+                {'error': 'この請求書を承認する権限がありません'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        # 承認履歴を記録
         ApprovalHistory.objects.create(
             invoice=invoice,
-            user=request.user,
+            approval_step=invoice.current_approval_step,
+            user=user,
             action='approved',
-            comment=comment
+            comment=comment or f'{user.get_position_display()}が承認しました'
         )
         
+        # 次の承認ステップへ進む
+        current_step_order = invoice.current_approval_step.step_order
+        next_step = invoice.approval_route.steps.filter(
+            step_order=current_step_order + 1
+        ).first()
+        
+        if next_step:
+            # 次のステップがある場合
+            invoice.current_approval_step = next_step
+            
+            # 次の承認者を設定
+            if next_step.approver_user:
+                invoice.current_approver = next_step.approver_user
+            else:
+                # 役職から承認者を検索
+                next_approver = User.objects.filter(
+                    user_type='internal',
+                    company=invoice.receiving_company,
+                    position=next_step.approver_position,
+                    is_active=True
+                ).first()
+                
+                if next_approver:
+                    invoice.current_approver = next_approver
+                else:
+                    return Response(
+                        {'error': f'次の承認者（{next_step.get_approver_position_display()}）が見つかりません'},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+            
+            invoice.save()
+            
+            # 次の承認者に通知
+            self._send_notification_email(
+                recipient=invoice.current_approver,
+                subject=f'【請求書承認依頼】{invoice.invoice_number}',
+                message=f'''
+{invoice.current_approver.get_full_name()} 様
+
+請求書の承認依頼が届いています。
+
+請求書番号: {invoice.invoice_number}
+協力会社: {invoice.customer_company.name}
+工事現場: {invoice.construction_site.name}
+金額: ¥{invoice.total_amount:,}
+
+前承認者: {user.get_full_name()} ({user.get_position_display()})
+
+システムにログインして確認してください。
+                '''.strip()
+            )
+            
+            message = f'{next_step.step_name}に進みました'
+        else:
+            # 全ての承認ステップが完了
+            invoice.status = 'approved'
+            invoice.current_approval_step = None
+            invoice.current_approver = None
+            invoice.save()
+            
+            # 協力会社に承認完了通知
+            self._send_notification_email(
+                recipient=invoice.created_by,
+                subject=f'【承認完了】{invoice.invoice_number}',
+                message=f'''
+{invoice.created_by.get_full_name()} 様
+
+請求書が承認されました。
+
+請求書番号: {invoice.invoice_number}
+工事現場: {invoice.construction_site.name}
+金額: ¥{invoice.total_amount:,}
+
+お支払いまでしばらくお待ちください。
+                '''.strip()
+            )
+            
+            message = '全ての承認が完了しました'
+        
         return Response({
-            'message': '請求書を承認しました',
+            'message': message,
             'invoice': InvoiceSerializer(invoice).data
         })
     
     @action(detail=True, methods=['post'], permission_classes=[IsInternalUser])
     def reject(self, request, pk=None):
-        """請求書却下"""
+        """
+        請求書却下
+        - 現在の承認ステップの担当者のみ実行可能
+        - 経理は全ステップで実行可能
+        """
         invoice = self.get_object()
+        user = request.user
         comment = request.data.get('comment', '')
         
-        if not comment:
+        if invoice.status != 'pending_approval':
             return Response(
-                {'error': '却下理由を入力してください'},
+                {'error': '承認待ち状態の請求書のみ却下できます'},
                 status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # 却下権限チェック
+        can_reject = False
+        
+        if invoice.current_approver == user:
+            can_reject = True
+        
+        if user.position == 'accountant':
+            can_reject = True
+        
+        if not can_reject:
+            return Response(
+                {'error': 'この請求書を却下する権限がありません'},
+                status=status.HTTP_403_FORBIDDEN
             )
         
         # ステータス更新
         invoice.status = 'rejected'
+        invoice.current_approval_step = None
+        invoice.current_approver = None
         invoice.save()
         
         # 承認履歴追加
         ApprovalHistory.objects.create(
             invoice=invoice,
-            user=request.user,
+            approval_step=invoice.current_approval_step,
+            user=user,
             action='rejected',
-            comment=comment
+            comment=comment or '却下されました'
+        )
+        
+        # 協力会社に通知
+        self._send_notification_email(
+            recipient=invoice.created_by,
+            subject=f'【却下】{invoice.invoice_number}',
+            message=f'''
+{invoice.created_by.get_full_name()} 様
+
+申し訳ございませんが、請求書が却下されました。
+
+請求書番号: {invoice.invoice_number}
+却下理由: {comment}
+
+詳細はシステムでご確認ください。
+            '''.strip()
         )
         
         return Response({
@@ -244,26 +462,65 @@ class InvoiceViewSet(viewsets.ModelViewSet):
     
     @action(detail=True, methods=['post'], permission_classes=[IsInternalUser])
     def return_invoice(self, request, pk=None):
-        """請求書差し戻し"""
+        """
+        請求書差し戻し
+        - 現在の承認ステップの担当者のみ実行可能
+        - 経理は全ステップで実行可能
+        """
         invoice = self.get_object()
+        user = request.user
         comment = request.data.get('comment', '')
         
-        if not comment:
+        if invoice.status != 'pending_approval':
             return Response(
-                {'error': '差し戻し理由を入力してください'},
+                {'error': '承認待ち状態の請求書のみ差し戻しできます'},
                 status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # 差し戻し権限チェック
+        can_return = False
+        
+        if invoice.current_approver == user:
+            can_return = True
+        
+        if user.position == 'accountant':
+            can_return = True
+        
+        if not can_return:
+            return Response(
+                {'error': 'この請求書を差し戻す権限がありません'},
+                status=status.HTTP_403_FORBIDDEN
             )
         
         # ステータス更新
         invoice.status = 'returned'
+        invoice.current_approval_step = None
+        invoice.current_approver = None
         invoice.save()
         
         # 承認履歴追加
         ApprovalHistory.objects.create(
             invoice=invoice,
-            user=request.user,
+            approval_step=invoice.current_approval_step,
+            user=user,
             action='returned',
-            comment=comment
+            comment=comment or '差し戻されました'
+        )
+        
+        # 協力会社に通知
+        self._send_notification_email(
+            recipient=invoice.created_by,
+            subject=f'【差し戻し】{invoice.invoice_number}',
+            message=f'''
+{invoice.created_by.get_full_name()} 様
+
+請求書が差し戻されました。修正して再提出してください。
+
+請求書番号: {invoice.invoice_number}
+差し戻し理由: {comment}
+
+システムにログインして内容を確認してください。
+            '''.strip()
         )
         
         return Response({
@@ -290,17 +547,46 @@ class InvoiceViewSet(viewsets.ModelViewSet):
         """コメント追加"""
         invoice = self.get_object()
         
-        serializer = InvoiceCommentSerializer(data=request.data)
-        if serializer.is_valid():
-            serializer.save(invoice=invoice, user=request.user)
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        comment_text = request.data.get('comment', '')
+        comment_type = request.data.get('comment_type', 'general')
+        is_private = request.data.get('is_private', False)
+        
+        # 顧客はプライベートコメント不可
+        if request.user.user_type == 'customer':
+            is_private = False
+        
+        comment = InvoiceComment.objects.create(
+            invoice=invoice,
+            user=request.user,
+            comment=comment_text,
+            comment_type=comment_type,
+            is_private=is_private
+        )
+        
+        serializer = InvoiceCommentSerializer(comment)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+    
+    def _send_notification_email(self, recipient, subject, message):
+        """
+        通知メール送信（開発環境ではコンソール出力）
+        """
+        print(f"\n{'='*60}")
+        print(f"📧 メール通知")
+        print(f"{'='*60}")
+        print(f"宛先: {recipient.email} ({recipient.get_full_name()})")
+        print(f"件名: {subject}")
+        print(f"\n{message}")
+        print(f"{'='*60}\n")
+        
+        # 本番環境では実際にメール送信
+        # send_mail(
+        #     subject=subject,
+        #     message=message,
+        #     from_email=settings.DEFAULT_FROM_EMAIL,
+        #     recipient_list=[recipient.email],
+        #     fail_silently=True,
+        # )
 
-
-# ============================================================
-# backend/invoices/api_views.py の DashboardViewSet を
-# 以下のコードで置き換えてください
-# ============================================================
 
 class DashboardViewSet(viewsets.GenericViewSet):
     """ダッシュボードAPI - ユーザー種別対応版"""
@@ -325,12 +611,12 @@ class DashboardViewSet(viewsets.GenericViewSet):
             # 社内ユーザー向け統計
             stats = {
                 'pending_invoices': Invoice.objects.filter(
-                    status__in=['submitted', 'in_approval']
+                    status='pending_approval'
                 ).count(),
                 
-                'pending_approvals': Invoice.objects.filter(
-                    status='in_approval',
-                    # current_approver=user  # 承認ルート実装時に有効化
+                'my_pending_approvals': Invoice.objects.filter(
+                    status='pending_approval',
+                    current_approver=user
                 ).count(),
                 
                 'monthly_payment': Invoice.objects.filter(
@@ -353,7 +639,7 @@ class DashboardViewSet(viewsets.GenericViewSet):
                 
                 'submitted_count': Invoice.objects.filter(
                     customer_company=user.customer_company,
-                    status__in=['submitted', 'in_approval']
+                    status__in=['submitted', 'pending_approval']
                 ).count(),
                 
                 'returned_count': Invoice.objects.filter(
@@ -368,7 +654,7 @@ class DashboardViewSet(viewsets.GenericViewSet):
                 
                 'total_amount_pending': Invoice.objects.filter(
                     customer_company=user.customer_company,
-                    status__in=['submitted', 'in_approval', 'approved']
+                    status__in=['submitted', 'pending_approval', 'approved']
                 ).aggregate(total=Sum('total_amount'))['total'] or 0,
             }
 

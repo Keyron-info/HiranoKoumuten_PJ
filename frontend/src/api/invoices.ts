@@ -1,6 +1,9 @@
+// frontend/src/api/invoices.ts
+
 import apiClient from './client';
 import {
   Invoice,
+  InvoiceListItem,
   InvoiceCreateForm,
   InvoiceComment,
   ConstructionSite,
@@ -13,8 +16,9 @@ export const invoiceAPI = {
   getInvoices: async (params?: {
     status?: string;
     page?: number;
-  }): Promise<PaginatedResponse<Invoice>> => {
-    const response = await apiClient.get<PaginatedResponse<Invoice>>('/invoices/', {
+    search?: string;
+  }): Promise<PaginatedResponse<InvoiceListItem>> => {
+    const response = await apiClient.get<PaginatedResponse<InvoiceListItem>>('/invoices/', {
       params,
     });
     return response.data;
@@ -44,32 +48,43 @@ export const invoiceAPI = {
   },
 
   // 請求書提出
-  submitInvoice: async (id: string): Promise<Invoice> => {
-    const response = await apiClient.post<Invoice>(`/invoices/${id}/submit/`);
+  submitInvoice: async (id: string): Promise<{ message: string; invoice: Invoice }> => {
+    const response = await apiClient.post<{ message: string; invoice: Invoice }>(
+      `/invoices/${id}/submit/`
+    );
     return response.data;
   },
 
   // 請求書承認
-  approveInvoice: async (id: string, comment?: string): Promise<Invoice> => {
-    const response = await apiClient.post<Invoice>(`/invoices/${id}/approve/`, {
-      comment,
-    });
+  approveInvoice: async (id: string, comment?: string): Promise<{ message: string; invoice: Invoice }> => {
+    const response = await apiClient.post<{ message: string; invoice: Invoice }>(
+      `/invoices/${id}/approve/`,
+      { comment }
+    );
     return response.data;
   },
 
   // 請求書却下
-  rejectInvoice: async (id: string, comment: string): Promise<Invoice> => {
-    const response = await apiClient.post<Invoice>(`/invoices/${id}/reject/`, {
-      comment,
-    });
+  rejectInvoice: async (id: string, comment: string): Promise<{ message: string; invoice: Invoice }> => {
+    const response = await apiClient.post<{ message: string; invoice: Invoice }>(
+      `/invoices/${id}/reject/`,
+      { comment }
+    );
     return response.data;
   },
 
   // 請求書差し戻し
-  returnInvoice: async (id: string, comment: string): Promise<Invoice> => {
-    const response = await apiClient.post<Invoice>(`/invoices/${id}/return/`, {
-      comment,
-    });
+  returnInvoice: async (id: string, comment: string): Promise<{ message: string; invoice: Invoice }> => {
+    const response = await apiClient.post<{ message: string; invoice: Invoice }>(
+      `/invoices/${id}/return_invoice/`,
+      { comment }
+    );
+    return response.data;
+  },
+
+  // コメント一覧取得
+  getComments: async (id: string): Promise<InvoiceComment[]> => {
+    const response = await apiClient.get<InvoiceComment[]>(`/invoices/${id}/comments/`);
     return response.data;
   },
 
@@ -77,11 +92,13 @@ export const invoiceAPI = {
   addComment: async (
     id: string,
     comment: string,
-    commentType: 'general' | 'approval' | 'payment' | 'correction' = 'general'
+    commentType: 'general' | 'approval' | 'payment' | 'correction' | 'internal_memo' = 'general',
+    isPrivate: boolean = false
   ): Promise<InvoiceComment> => {
-    const response = await apiClient.post<InvoiceComment>(`/invoices/${id}/comments/`, {
+    const response = await apiClient.post<InvoiceComment>(`/invoices/${id}/add_comment/`, {
       comment,
       comment_type: commentType,
+      is_private: isPrivate,
     });
     return response.data;
   },

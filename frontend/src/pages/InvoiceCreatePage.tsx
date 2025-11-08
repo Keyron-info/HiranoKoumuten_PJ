@@ -67,6 +67,14 @@ const InvoiceCreatePage: React.FC = () => {
     }
   };
 
+  // 選択された工事現場を取得
+  const getSelectedSite = (): ConstructionSite | undefined => {
+    if (!formData.construction_site) return undefined;
+    return sites.find(site => site.id.toString() === formData.construction_site.toString());
+  };
+
+  const selectedSite = getSelectedSite();
+
   // 金額計算
   const calculateTotals = () => {
     const subtotal = formData.items.reduce((sum, item) => sum + item.amount, 0);
@@ -164,6 +172,11 @@ const InvoiceCreatePage: React.FC = () => {
       return user.company_name;
     }
     
+    // user.customer_company_name が存在するか確認
+    if ('customer_company_name' in user && user.customer_company_name) {
+      return user.customer_company_name;
+    }
+    
     // user.company.name が存在するか確認（型アサーション）
     const userWithCompany = user as any;
     if (userWithCompany.company && userWithCompany.company.name) {
@@ -198,7 +211,7 @@ const InvoiceCreatePage: React.FC = () => {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* 工事現場 */}
-              <div>
+              <div className="md:col-span-2">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   工事現場 <span className="text-red-500">*</span>
                 </label>
@@ -213,6 +226,7 @@ const InvoiceCreatePage: React.FC = () => {
                     sites.map((site) => (
                       <option key={site.id} value={site.id}>
                         {site.name}
+                        {site.supervisor_name && ` - 担当: ${site.supervisor_name}`}
                       </option>
                     ))
                   ) : (
@@ -223,6 +237,37 @@ const InvoiceCreatePage: React.FC = () => {
                   <p className="mt-1 text-xs text-red-500">
                     工事現場が登録されていません。管理者に連絡してください。
                   </p>
+                )}
+
+                {/* 選択された工事現場の詳細表示 */}
+                {selectedSite && (
+                  <div className="mt-3 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                    <div className="flex items-start space-x-2">
+                      <svg className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-blue-900">
+                          {selectedSite.name}
+                        </p>
+                        {selectedSite.location && (
+                          <p className="text-sm text-blue-700 mt-1">
+                            📍 {selectedSite.location}
+                          </p>
+                        )}
+                        {selectedSite.supervisor_name && (
+                          <p className="text-sm text-blue-700 mt-1">
+                            👤 現場監督: <span className="font-medium">{selectedSite.supervisor_name}</span>
+                          </p>
+                        )}
+                        {selectedSite.supervisor_name && (
+                          <p className="text-xs text-blue-600 mt-2">
+                            💡 この請求書は {selectedSite.supervisor_name} が最初に承認します
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
                 )}
               </div>
 
@@ -239,6 +284,9 @@ const InvoiceCreatePage: React.FC = () => {
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
                 />
               </div>
+
+              {/* 空白（レイアウト調整） */}
+              <div></div>
 
               {/* 請求日 */}
               <div>

@@ -586,6 +586,74 @@ class InvoiceViewSet(viewsets.ModelViewSet):
         #     recipient_list=[recipient.email],
         #     fail_silently=True,
         # )
+    @action(detail=True, methods=['get'])
+    def generate_pdf(self, request, pk=None):
+        """請求書PDF生成"""
+        invoice = self.get_object()
+        
+        from .pdf_generator import generate_invoice_pdf
+        
+        pdf_buffer = generate_invoice_pdf(invoice)
+        
+        # 生成履歴を記録
+        PDFGenerationLog.objects.create(
+            invoice=invoice,
+            generated_by=request.user,
+            file_size=len(pdf_buffer.getvalue())
+        )
+        
+        # PDFレスポンス
+        response = HttpResponse(pdf_buffer.getvalue(), content_type='application/pdf')
+        response['Content-Disposition'] = f'attachment; filename="invoice_{invoice.invoice_number}.pdf"'
+        
+        return response
+    
+    @action(detail=True, methods=['get'])
+    def pdf_history(self, request, pk=None):
+        """PDF生成履歴"""
+        invoice = self.get_object()
+        logs = invoice.pdf_logs.all()[:10]
+        serializer = PDFGenerationLogSerializer(logs, many=True)
+        return Response(serializer.data)
+    
+    # Phase 2: 請求書作成時の期間チェック
+    def create(self, request, *args, **kwargs):
+        """請求書作成（期間チェック付き）"""
+        
+        # 協力会社ユーザーの場合のみチェック
+        if request.user.user_type == 'customer':
+            invoice_date = request.data.get('invoice_date')
+            if invoice_date:
+                try:
+                    from datetime import datetime
+                    date_obj = datetime.strptime(invoice_date, '%Y-%m-%d').date()
+                    year, month = date_obj.year, date_obj.month
+                    
+                    # 該当期間を取得
+                    period = MonthlyInvoicePeriod.objects.filter(
+                        company=request.user.customer_company.receiving_company,
+                        year=year,
+                        month=month
+                    ).first()
+                    
+                    if period and period.is_closed:
+                        return Response(
+                            {
+                                'error': f'{period.period_name}は既に締め切られています',
+                                'detail': '請求書の作成はできません。経理部門にお問い合わせください。'
+                            },
+                            status=status.HTTP_400_BAD_REQUEST
+                        )
+                    
+                    # 期間を自動設定
+                    if period:
+                        request.data['invoice_period'] = period.id
+                        
+                except ValueError:
+                    pass
+        
+        # 既存の作成処理を実行
+        return super().create(request, *args, **kwargs)
 
 
 class DashboardViewSet(viewsets.GenericViewSet):
@@ -659,3 +727,325 @@ class DashboardViewSet(viewsets.GenericViewSet):
             }
 
         return Response(stats, status=status.HTTP_200_OK)
+# ==========================================
+# Phase 2: API Views 追加
+# ==========================================
+# backend/invoices/api_views.py に追加してください
+
+from rest_framework import viewsets, status
+from rest_framework.decorators import action
+from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
+from django.utils import timezone
+from django.db.models import Q, Count
+from datetime import datetime, timedelta
+from django.http import HttpResponse
+import io
+
+from .models import (
+    InvoiceTemplate, TemplateField, MonthlyInvoicePeriod,
+    CustomField, CustomFieldValue, PDFGenerationLog, Invoice
+)
+from .serializers import (
+    InvoiceTemplateSerializer, InvoiceTemplateListSerializer,
+    TemplateFieldSerializer, MonthlyInvoicePeriodSerializer,
+    MonthlyInvoicePeriodListSerializer, CustomFieldSerializer,
+    CustomFieldValueSerializer, PDFGenerationLogSerializer
+)
+
+
+# ==========================================
+# 1. テンプレート管理API
+# ==========================================
+
+class InvoiceTemplateViewSet(viewsets.ModelViewSet):
+    """請求書テンプレートAPI"""
+    permission_classes = [IsAuthenticated]
+    
+    def get_queryset(self):
+        user = self.request.user
+        if user.user_type == 'internal':
+            # 社内ユーザーは自社のテンプレートを全て見れる
+            return InvoiceTemplate.objects.filter(company=user.company)
+        else:
+            # 協力会社は有効なテンプレートのみ
+            return InvoiceTemplate.objects.filter(
+                company=user.customer_company.receiving_company,
+                is_active=True
+            )
+    
+    def get_serializer_class(self):
+        if self.action == 'list':
+            return InvoiceTemplateListSerializer
+        return InvoiceTemplateSerializer
+    
+    @action(detail=False, methods=['get'])
+    def active(self, request):
+        """有効なテンプレート一覧"""
+        templates = self.get_queryset().filter(is_active=True)
+        serializer = InvoiceTemplateListSerializer(templates, many=True)
+        return Response(serializer.data)
+    
+    @action(detail=False, methods=['get'])
+    def default(self, request):
+        """デフォルトテンプレート取得"""
+        template = self.get_queryset().filter(is_default=True).first()
+        if not template:
+            return Response(
+                {'error': 'デフォルトテンプレートが設定されていません'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        serializer = InvoiceTemplateSerializer(template)
+        return Response(serializer.data)
+
+
+class TemplateFieldViewSet(viewsets.ModelViewSet):
+    """テンプレートフィールドAPI"""
+    serializer_class = TemplateFieldSerializer
+    permission_classes = [IsAuthenticated]
+    
+    def get_queryset(self):
+        template_id = self.request.query_params.get('template')
+        if template_id:
+            return TemplateField.objects.filter(template_id=template_id)
+        return TemplateField.objects.all()
+
+
+# ==========================================
+# 2. 月次請求期間管理API
+# ==========================================
+
+class MonthlyInvoicePeriodViewSet(viewsets.ModelViewSet):
+    """月次請求期間API"""
+    permission_classes = [IsAuthenticated]
+    
+    def get_queryset(self):
+        user = self.request.user
+        if user.user_type == 'internal':
+            return MonthlyInvoicePeriod.objects.filter(company=user.company)
+        else:
+            # 協力会社は受付先の期間を見れる
+            return MonthlyInvoicePeriod.objects.filter(
+                company=user.customer_company.receiving_company
+            )
+    
+    def get_serializer_class(self):
+        if self.action == 'list':
+            return MonthlyInvoicePeriodListSerializer
+        return MonthlyInvoicePeriodSerializer
+    
+    @action(detail=False, methods=['get'])
+    def current(self, request):
+        """当月の請求期間取得"""
+        now = timezone.now()
+        period = self.get_queryset().filter(
+            year=now.year,
+            month=now.month
+        ).first()
+        
+        if not period:
+            return Response(
+                {'error': '当月の請求期間が設定されていません'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        serializer = MonthlyInvoicePeriodSerializer(period)
+        return Response(serializer.data)
+    
+    @action(detail=False, methods=['get'])
+    def open_periods(self, request):
+        """受付中の期間一覧"""
+        periods = self.get_queryset().filter(is_closed=False)
+        serializer = MonthlyInvoicePeriodListSerializer(periods, many=True)
+        return Response(serializer.data)
+    
+    @action(detail=True, methods=['post'])
+    def close(self, request, pk=None):
+        """期間を締める"""
+        period = self.get_object()
+        
+        # 既に締められているか確認
+        if period.is_closed:
+            return Response(
+                {'error': 'この期間は既に締められています'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # 権限確認（社内ユーザーのみ）
+        if request.user.user_type != 'internal':
+            return Response(
+                {'error': '権限がありません'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        # 締め処理実行
+        period.close_period(request.user)
+        
+        serializer = MonthlyInvoicePeriodSerializer(period)
+        return Response({
+            'message': f'{period.period_name}を締めました',
+            'period': serializer.data
+        })
+    
+    @action(detail=True, methods=['post'])
+    def reopen(self, request, pk=None):
+        """期間を再開する"""
+        period = self.get_object()
+        
+        # 権限確認（管理者のみ）
+        if not (request.user.user_type == 'internal' and 
+                request.user.position in ['president', 'accountant']):
+            return Response(
+                {'error': '期間の再開は社長または経理のみが実行できます'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        # 再開処理
+        period.reopen_period()
+        
+        serializer = MonthlyInvoicePeriodSerializer(period)
+        return Response({
+            'message': f'{period.period_name}を再開しました',
+            'period': serializer.data
+        })
+    
+    @action(detail=True, methods=['get'])
+    def unsubmitted_companies(self, request, pk=None):
+        """未提出の協力会社一覧"""
+        period = self.get_object()
+        
+        # この期間の全協力会社を取得
+        from .models import CustomerCompany
+        all_companies = CustomerCompany.objects.filter(
+            receiving_company=period.company
+        )
+        
+        # この期間に請求書を提出済みの会社
+        submitted_company_ids = period.invoices.exclude(
+            status='draft'
+        ).values_list('customer_company_id', flat=True).distinct()
+        
+        # 未提出の会社
+        unsubmitted = all_companies.exclude(id__in=submitted_company_ids)
+        
+        return Response({
+            'period': period.period_name,
+            'total_companies': all_companies.count(),
+            'submitted_count': len(submitted_company_ids),
+            'unsubmitted_count': unsubmitted.count(),
+            'unsubmitted_companies': [
+                {
+                    'id': company.id,
+                    'name': company.name,
+                    'contact_email': company.contact_email
+                }
+                for company in unsubmitted
+            ]
+        })
+
+
+# ==========================================
+# 3. カスタムフィールドAPI
+# ==========================================
+
+class CustomFieldViewSet(viewsets.ModelViewSet):
+    """カスタムフィールドAPI"""
+    serializer_class = CustomFieldSerializer
+    permission_classes = [IsAuthenticated]
+    
+    def get_queryset(self):
+        user = self.request.user
+        if user.user_type == 'internal':
+            return CustomField.objects.filter(company=user.company, is_active=True)
+        else:
+            return CustomField.objects.filter(
+                company=user.customer_company.receiving_company,
+                is_active=True
+            )
+
+
+# ==========================================
+# 4. PDF生成API（既存のInvoiceViewSetに追加）
+# ==========================================
+
+# ※ 以下を既存のInvoiceViewSetに@actionとして追加してください
+
+"""
+@action(detail=True, methods=['get'])
+def generate_pdf(self, request, pk=None):
+    '''請求書PDF生成'''
+    invoice = self.get_object()
+    
+    # PDF生成ロジック（次のステップで実装）
+    from .pdf_generator import generate_invoice_pdf
+    
+    pdf_buffer = generate_invoice_pdf(invoice)
+    
+    # 生成履歴を記録
+    PDFGenerationLog.objects.create(
+        invoice=invoice,
+        generated_by=request.user,
+        file_size=len(pdf_buffer.getvalue())
+    )
+    
+    # PDFレスポンス
+    response = HttpResponse(pdf_buffer.getvalue(), content_type='application/pdf')
+    response['Content-Disposition'] = f'attachment; filename="invoice_{invoice.invoice_number}.pdf"'
+    
+    return response
+
+@action(detail=True, methods=['get'])
+def pdf_history(self, request, pk=None):
+    '''PDF生成履歴'''
+    invoice = self.get_object()
+    logs = invoice.pdf_logs.all()[:10]  # 最新10件
+    serializer = PDFGenerationLogSerializer(logs, many=True)
+    return Response(serializer.data)
+"""
+
+
+# ==========================================
+# 5. 請求書作成時の期間チェック（既存のInvoiceViewSetに追加）
+# ==========================================
+
+"""
+# 既存のInvoiceViewSetのcreateメソッドを以下のように拡張:
+
+def create(self, request, *args, **kwargs):
+    '''請求書作成（期間チェック付き）'''
+    
+    # 協力会社ユーザーの場合のみチェック
+    if request.user.user_type == 'customer':
+        # 請求期間のチェック
+        invoice_date = request.data.get('invoice_date')
+        if invoice_date:
+            try:
+                date_obj = datetime.strptime(invoice_date, '%Y-%m-%d').date()
+                year, month = date_obj.year, date_obj.month
+                
+                # 該当期間を取得
+                period = MonthlyInvoicePeriod.objects.filter(
+                    company=request.user.customer_company.receiving_company,
+                    year=year,
+                    month=month
+                ).first()
+                
+                if period and period.is_closed:
+                    return Response(
+                        {
+                            'error': f'{period.period_name}は既に締め切られています',
+                            'detail': '請求書の作成はできません。経理部門にお問い合わせください。'
+                        },
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+                
+                # 期間を自動設定
+                if period:
+                    request.data['invoice_period'] = period.id
+                    
+            except ValueError:
+                pass
+    
+    # 既存の作成処理を実行
+    return super().create(request, *args, **kwargs)
+"""

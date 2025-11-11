@@ -343,6 +343,22 @@ class Invoice(models.Model):
         default=Decimal('0'),
         verbose_name="合計金額"
     )
+    template = models.ForeignKey(
+        'InvoiceTemplate',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='invoices',
+        verbose_name='テンプレート'
+    )
+    invoice_period = models.ForeignKey(
+        'MonthlyInvoicePeriod',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='invoices',
+        verbose_name='請求期間'
+    )
     
     # 日付
     issue_date = models.DateField(verbose_name="発行日", null=True, blank=True)
@@ -576,3 +592,246 @@ class InvoiceComment(models.Model):
     
     def __str__(self):
         return f"{self.invoice.invoice_number} - {self.user} ({self.timestamp.strftime('%Y/%m/%d %H:%M')})"
+    
+    # ==========================================
+# Phase 2: 顧客向け機能 - モデル追加
+# ==========================================
+# このコードを既存のmodels.pyの最後に追加してください
+
+import uuid
+from datetime import timedelta
+
+
+# ==========================================
+# 1. 請求書テンプレートシステム
+# ==========================================
+
+class InvoiceTemplate(models.Model):
+    """請求書テンプレート - 業種別テンプレート管理"""
+    name = models.CharField('テンプレート名', max_length=100)
+    company = models.ForeignKey(Company, on_delete=models.CASCADE, verbose_name='会社')
+    description = models.TextField('説明', blank=True)
+    is_active = models.BooleanField('有効', default=True)
+    is_default = models.BooleanField('デフォルト', default=False)
+    created_at = models.DateTimeField('作成日時', auto_now_add=True)
+    updated_at = models.DateTimeField('更新日時', auto_now=True)
+
+    class Meta:
+        db_table = 'invoice_templates'
+        verbose_name = '請求書テンプレート'
+        verbose_name_plural = '請求書テンプレート'
+        ordering = ['-is_default', '-created_at']
+
+    def __str__(self):
+        return f"{self.company.name} - {self.name}"
+
+    def save(self, *args, **kwargs):
+        # デフォルトテンプレートは1つだけ
+        if self.is_default:
+            InvoiceTemplate.objects.filter(
+                company=self.company,
+                is_default=True
+            ).update(is_default=False)
+        super().save(*args, **kwargs)
+
+
+class TemplateField(models.Model):
+    """テンプレートフィールド定義 - カスタムフィールド用"""
+    FIELD_TYPE_CHOICES = [
+        ('text', 'テキスト'),
+        ('number', '数値'),
+        ('date', '日付'),
+        ('select', '選択'),
+        ('textarea', 'テキストエリア'),
+    ]
+
+    template = models.ForeignKey(
+        InvoiceTemplate,
+        on_delete=models.CASCADE,
+        related_name='fields',
+        verbose_name='テンプレート'
+    )
+    field_name = models.CharField('フィールド名', max_length=100)
+    field_type = models.CharField('フィールドタイプ', max_length=20, choices=FIELD_TYPE_CHOICES)
+    is_required = models.BooleanField('必須', default=False)
+    default_value = models.CharField('デフォルト値', max_length=200, blank=True)
+    display_order = models.IntegerField('表示順', default=0)
+    help_text = models.CharField('ヘルプテキスト', max_length=200, blank=True)
+    
+    # 選択肢（selectタイプの場合、カンマ区切り）
+    choices = models.TextField('選択肢', blank=True, help_text='カンマ区切り (例: 銀行振込,現金,小切手)')
+
+    class Meta:
+        db_table = 'template_fields'
+        verbose_name = 'テンプレートフィールド'
+        verbose_name_plural = 'テンプレートフィールド'
+        ordering = ['display_order', 'id']
+
+    def __str__(self):
+        return f"{self.template.name} - {self.field_name}"
+
+
+# ==========================================
+# 2. 月次請求期間管理（締め処理）
+# ==========================================
+
+class MonthlyInvoicePeriod(models.Model):
+    """月次請求期間管理 - 月末締め処理"""
+    company = models.ForeignKey(Company, on_delete=models.CASCADE, verbose_name='会社')
+    year = models.IntegerField('年')
+    month = models.IntegerField('月', help_text='1-12')
+    deadline_date = models.DateField('締切日')
+    is_closed = models.BooleanField('締め済み', default=False)
+    closed_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='closed_periods',
+        verbose_name='締め実行者'
+    )
+    closed_at = models.DateTimeField('締め日時', null=True, blank=True)
+    notes = models.TextField('備考', blank=True)
+    created_at = models.DateTimeField('作成日時', auto_now_add=True)
+
+    class Meta:
+        db_table = 'monthly_invoice_periods'
+        verbose_name = '月次請求期間'
+        verbose_name_plural = '月次請求期間'
+        unique_together = ['company', 'year', 'month']
+        ordering = ['-year', '-month']
+
+    def __str__(self):
+        status = '締め済み' if self.is_closed else '受付中'
+        return f"{self.company.name} - {self.year}年{self.month}月 ({status})"
+
+    @property
+    def period_name(self):
+        """期間名（例: 2024年10月分）"""
+        return f"{self.year}年{self.month}月分"
+
+    @property
+    def is_past_deadline(self):
+        """締切を過ぎているか"""
+        from django.utils import timezone
+        return timezone.now().date() > self.deadline_date
+
+    def close_period(self, user):
+        """期間を締める"""
+        from django.utils import timezone
+        self.is_closed = True
+        self.closed_by = user
+        self.closed_at = timezone.now()
+        self.save()
+
+    def reopen_period(self):
+        """期間を再開する"""
+        self.is_closed = False
+        self.closed_by = None
+        self.closed_at = None
+        self.save()
+
+
+# ==========================================
+# 3. カスタムフィールド（将来の拡張用）
+# ==========================================
+
+class CustomField(models.Model):
+    """カスタムフィールド定義"""
+    FIELD_TYPE_CHOICES = [
+        ('text', 'テキスト'),
+        ('number', '数値'),
+        ('date', '日付'),
+        ('select', '選択'),
+        ('checkbox', 'チェックボックス'),
+    ]
+
+    company = models.ForeignKey(Company, on_delete=models.CASCADE, verbose_name='会社')
+    field_name = models.CharField('フィールド名', max_length=100)
+    field_type = models.CharField('フィールドタイプ', max_length=20, choices=FIELD_TYPE_CHOICES)
+    is_required = models.BooleanField('必須', default=False)
+    is_active = models.BooleanField('有効', default=True)
+    display_order = models.IntegerField('表示順', default=0)
+    help_text = models.CharField('ヘルプテキスト', max_length=200, blank=True)
+
+    class Meta:
+        db_table = 'custom_fields'
+        verbose_name = 'カスタムフィールド'
+        verbose_name_plural = 'カスタムフィールド'
+        ordering = ['display_order', 'id']
+
+    def __str__(self):
+        return f"{self.company.name} - {self.field_name}"
+
+
+class CustomFieldValue(models.Model):
+    """カスタムフィールド値"""
+    invoice = models.ForeignKey(
+        'Invoice',
+        on_delete=models.CASCADE,
+        related_name='custom_values',
+        verbose_name='請求書'
+    )
+    custom_field = models.ForeignKey(
+        CustomField,
+        on_delete=models.CASCADE,
+        verbose_name='カスタムフィールド'
+    )
+    value = models.TextField('値')
+
+    class Meta:
+        db_table = 'custom_field_values'
+        verbose_name = 'カスタムフィールド値'
+        verbose_name_plural = 'カスタムフィールド値'
+        unique_together = ['invoice', 'custom_field']
+
+    def __str__(self):
+        return f"{self.invoice.invoice_number} - {self.custom_field.field_name}: {self.value}"
+
+
+# ==========================================
+# 4. PDF生成履歴（オプション）
+# ==========================================
+
+class PDFGenerationLog(models.Model):
+    """PDF生成履歴"""
+    invoice = models.ForeignKey(
+        'Invoice',
+        on_delete=models.CASCADE,
+        related_name='pdf_logs',
+        verbose_name='請求書'
+    )
+    generated_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, verbose_name='生成者')
+    generated_at = models.DateTimeField('生成日時', auto_now_add=True)
+    file_size = models.IntegerField('ファイルサイズ(bytes)', null=True, blank=True)
+
+    class Meta:
+        db_table = 'pdf_generation_logs'
+        verbose_name = 'PDF生成履歴'
+        verbose_name_plural = 'PDF生成履歴'
+        ordering = ['-generated_at']
+
+    def __str__(self):
+        return f"{self.invoice.invoice_number} - {self.generated_at.strftime('%Y-%m-%d %H:%M')}"
+
+
+# ==========================================
+# 既存のInvoiceモデルに追加するフィールド
+# ==========================================
+# ※ これは既存のInvoiceモデル内に追加してください
+
+# Invoice モデルに以下のフィールドを追加:
+# template = models.ForeignKey(
+#     InvoiceTemplate,
+#     on_delete=models.SET_NULL,
+#     null=True,
+#     blank=True,
+#     verbose_name='テンプレート'
+# )
+# invoice_period = models.ForeignKey(
+#     MonthlyInvoicePeriod,
+#     on_delete=models.SET_NULL,
+#     null=True,
+#     blank=True,
+#     verbose_name='請求期間'
+# )

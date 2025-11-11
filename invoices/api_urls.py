@@ -11,6 +11,10 @@ from .api_views import (
     ConstructionSiteViewSet,
     InvoiceViewSet,
     DashboardViewSet,
+    InvoiceTemplateViewSet,
+    TemplateFieldViewSet,
+    MonthlyInvoicePeriodViewSet,
+    CustomFieldViewSet,
 )
 
 router = DefaultRouter()
@@ -20,6 +24,10 @@ router.register(r'construction-sites', ConstructionSiteViewSet, basename='constr
 router.register(r'invoices', InvoiceViewSet, basename='invoice')
 router.register(r'dashboard', DashboardViewSet, basename='dashboard')
 router.register(r'users', UserProfileViewSet, basename='user')
+router.register(r'templates', InvoiceTemplateViewSet, basename='template')
+router.register(r'template-fields', TemplateFieldViewSet, basename='template-field')
+router.register(r'invoice-periods', MonthlyInvoicePeriodViewSet, basename='invoice-period')
+router.register(r'custom-fields', CustomFieldViewSet, basename='custom-field')
 
 urlpatterns = [
     # JWT認証

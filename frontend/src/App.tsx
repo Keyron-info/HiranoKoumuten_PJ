@@ -1,14 +1,21 @@
+// src/App.tsx
+// 統合版 App.tsx（AuthContext + InternalRoute対応）
+
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import DashboardPage from './pages/DashboardPage';
 import InvoiceListPage from './pages/InvoiceListPage';
 import InvoiceCreatePage from './pages/InvoiceCreatePage';
 import InvoiceDetailPage from './pages/InvoiceDetailPage';
+import InvoicePeriods from './pages/InvoicePeriods';
 
-// 認証が必要なルートを保護するコンポーネント
+// ====================
+// 認証保護ルート
+// ====================
 const ProtectedRoute: React.FC<{ children: React.ReactElement }> = ({ children }) => {
   const { isAuthenticated, loading } = useAuth();
 
@@ -16,7 +23,7 @@ const ProtectedRoute: React.FC<{ children: React.ReactElement }> = ({ children }
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-600 mx-auto"></div>
           <p className="mt-4 text-gray-600">読み込み中...</p>
         </div>
       </div>
@@ -26,14 +33,44 @@ const ProtectedRoute: React.FC<{ children: React.ReactElement }> = ({ children }
   return isAuthenticated ? children : <Navigate to="/login" replace />;
 };
 
-// ログイン済みの場合はダッシュボードにリダイレクト
+// ====================
+// 内部ユーザー専用ルート
+// ====================
+const InternalRoute: React.FC<{ children: React.ReactElement }> = ({ children }) => {
+  const { user, isAuthenticated, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">読み込み中...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
+
+  if (user?.user_type !== 'internal') {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  return children;
+};
+
+// ====================
+// 未ログインユーザー専用ルート
+// ====================
 const PublicRoute: React.FC<{ children: React.ReactElement }> = ({ children }) => {
   const { isAuthenticated, loading } = useAuth();
 
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-600 mx-auto"></div>
       </div>
     );
   }
@@ -41,10 +78,13 @@ const PublicRoute: React.FC<{ children: React.ReactElement }> = ({ children }) =
   return !isAuthenticated ? children : <Navigate to="/dashboard" replace />;
 };
 
+// ====================
+// ルーティング定義
+// ====================
 const AppRoutes: React.FC = () => {
   return (
     <Routes>
-      {/* 公開ルート（未ログイン向け） */}
+      {/* 公開ルート */}
       <Route
         path="/login"
         element={
@@ -62,7 +102,7 @@ const AppRoutes: React.FC = () => {
         }
       />
 
-      {/* 保護されたルート（ログイン必須） */}
+      {/* 保護ルート */}
       <Route
         path="/dashboard"
         element={
@@ -96,15 +136,28 @@ const AppRoutes: React.FC = () => {
         }
       />
 
+      {/* 内部ユーザー専用 */}
+      <Route
+        path="/invoice-periods"
+        element={
+          <InternalRoute>
+            <InvoicePeriods />
+          </InternalRoute>
+        }
+      />
+
       {/* デフォルトルート */}
       <Route path="/" element={<Navigate to="/dashboard" replace />} />
-      
-      {/* 404ページ */}
+
+      {/* 404 */}
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
     </Routes>
   );
 };
 
+// ====================
+// メインApp
+// ====================
 const App: React.FC = () => {
   return (
     <Router>

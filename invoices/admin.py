@@ -77,3 +77,162 @@ class ApprovalHistoryAdmin(admin.ModelAdmin):
 class InvoiceCommentAdmin(admin.ModelAdmin):
     list_display = ['invoice', 'user', 'comment_type', 'timestamp']
     list_filter = ['comment_type', 'timestamp', 'is_private']
+# ==========================================
+# Phase 2: Admin管理画面追加
+# ==========================================
+# backend/invoices/admin.py に追加してください
+
+from django.contrib import admin
+from .models import (
+    InvoiceTemplate, TemplateField, MonthlyInvoicePeriod,
+    CustomField, CustomFieldValue, PDFGenerationLog
+)
+
+
+# ==========================================
+# 1. テンプレート管理
+# ==========================================
+
+class TemplateFieldInline(admin.TabularInline):
+    """テンプレートフィールドのインライン表示"""
+    model = TemplateField
+    extra = 1
+    fields = ['field_name', 'field_type', 'is_required', 'default_value', 'display_order']
+    ordering = ['display_order']
+
+
+@admin.register(InvoiceTemplate)
+class InvoiceTemplateAdmin(admin.ModelAdmin):
+    """請求書テンプレート管理"""
+    list_display = ['name', 'company', 'is_active', 'is_default', 'created_at']
+    list_filter = ['company', 'is_active', 'is_default']
+    search_fields = ['name', 'description']
+    readonly_fields = ['created_at', 'updated_at']
+    inlines = [TemplateFieldInline]
+    
+    fieldsets = (
+        ('基本情報', {
+            'fields': ('name', 'company', 'description')
+        }),
+        ('設定', {
+            'fields': ('is_active', 'is_default')
+        }),
+        ('システム情報', {
+            'fields': ('created_at', 'updated_at'),
+            'classes': ('collapse',)
+        }),
+    )
+
+
+@admin.register(TemplateField)
+class TemplateFieldAdmin(admin.ModelAdmin):
+    """テンプレートフィールド管理"""
+    list_display = ['template', 'field_name', 'field_type', 'is_required', 'display_order']
+    list_filter = ['template', 'field_type', 'is_required']
+    search_fields = ['field_name', 'template__name']
+    list_editable = ['display_order']
+
+
+# ==========================================
+# 2. 月次請求期間管理
+# ==========================================
+
+@admin.register(MonthlyInvoicePeriod)
+class MonthlyInvoicePeriodAdmin(admin.ModelAdmin):
+    """月次請求期間管理"""
+    list_display = [
+        'period_name', 'company', 'deadline_date',
+        'is_closed', 'closed_by', 'invoice_count'
+    ]
+    list_filter = ['company', 'is_closed', 'year']
+    search_fields = ['company__name', 'notes']
+    readonly_fields = ['closed_by', 'closed_at', 'created_at']
+    date_hierarchy = 'deadline_date'
+    
+    fieldsets = (
+        ('期間情報', {
+            'fields': ('company', 'year', 'month', 'deadline_date')
+        }),
+        ('締め状態', {
+            'fields': ('is_closed', 'closed_by', 'closed_at', 'notes')
+        }),
+        ('システム情報', {
+            'fields': ('created_at',),
+            'classes': ('collapse',)
+        }),
+    )
+    
+    def period_name(self, obj):
+        return obj.period_name
+    period_name.short_description = '期間'
+    
+    def invoice_count(self, obj):
+        """この期間の請求書数"""
+        return obj.invoices.count()
+    invoice_count.short_description = '請求書数'
+    
+    actions = ['close_periods', 'reopen_periods']
+    
+    def close_periods(self, request, queryset):
+        """一括締め処理"""
+        for period in queryset.filter(is_closed=False):
+            period.close_period(request.user)
+        self.message_user(request, f'{queryset.count()}件の期間を締めました')
+    close_periods.short_description = '選択した期間を締める'
+    
+    def reopen_periods(self, request, queryset):
+        """一括再開処理"""
+        for period in queryset.filter(is_closed=True):
+            period.reopen_period()
+        self.message_user(request, f'{queryset.count()}件の期間を再開しました')
+    reopen_periods.short_description = '選択した期間を再開する'
+
+
+# ==========================================
+# 3. カスタムフィールド管理
+# ==========================================
+
+@admin.register(CustomField)
+class CustomFieldAdmin(admin.ModelAdmin):
+    """カスタムフィールド管理"""
+    list_display = ['field_name', 'company', 'field_type', 'is_required', 'is_active', 'display_order']
+    list_filter = ['company', 'field_type', 'is_required', 'is_active']
+    search_fields = ['field_name', 'help_text']
+    list_editable = ['is_active', 'display_order']
+
+
+@admin.register(CustomFieldValue)
+class CustomFieldValueAdmin(admin.ModelAdmin):
+    """カスタムフィールド値管理"""
+    list_display = ['invoice', 'custom_field', 'value']
+    list_filter = ['custom_field']
+    search_fields = ['invoice__invoice_number', 'value']
+
+
+# ==========================================
+# 4. PDF生成履歴
+# ==========================================
+
+@admin.register(PDFGenerationLog)
+class PDFGenerationLogAdmin(admin.ModelAdmin):
+    """PDF生成履歴管理"""
+    list_display = ['invoice', 'generated_by', 'generated_at', 'file_size_kb']
+    list_filter = ['generated_at']
+    search_fields = ['invoice__invoice_number', 'generated_by__username']
+    readonly_fields = ['invoice', 'generated_by', 'generated_at', 'file_size']
+    date_hierarchy = 'generated_at'
+    
+    def file_size_kb(self, obj):
+        """ファイルサイズをKB表示"""
+        if obj.file_size:
+            return f"{obj.file_size / 1024:.1f} KB"
+        return "-"
+    file_size_kb.short_description = 'サイズ'
+    
+    def has_add_permission(self, request):
+        """追加不可"""
+        return False
+    
+    def has_change_permission(self, request, obj=None):
+        """編集不可"""
+        return False

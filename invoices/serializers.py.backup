@@ -5,18 +5,11 @@ from django.contrib.auth import get_user_model
 from .models import (
     Company, Department, CustomerCompany, User,
     Invoice, ApprovalRoute, ApprovalStep,
-    ApprovalHistory, InvoiceComment, ConstructionSite, InvoiceItem,
-    # Phase 2追加
-    InvoiceTemplate, TemplateField, MonthlyInvoicePeriod,
-    CustomField, CustomFieldValue, PDFGenerationLog
+    ApprovalHistory, InvoiceComment, ConstructionSite, InvoiceItem
 )
 
 User = get_user_model()
 
-
-# ==========================================
-# Phase 1: 既存シリアライザー
-# ==========================================
 
 class CompanySerializer(serializers.ModelSerializer):
     class Meta:
@@ -176,8 +169,149 @@ class InvoiceItemSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'amount']
 
 
+class InvoiceCreateSerializer(serializers.ModelSerializer):
+    """請求書作成用シリアライザー"""
+    items = InvoiceItemSerializer(many=True)
+    
+    class Meta:
+        model = Invoice
+        fields = [
+            'construction_site', 'project_name', 'invoice_date',
+            'payment_due_date', 'notes', 'items'
+        ]
+    
+    def create(self, validated_data):
+        items_data = validated_data.pop('items')
+        
+        # リクエストユーザーの情報を取得
+        user = self.context['request'].user
+        
+        # created_byを設定
+        validated_data['created_by'] = user
+        
+        # customer_companyを自動設定（協力会社ユーザーの場合）
+        if user.user_type == 'customer' and user.customer_company:
+            validated_data['customer_company'] = user.customer_company
+        
+        # receiving_company を自動設定
+        from .models import Company
+        receiving_company = Company.objects.first()
+        if receiving_company:
+            validated_data['receiving_company'] = receiving_company
+        
+        # invoiceを作成
+        invoice = Invoice.objects.create(**validated_data)
+        
+        # 明細を作成
+        for item_data in items_data:
+            InvoiceItem.objects.create(invoice=invoice, **item_data)
+        
+        # 金額計算
+        invoice.calculate_totals()
+        
+        return invoice
+
+
+class InvoiceListSerializer(serializers.ModelSerializer):
+    """請求書一覧用シリアライザー（軽量版）"""
+    customer_company_name = serializers.CharField(source='customer_company.name', read_only=True)
+    construction_site_name_display = serializers.SerializerMethodField()
+    status_display = serializers.CharField(source='get_status_display', read_only=True)
+    created_by_name = serializers.CharField(source='created_by.get_full_name', read_only=True)
+    current_approver_name = serializers.CharField(source='current_approver.get_full_name', read_only=True, allow_null=True)
+    template_name = serializers.CharField(source='template.name', read_only=True, allow_null=True)
+    period_name = serializers.CharField(source='invoice_period.period_name', read_only=True, allow_null=True)
+    custom_values = CustomFieldValueSerializer(many=True, read_only=True)
+    
+    class Meta:
+        model = Invoice
+        fields = [
+            'id', 'invoice_number', 
+            'customer_company_name',
+            'construction_site_name_display',
+            'project_name', 'invoice_date', 'payment_due_date',
+            'status', 'status_display',
+            'total_amount',
+            'current_approver_name',
+            'created_by_name',
+            'created_at', 'updated_at',
+            'template', 'template_name',
+            'invoice_period', 'period_name',
+            'custom_values',
+        ]
+    
+    def get_construction_site_name_display(self, obj):
+        """工事現場名を取得（construction_site_nameまたはconstruction_site.name）"""
+        if obj.construction_site_name:
+            return obj.construction_site_name
+        elif obj.construction_site:
+            return obj.construction_site.name
+        return ''
+
+
+class InvoiceSerializer(serializers.ModelSerializer):
+    """請求書詳細シリアライザー"""
+    items = InvoiceItemSerializer(many=True, read_only=True)
+    customer_company_name = serializers.CharField(source='customer_company.name', read_only=True)
+    construction_site_name_display = serializers.SerializerMethodField()
+    status_display = serializers.CharField(source='get_status_display', read_only=True)
+    created_by_name = serializers.CharField(source='created_by.get_full_name', read_only=True)
+    current_approver_name = serializers.CharField(source='current_approver.get_full_name', read_only=True, allow_null=True)
+    current_step_name = serializers.CharField(source='current_approval_step.step_name', read_only=True, allow_null=True)
+    comments = InvoiceCommentSerializer(many=True, read_only=True)
+    approval_histories = ApprovalHistorySerializer(many=True, read_only=True)
+    approval_route_detail = ApprovalRouteSerializer(source='approval_route', read_only=True)
+    # Phase 2: 追加
+    template_name = serializers.CharField(source='template.name', read_only=True, allow_null=True)
+    period_name = serializers.CharField(source='invoice_period.period_name', read_only=True, allow_null=True)
+    custom_values = CustomFieldValueSerializer(many=True, read_only=True)
+    
+    class Meta:
+        model = Invoice
+        fields = [
+            'id', 'invoice_number', 
+            'customer_company', 'customer_company_name',
+            'construction_site', 'construction_site_name_display',
+            'project_name', 'invoice_date', 'payment_due_date',
+            'status', 'status_display',
+            'subtotal', 'tax_amount', 'total_amount',
+            'notes', 'items',
+            'approval_route', 'approval_route_detail',
+            'current_approval_step', 'current_step_name',
+            'current_approver', 'current_approver_name',
+            'created_by', 'created_by_name',
+            'created_at', 'updated_at',
+            'comments', 'approval_histories'
+            'template', 'template_name',
+            'invoice_period', 'period_name',
+            'custom_values',
+        ]
+        read_only_fields = [
+            'id', 'invoice_number', 'subtotal', 'tax_amount', 'total_amount',
+            'created_by', 'created_at', 'updated_at'
+        ]
+    
+    def get_construction_site_name_display(self, obj):
+        """工事現場名を取得"""
+        if obj.construction_site_name:
+            return obj.construction_site_name
+        elif obj.construction_site:
+            return obj.construction_site.name
+        return ''
+    # ==========================================
+# Phase 2: シリアライザー追加
 # ==========================================
-# Phase 2: 新規シリアライザー
+# backend/invoices/serializers.py に追加してください
+
+from rest_framework import serializers
+from .models import (
+    InvoiceTemplate, TemplateField, MonthlyInvoicePeriod,
+    CustomField, CustomFieldValue, PDFGenerationLog
+)
+
+
+# ==========================================
+# 1. テンプレート関連
 # ==========================================
 
 class TemplateFieldSerializer(serializers.ModelSerializer):
@@ -220,6 +354,10 @@ class InvoiceTemplateListSerializer(serializers.ModelSerializer):
     def get_field_count(self, obj):
         return obj.fields.count()
 
+
+# ==========================================
+# 2. 月次請求期間管理
+# ==========================================
 
 class MonthlyInvoicePeriodSerializer(serializers.ModelSerializer):
     """月次請求期間シリアライザー"""
@@ -278,6 +416,10 @@ class MonthlyInvoicePeriodListSerializer(serializers.ModelSerializer):
             return '受付中'
 
 
+# ==========================================
+# 3. カスタムフィールド
+# ==========================================
+
 class CustomFieldSerializer(serializers.ModelSerializer):
     """カスタムフィールドシリアライザー"""
     
@@ -299,6 +441,10 @@ class CustomFieldValueSerializer(serializers.ModelSerializer):
         fields = ['id', 'custom_field', 'field_name', 'field_type', 'value']
 
 
+# ==========================================
+# 4. PDF生成履歴
+# ==========================================
+
 class PDFGenerationLogSerializer(serializers.ModelSerializer):
     """PDF生成履歴シリアライザー"""
     generated_by_name = serializers.CharField(source='generated_by.get_full_name', read_only=True, allow_null=True)
@@ -314,134 +460,23 @@ class PDFGenerationLogSerializer(serializers.ModelSerializer):
 
 
 # ==========================================
-# Phase 1+2: Invoice関連シリアライザー
+# 5. 既存InvoiceSerializerへの追加
 # ==========================================
+# ※ 既存のInvoiceSerializerに以下のフィールドを追加してください
 
-class InvoiceCreateSerializer(serializers.ModelSerializer):
-    """請求書作成用シリアライザー"""
-    items = InvoiceItemSerializer(many=True)
-    
-    class Meta:
-        model = Invoice
-        fields = [
-            'construction_site', 'project_name', 'invoice_date',
-            'payment_due_date', 'notes', 'items'
-        ]
-    
-    def create(self, validated_data):
-        items_data = validated_data.pop('items')
-        
-        # リクエストユーザーの情報を取得
-        user = self.context['request'].user
-        
-        # created_byを設定
-        validated_data['created_by'] = user
-        
-        # customer_companyを自動設定（協力会社ユーザーの場合）
-        if user.user_type == 'customer' and user.customer_company:
-            validated_data['customer_company'] = user.customer_company
-        
-        # receiving_company を自動設定
-        from .models import Company
-        receiving_company = Company.objects.first()
-        if receiving_company:
-            validated_data['receiving_company'] = receiving_company
-        
-        # invoiceを作成
-        invoice = Invoice.objects.create(**validated_data)
-        
-        # 明細を作成
-        for item_data in items_data:
-            InvoiceItem.objects.create(invoice=invoice, **item_data)
-        
-        # 金額計算
-        invoice.calculate_totals()
-        
-        return invoice
-
-
-class InvoiceListSerializer(serializers.ModelSerializer):
-    """請求書一覧用シリアライザー（軽量版）"""
-    customer_company_name = serializers.CharField(source='customer_company.name', read_only=True)
-    construction_site_name_display = serializers.SerializerMethodField()
-    status_display = serializers.CharField(source='get_status_display', read_only=True)
-    created_by_name = serializers.CharField(source='created_by.get_full_name', read_only=True)
-    current_approver_name = serializers.CharField(source='current_approver.get_full_name', read_only=True, allow_null=True)
-    # Phase 2追加
-    template_name = serializers.CharField(source='template.name', read_only=True, allow_null=True)
-    period_name = serializers.CharField(source='invoice_period.period_name', read_only=True, allow_null=True)
-    
-    class Meta:
-        model = Invoice
-        fields = [
-            'id', 'invoice_number', 
-            'customer_company_name',
-            'construction_site_name_display',
-            'project_name', 'invoice_date', 'payment_due_date',
-            'status', 'status_display',
-            'total_amount',
-            'current_approver_name',
-            'created_by_name',
-            'created_at', 'updated_at',
-            'template', 'template_name',
-            'invoice_period', 'period_name',
-        ]
-    
-    def get_construction_site_name_display(self, obj):
-        """工事現場名を取得（construction_site_nameまたはconstruction_site.name）"""
-        if obj.construction_site_name:
-            return obj.construction_site_name
-        elif obj.construction_site:
-            return obj.construction_site.name
-        return ''
-
-
-class InvoiceSerializer(serializers.ModelSerializer):
-    """請求書詳細シリアライザー"""
-    items = InvoiceItemSerializer(many=True, read_only=True)
-    customer_company_name = serializers.CharField(source='customer_company.name', read_only=True)
-    construction_site_name_display = serializers.SerializerMethodField()
-    status_display = serializers.CharField(source='get_status_display', read_only=True)
-    created_by_name = serializers.CharField(source='created_by.get_full_name', read_only=True)
-    current_approver_name = serializers.CharField(source='current_approver.get_full_name', read_only=True, allow_null=True)
-    current_step_name = serializers.CharField(source='current_approval_step.step_name', read_only=True, allow_null=True)
-    comments = InvoiceCommentSerializer(many=True, read_only=True)
-    approval_histories = ApprovalHistorySerializer(many=True, read_only=True)
-    approval_route_detail = ApprovalRouteSerializer(source='approval_route', read_only=True)
-    # Phase 2追加
-    template_name = serializers.CharField(source='template.name', read_only=True, allow_null=True)
-    period_name = serializers.CharField(source='invoice_period.period_name', read_only=True, allow_null=True)
-    custom_values = CustomFieldValueSerializer(many=True, read_only=True)
-    
-    class Meta:
-        model = Invoice
-        fields = [
-            'id', 'invoice_number', 
-            'customer_company', 'customer_company_name',
-            'construction_site', 'construction_site_name_display',
-            'project_name', 'invoice_date', 'payment_due_date',
-            'status', 'status_display',
-            'subtotal', 'tax_amount', 'total_amount',
-            'notes', 'items',
-            'approval_route', 'approval_route_detail',
-            'current_approval_step', 'current_step_name',
-            'current_approver', 'current_approver_name',
-            'created_by', 'created_by_name',
-            'created_at', 'updated_at',
-            'comments', 'approval_histories',
-            'template', 'template_name',
-            'invoice_period', 'period_name',
-            'custom_values',
-        ]
-        read_only_fields = [
-            'id', 'invoice_number', 'subtotal', 'tax_amount', 'total_amount',
-            'created_by', 'created_at', 'updated_at'
-        ]
-    
-    def get_construction_site_name_display(self, obj):
-        """工事現場名を取得"""
-        if obj.construction_site_name:
-            return obj.construction_site_name
-        elif obj.construction_site:
-            return obj.construction_site.name
-        return ''
+# class InvoiceSerializer(serializers.ModelSerializer):
+#     # 既存のフィールド...
+#     
+#     # Phase 2: 追加フィールド
+#     template_name = serializers.CharField(source='template.name', read_only=True, allow_null=True)
+#     period_name = serializers.CharField(source='invoice_period.period_name', read_only=True, allow_null=True)
+#     custom_values = CustomFieldValueSerializer(many=True, read_only=True)
+#     
+#     class Meta:
+#         model = Invoice
+#         fields = [
+#             # ... 既存のフィールド ...
+#             'template', 'template_name',
+#             'invoice_period', 'period_name',
+#             'custom_values',
+#         ]

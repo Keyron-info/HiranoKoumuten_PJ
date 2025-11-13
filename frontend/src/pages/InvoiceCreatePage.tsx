@@ -4,12 +4,14 @@ import { invoiceAPI } from '../api/invoices';
 import { InvoiceCreateForm, ConstructionSite, InvoiceItem } from '../types';
 import Layout from '../components/common/Layout';
 import { useAuth } from '../contexts/AuthContext';
+import TemplateSelector from '../components/TemplateSelector';
 
 const InvoiceCreatePage: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [sites, setSites] = useState<ConstructionSite[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
+  const [selectedTemplate, setSelectedTemplate] = useState<number | null>(null);
   const [formData, setFormData] = useState<InvoiceCreateForm>({
     construction_site: '',
     project_name: '',
@@ -74,6 +76,12 @@ const InvoiceCreatePage: React.FC = () => {
   };
 
   const selectedSite = getSelectedSite();
+
+  {/* テンプレート選択 */}
+<TemplateSelector
+  onSelect={(templateId) => setSelectedTemplate(templateId)}
+  selectedTemplateId={selectedTemplate}
+/>
 
   // 金額計算
   const calculateTotals = () => {

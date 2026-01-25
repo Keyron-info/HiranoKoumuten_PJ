@@ -1,487 +1,651 @@
-// frontend/src/pages/InvoiceCreatePage.tsx
-// 完全版（そのままコピペOK）
-
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
+import { 
+  CheckCircle, XCircle, Download, MessageSquare, Clock, User, 
+  Building2, Calendar, Edit3, ArrowLeft 
+} from 'lucide-react';
 import { invoiceAPI } from '../api/invoices';
-import { InvoiceCreateForm, ConstructionSite, InvoiceItem } from '../types';
 import Layout from '../components/common/Layout';
 import { useAuth } from '../contexts/AuthContext';
-import TemplateSelector from '../components/TemplateSelector';
 
-const InvoiceCreatePage: React.FC = () => {
+interface InvoiceItem {
+  id: number;
+  item_number: number;
+  description: string;
+  quantity: number;
+  unit: string;
+  unit_price: number;
+  amount: number;
+}
+
+interface ApprovalHistoryItem {
+  id: number;
+  action: string;
+  action_display?: string;
+  user_name?: string;
+  comment: string;
+  timestamp: string;
+}
+
+interface Correction {
+  id: number;
+  field_name: string;
+  field_type_display: string;
+  original_value: string;
+  corrected_value: string;
+  correction_reason: string;
+  corrected_by_name: string;
+  created_at: string;
+  is_approved_by_partner: boolean;
+}
+
+interface InvoiceDetail {
+  id: number;
+  invoice_number: string;
+  customer_company_name: string;
+  receiving_company_name?: string;
+  construction_site_name_display?: string;
+  project_name?: string;
+  construction_type_name?: string;
+  invoice_date: string;
+  billing_period_start?: string;
+  billing_period_end?: string;
+  subtotal: number;
+  tax_amount: number;
+  total_amount: number;
+  status: string;
+  status_display: string;
+  created_at: string;
+  submitted_at?: string;
+  is_returned?: boolean;
+  has_corrections?: boolean;
+  can_partner_edit?: boolean;
+  return_reason?: string;
+  return_note?: string;
+  partner_acknowledged_at?: string;
+  partner_acknowledged_by?: number;
+  items: InvoiceItem[];
+  approval_histories?: ApprovalHistoryItem[];
+  corrections?: Correction[];
+}
+
+const InvoiceDetailPage: React.FC = () => {
+  const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const [sites, setSites] = useState<ConstructionSite[]>([]);
-  const [loading, setLoading] = useState<boolean>(false);
-  const [selectedTemplate, setSelectedTemplate] = useState<number | null>(null);
-  const [formData, setFormData] = useState<InvoiceCreateForm>({
-    construction_site: '',
-    project_name: '',
-    invoice_date: new Date().toISOString().split('T')[0],
-    payment_due_date: '',
-    notes: '',
-    items: [{ 
-      item_number: 1, 
-      description: '', 
-      quantity: 1, 
-      unit: '式', 
-      unit_price: 0, 
-      amount: 0 
-    }],
-  });
-
-  const unitOptions = ['式', '個', 'm', 'm²', 'm³', 't', 'kg', 'L'];
+  
+  const [invoice, setInvoice] = useState<InvoiceDetail | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [showRejectModal, setShowRejectModal] = useState(false);
+  const [rejectReason, setRejectReason] = useState('');
+  const [comment, setComment] = useState('');
+  const [processing, setProcessing] = useState(false);
+  const [corrections, setCorrections] = useState<Correction[]>([]);
+  const [canDownloadPdf, setCanDownloadPdf] = useState(false);
 
   useEffect(() => {
-    fetchSites();
-  }, []);
+    if (id) {
+      fetchInvoice();
+      checkPdfPermission();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]);
 
-  const fetchSites = async () => {
+  const fetchInvoice = async () => {
     try {
-      const response: any = await invoiceAPI.getConstructionSites();
-      console.log('Construction sites response:', response);
+      setLoading(true);
+      const data = await invoiceAPI.getInvoice(id!);
+      setInvoice(data as unknown as InvoiceDetail);
       
-      if (Array.isArray(response)) {
-        setSites(response);
-      } else if (response && typeof response === 'object') {
-        const results = (response as any).results;
-        const data = (response as any).data;
-        
-        if (Array.isArray(results)) {
-          setSites(results);
-        } else if (Array.isArray(data)) {
-          setSites(data);
-        } else {
-          console.error('Unexpected response format:', response);
-          setSites([]);
-          alert('工事現場データの形式が正しくありません');
-        }
-      } else {
-        console.error('Unexpected response type:', typeof response);
-        setSites([]);
-        alert('工事現場データの取得に失敗しました');
+      // 修正履歴を取得
+      try {
+        const correctionData = await invoiceAPI.getCorrections(id!);
+        setCorrections(correctionData.results || []);
+      } catch (error) {
+        console.error('Failed to fetch corrections:', error);
       }
-    } catch (error: any) {
-      console.error('Failed to fetch sites:', error);
-      setSites([]);
-      alert('工事現場の取得に失敗しました');
-    }
-  };
-
-  const getSelectedSite = (): ConstructionSite | undefined => {
-    if (!formData.construction_site) return undefined;
-    return sites.find(site => site.id.toString() === formData.construction_site.toString());
-  };
-
-  const selectedSite = getSelectedSite();
-
-  const calculateTotals = () => {
-    const subtotal = formData.items.reduce((sum, item) => sum + item.amount, 0);
-    const taxAmount = Math.floor(subtotal * 0.1);
-    const totalAmount = subtotal + taxAmount;
-    return { subtotal, taxAmount, totalAmount };
-  };
-
-  const handleAddItem = () => {
-    setFormData({
-      ...formData,
-      items: [...formData.items, {
-        item_number: formData.items.length + 1,
-        description: '',
-        quantity: 1,
-        unit: '式',
-        unit_price: 0,
-        amount: 0,
-      }],
-    });
-  };
-
-  const handleRemoveItem = (index: number) => {
-    if (formData.items.length === 1) {
-      alert('最低1つの明細が必要です');
-      return;
-    }
-    const newItems = formData.items.filter((_, i) => i !== index);
-    const reindexedItems = newItems.map((item, i) => ({
-      ...item,
-      item_number: i + 1,
-    }));
-    setFormData({ ...formData, items: reindexedItems });
-  };
-
-  const handleItemChange = (index: number, field: keyof InvoiceItem, value: any) => {
-    const newItems = [...formData.items];
-    newItems[index] = { ...newItems[index], [field]: value };
-    
-    if (field === 'quantity' || field === 'unit_price') {
-      newItems[index].amount = newItems[index].quantity * newItems[index].unit_price;
-    }
-    
-    setFormData({ ...formData, items: newItems });
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!formData.construction_site) {
-      alert('工事現場を選択してください');
-      return;
-    }
-    
-    if (!formData.payment_due_date) {
-      alert('支払予定日を入力してください');
-      return;
-    }
-    
-    const hasEmptyDescription = formData.items.some(item => !item.description.trim());
-    if (hasEmptyDescription) {
-      alert('全ての明細に品名を入力してください');
-      return;
-    }
-    
-    setLoading(true);
-    try {
-      const submitData = {
-        ...formData,
-        template: selectedTemplate,
-      };
-      
-      const invoice = await invoiceAPI.createInvoice(submitData);
-      alert('請求書を作成しました');
-      navigate(`/invoices/${invoice.id}`);
-    } catch (error: any) {
-      console.error('Failed to create invoice:', error);
-      const errorMessage = error.response?.data?.message || '請求書の作成に失敗しました';
-      alert(errorMessage);
+    } catch (error) {
+      console.error('Failed to fetch invoice:', error);
     } finally {
       setLoading(false);
     }
   };
 
-  const { subtotal, taxAmount, totalAmount } = calculateTotals();
-
-  const getCompanyName = () => {
-    if (!user) return '会社名未設定';
-    
-    if ('company_name' in user && user.company_name) {
-      return user.company_name;
+  const checkPdfPermission = async () => {
+    try {
+      const result = await invoiceAPI.checkPdfPermission(id!);
+      setCanDownloadPdf(result.can_download);
+    } catch (error) {
+      setCanDownloadPdf(false);
     }
-    
-    if ('customer_company_name' in user && user.customer_company_name) {
-      return user.customer_company_name;
-    }
-    
-    const userWithCompany = user as any;
-    if (userWithCompany.company && userWithCompany.company.name) {
-      return userWithCompany.company.name;
-    }
-    
-    return '会社名未設定';
   };
+
+  const handleApprove = async () => {
+    if (!id) return;
+    try {
+      setProcessing(true);
+      await invoiceAPI.approveInvoice(id, comment);
+      alert('承認しました');
+      fetchInvoice();
+    } catch (error: any) {
+      alert(error.response?.data?.error || '承認に失敗しました');
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  const handleAcknowledgeReturn = async () => {
+    if (!id) return;
+    if (!window.confirm('差し戻し内容を確認しました。承認すると経理承認段階へ進みます。よろしいですか？')) {
+      return;
+    }
+    try {
+      setProcessing(true);
+      await invoiceAPI.acknowledgeReturn(id);
+      alert('承認しました。経理承認段階へ進みます。');
+      fetchInvoice();
+    } catch (error: any) {
+      alert(error.response?.data?.error || '承認処理に失敗しました');
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  const handleReject = async () => {
+    if (!rejectReason.trim()) {
+      alert('却下理由を入力してください');
+      return;
+    }
+    if (!id) return;
+
+    try {
+      setProcessing(true);
+      await invoiceAPI.rejectInvoice(id, rejectReason);
+      alert(`却下しました`);
+      setShowRejectModal(false);
+      fetchInvoice();
+    } catch (error: any) {
+      alert(error.response?.data?.error || '却下に失敗しました');
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  const handleDownloadPdf = async () => {
+    if (!canDownloadPdf) {
+      alert('PDFダウンロード権限がありません。経理部門にお問い合わせください。');
+      return;
+    }
+    try {
+      // トークンを取得
+      const token = localStorage.getItem('access_token');
+      
+      // ベースURLを構築（環境変数があれば使用、なければデフォルト）
+      let apiBaseUrl = process.env.REACT_APP_API_URL || 'http://localhost:8001/api';
+      // /api が含まれていない場合は追加
+      if (!apiBaseUrl.includes('/api')) {
+        apiBaseUrl = apiBaseUrl.replace(/\/$/, '') + '/api';
+      }
+      
+      // PDFをダウンロード
+      const response = await fetch(`${apiBaseUrl}/invoices/${id}/download_pdf/`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+      
+      if (!response.ok) {
+        // エラーレスポンスがJSONかHTMLかを判定
+        const contentType = response.headers.get('Content-Type') || '';
+        if (contentType.includes('application/json')) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'PDFダウンロードに失敗しました');
+        } else {
+          throw new Error(`HTTPエラー: ${response.status}`);
+        }
+      }
+      
+      // PDFをBlobとして取得
+      const blob = await response.blob();
+      
+      // ダウンロードリンクを作成
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `invoice_${invoice?.invoice_number || id}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      
+    } catch (error: any) {
+      alert(error.message || 'PDFダウンロードに失敗しました');
+    }
+  };
+
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('ja-JP', {
+      style: 'currency',
+      currency: 'JPY',
+      minimumFractionDigits: 0,
+    }).format(amount);
+  };
+
+  const formatDate = (dateString: string | null | undefined) => {
+    if (!dateString) return '-';
+    return new Date(dateString).toLocaleDateString('ja-JP');
+  };
+
+  const formatDateTime = (dateString: string | null | undefined) => {
+    if (!dateString) return '-';
+    return new Date(dateString).toLocaleString('ja-JP');
+  };
+
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'approved':
+        return <CheckCircle size={18} className="text-green-600" />;
+      case 'submitted':
+        return <CheckCircle size={18} className="text-green-600" />;
+      case 'pending_approval':
+        return <Clock size={18} className="text-orange-600" />;
+      case 'returned':
+      case 'rejected':
+        return <XCircle size={18} className="text-red-600" />;
+      default:
+        return <User size={18} className="text-gray-400" />;
+    }
+  };
+
+  if (loading) {
+    return (
+      <Layout>
+        <div className="flex items-center justify-center h-64">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500"></div>
+        </div>
+      </Layout>
+    );
+  }
+
+  if (!invoice) {
+    return (
+      <Layout>
+        <div className="max-w-6xl mx-auto px-4 py-8">
+          <p className="text-center text-gray-500">請求書が見つかりません</p>
+        </div>
+      </Layout>
+    );
+  }
+
+  const isInternalUser = user?.user_type === 'internal';
+  const isPartnerUser = user?.user_type === 'customer';
+  const isReturned = invoice.status === 'returned';
+  const hasCorrections = corrections.length > 0;
+  const workPeriod = invoice.billing_period_start && invoice.billing_period_end
+    ? `${formatDate(invoice.billing_period_start)} - ${formatDate(invoice.billing_period_end)}`
+    : '-';
+
+  // 承認フロー定義
+  const approvalSteps = [
+    { step: '提出', role: 'partner', status: 'completed' },
+    { step: '監督承認', role: 'supervisor', status: 'pending' },
+    { step: '部門長承認', role: 'manager', status: 'waiting' },
+    { step: '経理承認', role: 'accounting', status: 'waiting' },
+    { step: '役員承認', role: 'executive', status: 'waiting' },
+  ];
 
   return (
     <Layout>
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-6xl mx-auto px-4 py-8">
+        {/* ヘッダー */}
         <div className="mb-6">
-          <h1 className="text-3xl font-bold text-gray-900">請求書作成</h1>
-          <p className="mt-2 text-sm text-gray-600">
-            請求書情報を入力してください。下書き保存または提出できます。
-          </p>
+              <button
+            onClick={() => navigate(-1)}
+            className="text-blue-600 hover:text-blue-700 mb-4 flex items-center space-x-1"
+              >
+            <ArrowLeft size={16} />
+            <span>戻る</span>
+              </button>
+          <div className="flex items-start justify-between">
+              <div>
+              <h1 className="text-3xl font-bold text-gray-900 mb-2">{invoice.invoice_number}</h1>
+              <span className={`inline-block px-4 py-2 rounded-lg text-sm font-medium border ${
+                invoice.status === 'pending_approval' ? 'bg-orange-100 text-orange-700 border-orange-200' :
+                invoice.status === 'approved' ? 'bg-green-100 text-green-700 border-green-200' :
+                invoice.status === 'returned' ? 'bg-red-100 text-red-700 border-red-200' :
+                'bg-gray-100 text-gray-700 border-gray-200'
+              }`}>
+                {invoice.status_display}
+              </span>
+            </div>
+            <button 
+              onClick={handleDownloadPdf}
+              disabled={!canDownloadPdf}
+              className={`flex items-center space-x-2 px-4 py-2 border rounded-lg transition-colors ${
+                canDownloadPdf 
+                  ? 'bg-white border-gray-300 hover:bg-gray-50' 
+                  : 'bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed'
+              }`}
+              title={canDownloadPdf ? 'PDFをダウンロード' : 'PDFダウンロード権限がありません'}
+            >
+              <Download size={20} />
+              <span>PDFダウンロード</span>
+            </button>
+          </div>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="bg-white p-6 rounded-lg shadow">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">基本情報</h2>
-            
-            <div className="mb-6 p-4 bg-gray-50 rounded-md">
-              <h3 className="text-sm font-medium text-gray-700 mb-2">請求元</h3>
-              <p className="text-sm text-gray-900">{getCompanyName()}</p>
-              {user?.email && <p className="text-xs text-gray-600 mt-1">{user.email}</p>}
+        {/* 差し戻し理由表示 */}
+        {isReturned && invoice.return_reason && (
+          <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-6 rounded-lg">
+            <div className="flex">
+              <div className="flex-shrink-0">
+                <svg className="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <div className="ml-3">
+                <h3 className="text-sm font-medium text-yellow-800">差し戻し理由</h3>
+                <p className="mt-2 text-sm text-yellow-700">{invoice.return_reason}</p>
+                {invoice.return_note && (
+                  <p className="mt-1 text-sm text-yellow-600">備考: {invoice.return_note}</p>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 修正履歴バナー */}
+        {hasCorrections && (
+          <div className="bg-red-50 border-l-4 border-red-500 p-4 mb-6 rounded-lg">
+            <div className="flex items-center space-x-2 mb-2">
+              <Edit3 size={20} className="text-red-600" />
+              <h3 className="font-bold text-red-900">修正履歴あり</h3>
+            </div>
+            {corrections.map((correction, index) => (
+              <div key={index} className="mt-3 bg-white p-4 rounded-lg">
+                <p className="font-medium text-gray-900 mb-2">{correction.field_name}</p>
+                <div className="space-y-1">
+                  <p className="text-gray-500 line-through">{correction.original_value}</p>
+                  <div className="flex items-center space-x-2">
+                    <span className="text-red-600 font-bold text-lg">{correction.corrected_value}</span>
+                    <Edit3 size={16} className="text-red-600" />
+                  </div>
+                  <p className="text-sm text-gray-700 mt-2">
+                    <span className="font-medium">理由:</span> {correction.correction_reason}
+                  </p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    {correction.corrected_by_name} - {formatDateTime(correction.created_at)}
+                  </p>
+                </div>
+              </div>
+            ))}
+      </div>
+        )}
+
+        {/* メインコンテンツ */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+          <div className="lg:col-span-2 space-y-6">
+            {/* 基本情報 */}
+            <div className="bg-white rounded-xl shadow-sm p-6">
+              <h2 className="text-xl font-bold text-gray-900 mb-6">基本情報</h2>
+              <div className="grid grid-cols-2 gap-6">
+                <div>
+                  <p className="text-sm text-gray-500 mb-1">協力会社</p>
+                  <p className="font-medium text-gray-900 flex items-center space-x-2">
+                    <Building2 size={18} className="text-gray-400" />
+                    <span>{invoice.customer_company_name}</span>
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500 mb-1">工事名</p>
+                  <p className="font-medium text-gray-900">
+                    {invoice.construction_site_name_display || invoice.project_name || '-'}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500 mb-1">請求日</p>
+                  <p className="font-medium text-gray-900 flex items-center space-x-2">
+                    <Calendar size={18} className="text-gray-400" />
+                    <span>{formatDate(invoice.invoice_date)}</span>
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500 mb-1">工事期間</p>
+                  <p className="font-medium text-gray-900">{workPeriod}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500 mb-1">工種</p>
+                  <p className="font-medium text-gray-900">{invoice.construction_type_name || '-'}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500 mb-1">提出日時</p>
+                  <p className="font-medium text-gray-900">{formatDateTime(invoice.submitted_at)}</p>
+                </div>
+                </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  工事現場 <span className="text-red-500">*</span>
-                </label>
-                <select
-                  required
-                  value={formData.construction_site}
-                  onChange={(e) => setFormData({ ...formData, construction_site: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
-                >
-                  <option value="">選択してください</option>
-                  {sites && sites.length > 0 ? (
-                    sites.map((site) => (
-                      <option key={site.id} value={site.id}>
-                        {site.name}
-                        {site.supervisor_name && ` - 担当: ${site.supervisor_name}`}
-                      </option>
-                    ))
-                  ) : (
-                    <option value="" disabled>工事現場がありません</option>
-                  )}
-                </select>
-                {sites.length === 0 && (
-                  <p className="mt-1 text-xs text-red-500">
-                    工事現場が登録されていません。管理者に連絡してください。
-                  </p>
-                )}
+            {/* 請求明細 */}
+            <div className="bg-white rounded-xl shadow-sm p-6">
+              <h2 className="text-xl font-bold text-gray-900 mb-6">請求明細</h2>
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b-2 border-gray-200">
+                      <th className="text-left py-3 px-2 text-sm font-medium text-gray-600">項目</th>
+                      <th className="text-right py-3 px-2 text-sm font-medium text-gray-600">数量</th>
+                      <th className="text-center py-3 px-2 text-sm font-medium text-gray-600">単位</th>
+                      <th className="text-right py-3 px-2 text-sm font-medium text-gray-600">単価</th>
+                      <th className="text-right py-3 px-2 text-sm font-medium text-gray-600">金額</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {invoice.items?.map((item, index) => (
+                      <tr key={index} className="border-b border-gray-100">
+                        <td className="py-4 px-2 text-sm text-gray-900">{item.description}</td>
+                        <td className="py-4 px-2 text-sm text-right text-gray-900">{Number(item.quantity).toLocaleString()}</td>
+                        <td className="py-4 px-2 text-sm text-center text-gray-900">{item.unit}</td>
+                        <td className="py-4 px-2 text-sm text-right text-gray-900">{formatCurrency(item.unit_price)}</td>
+                        <td className="py-4 px-2 text-sm text-right font-medium text-gray-900">{formatCurrency(item.amount)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr className="border-t-2 border-gray-300">
+                      <td colSpan={4} className="py-3 px-2 text-right font-medium text-gray-700">小計</td>
+                      <td className="py-3 px-2 text-right font-medium text-gray-900">{formatCurrency(invoice.subtotal)}</td>
+                    </tr>
+                    <tr>
+                      <td colSpan={4} className="py-3 px-2 text-right font-medium text-gray-700">消費税（10%）</td>
+                      <td className="py-3 px-2 text-right font-medium text-gray-900">{formatCurrency(invoice.tax_amount)}</td>
+                    </tr>
+                    <tr className="border-t border-gray-200">
+                      <td colSpan={4} className="py-3 px-2 text-right font-bold text-gray-900 text-lg">合計</td>
+                      <td className="py-3 px-2 text-right font-bold text-orange-600 text-xl">{formatCurrency(invoice.total_amount)}</td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            </div>
 
-                {selectedSite && (
-                  <div className="mt-3 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                    <div className="flex items-start space-x-2">
-                      <svg className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                      <div className="flex-1">
-                        <p className="text-sm font-medium text-blue-900">
-                          {selectedSite.name}
-                        </p>
-                        {selectedSite.location && (
-                          <p className="text-sm text-blue-700 mt-1">
-                            📍 {selectedSite.location}
+            {/* コメント */}
+            {isInternalUser && (
+              <div className="bg-white rounded-xl shadow-sm p-6">
+                <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center space-x-2">
+                  <MessageSquare size={20} />
+                  <span>コメント</span>
+                </h2>
+                <textarea
+                  value={comment}
+                  onChange={(e) => setComment(e.target.value)}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent resize-none"
+                  rows={4}
+                  placeholder="承認時のコメントを入力してください（任意）"
+                />
+              </div>
+            )}
+          </div>
+
+          {/* サイドバー */}
+          <div className="space-y-6">
+            {/* アクションボタン */}
+            {isPartnerUser && isReturned ? (
+              // 協力会社ユーザー & 差し戻し状態: 承認ボタンのみ
+              <div className="bg-white rounded-xl shadow-sm p-6">
+                <h2 className="text-xl font-bold text-gray-900 mb-6">アクション</h2>
+                <div className="space-y-3">
+                  <button
+                    onClick={handleAcknowledgeReturn}
+                    disabled={processing}
+                    className="w-full bg-gradient-to-r from-blue-500 to-blue-600 text-white py-4 rounded-lg font-bold text-lg hover:from-blue-600 hover:to-blue-700 transition-all shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 flex items-center justify-center space-x-2 disabled:opacity-50"
+                  >
+                    <CheckCircle size={24} />
+                    <span>{processing ? '処理中...' : '差し戻し内容を承認'}</span>
+                  </button>
+                  <div className="text-sm text-gray-600 flex items-center mt-3 p-3 bg-gray-50 rounded-lg">
+                    <svg className="w-4 h-4 mr-2 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                    </svg>
+                    <span>内容修正が必要な場合は平野工務店へお問い合わせください</span>
+                  </div>
+                </div>
+              </div>
+            ) : isInternalUser && invoice.status === 'pending_approval' ? (
+              // 平野工務店ユーザー & 承認待ち: 承認・差し戻し・却下ボタン
+              <div className="bg-white rounded-xl shadow-sm p-6">
+                <h2 className="text-xl font-bold text-gray-900 mb-6">承認アクション</h2>
+              <div className="space-y-3">
+                  <button
+                    onClick={handleApprove}
+                    disabled={processing}
+                    className="w-full bg-gradient-to-r from-green-500 to-green-600 text-white py-4 rounded-lg font-bold text-lg hover:from-green-600 hover:to-green-700 transition-all shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 flex items-center justify-center space-x-2 disabled:opacity-50"
+                  >
+                    <CheckCircle size={24} />
+                    <span>{processing ? '処理中...' : '承認する'}</span>
+                  </button>
+                  {/* 差し戻し（赤ペン修正）ボタン */}
+                    <button
+                    onClick={() => navigate(`/invoices/${id}/edit-correction`)}
+                    className="w-full bg-gradient-to-r from-orange-500 to-orange-600 text-white py-4 rounded-lg font-bold text-lg hover:from-orange-600 hover:to-orange-700 transition-all shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 flex items-center justify-center space-x-2"
+                    >
+                    <Edit3 size={24} />
+                    <span>差し戻し（修正依頼）</span>
+                    </button>
+                  {/* 却下ボタン */}
+                    <button
+                    onClick={() => setShowRejectModal(true)}
+                    disabled={processing}
+                    className="w-full bg-gradient-to-r from-red-500 to-red-600 text-white py-4 rounded-lg font-bold text-lg hover:from-red-600 hover:to-red-700 transition-all shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 flex items-center justify-center space-x-2 disabled:opacity-50"
+                    >
+                    <XCircle size={24} />
+                    <span>却下</span>
+                    </button>
+                </div>
+              </div>
+            ) : null}
+
+            {/* 承認履歴 */}
+            <div className="bg-white rounded-xl shadow-sm p-6">
+              <h2 className="text-lg font-bold text-gray-900 mb-4">承認履歴</h2>
+              <div className="space-y-4">
+                {invoice.approval_histories && invoice.approval_histories.length > 0 ? (
+                  invoice.approval_histories.map((history, index) => (
+                    <div key={index} className="relative">
+                      {index !== invoice.approval_histories!.length - 1 && (
+                        <div className="absolute left-4 top-10 bottom-0 w-0.5 bg-gray-200" />
+                      )}
+                      <div className="flex items-start space-x-3">
+                        <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
+                          history.action === 'approved' || history.action === 'submitted'
+                            ? 'bg-green-100 text-green-600'
+                            : history.action === 'returned' || history.action === 'rejected'
+                            ? 'bg-red-100 text-red-600'
+                            : 'bg-orange-100 text-orange-600'
+                        }`}>
+                          {getStatusIcon(history.action)}
+                        </div>
+                        <div className="flex-1 pb-4">
+                          <p className="font-medium text-gray-900 text-sm">{history.action_display || history.action}</p>
+                          <p className="text-xs text-gray-600">{history.user_name || '不明'}</p>
+                          <p className="text-xs text-gray-500 mt-1">{formatDateTime(history.timestamp)}</p>
+                          {history.comment && (
+                            <p className="text-xs text-gray-700 mt-2 bg-gray-50 p-2 rounded">{history.comment}</p>
+                          )}
+                        </div>
+                      </div>
+                          </div>
+                  ))
+                ) : (
+                  // デフォルト承認フロー表示
+                  approvalSteps.map((step, index) => (
+                    <div key={index} className="relative">
+                      {index !== approvalSteps.length - 1 && (
+                        <div className="absolute left-4 top-10 bottom-0 w-0.5 bg-gray-200" />
+                      )}
+                      <div className="flex items-start space-x-3">
+                        <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
+                          step.status === 'completed'
+                            ? 'bg-green-100 text-green-600'
+                            : step.status === 'pending'
+                            ? 'bg-orange-100 text-orange-600'
+                            : 'bg-gray-100 text-gray-400'
+                        }`}>
+                          {step.status === 'completed' ? (
+                            <CheckCircle size={18} />
+                          ) : step.status === 'pending' ? (
+                            <Clock size={18} />
+                          ) : (
+                            <User size={18} />
+                          )}
+                        </div>
+                        <div className="flex-1 pb-4">
+                          <p className="font-medium text-gray-900 text-sm">{step.step}</p>
+                          <p className="text-xs text-gray-600">
+                            {step.status === 'completed' ? '完了' : step.status === 'pending' ? '待機中' : '未着手'}
                           </p>
-                        )}
-                        {selectedSite.supervisor_name && (
-                          <p className="text-sm text-blue-700 mt-1">
-                            👤 現場監督: <span className="font-medium">{selectedSite.supervisor_name}</span>
-                          </p>
-                        )}
-                        {selectedSite.supervisor_name && (
-                          <p className="text-xs text-blue-600 mt-2">
-                            💡 この請求書は {selectedSite.supervisor_name} が最初に承認します
-                          </p>
-                        )}
+                        </div>
                       </div>
                     </div>
-                  </div>
+                  ))
                 )}
               </div>
-
-              <div className="md:col-span-2">
-                <TemplateSelector
-                  onSelect={(templateId) => setSelectedTemplate(templateId)}
-                  selectedTemplateId={selectedTemplate}
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  工事名
-                </label>
-                <input
-                  type="text"
-                  value={formData.project_name}
-                  onChange={(e) => setFormData({ ...formData, project_name: e.target.value })}
-                  placeholder="例: 外壁塗装工事"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
-                />
-              </div>
-
-              <div></div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  請求日 <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="date"
-                  required
-                  value={formData.invoice_date}
-                  onChange={(e) => setFormData({ ...formData, invoice_date: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  支払予定日 <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="date"
-                  required
-                  value={formData.payment_due_date}
-                  onChange={(e) => setFormData({ ...formData, payment_due_date: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
-                />
-              </div>
-            </div>
-
-            <div className="mt-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                備考
-              </label>
-              <textarea
-                value={formData.notes}
-                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                rows={3}
-                placeholder="特記事項があれば入力してください"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
-              />
             </div>
           </div>
-          <div className="bg-white p-6 rounded-lg shadow">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-semibold text-gray-900">請求明細</h2>
-              <button
-                type="button"
-                onClick={handleAddItem}
-                className="px-4 py-2 bg-orange-500 text-white rounded-md hover:bg-orange-600 transition-colors text-sm flex items-center gap-1"
-              >
-                <span className="text-lg">+</span>
-                明細を追加
-              </button>
-            </div>
-
-            <div className="overflow-x-auto">
-              <table className="w-full border-collapse">
-                <thead>
-                  <tr className="bg-gray-50 border-b">
-                    <th className="px-2 py-3 text-left text-xs font-medium text-gray-700 w-8">#</th>
-                    <th className="px-2 py-3 text-left text-xs font-medium text-gray-700">品名 *</th>
-                    <th className="px-2 py-3 text-right text-xs font-medium text-gray-700 w-20">数量</th>
-                    <th className="px-2 py-3 text-left text-xs font-medium text-gray-700 w-20">単位</th>
-                    <th className="px-2 py-3 text-right text-xs font-medium text-gray-700 w-28">単価</th>
-                    <th className="px-2 py-3 text-right text-xs font-medium text-gray-700 w-32">金額</th>
-                    <th className="px-2 py-3 w-16"></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {formData.items.map((item, index) => (
-                    <tr key={index} className="border-b hover:bg-gray-50">
-                      <td className="px-2 py-2 text-sm text-gray-600">
-                        {item.item_number}
-                      </td>
-
-                      <td className="px-2 py-2">
-                        <input
-                          type="text"
-                          placeholder="例: 土工事"
-                          value={item.description}
-                          onChange={(e) => handleItemChange(index, 'description', e.target.value)}
-                          required
-                          className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-orange-500"
-                        />
-                      </td>
-
-                      <td className="px-2 py-2">
-                        <input
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          value={item.quantity}
-                          onChange={(e) => handleItemChange(index, 'quantity', Number(e.target.value))}
-                          required
-                          className="w-full px-2 py-1 border border-gray-300 rounded text-sm text-right focus:outline-none focus:ring-1 focus:ring-orange-500"
-                        />
-                      </td>
-
-                      <td className="px-2 py-2">
-                        <select
-                          value={item.unit}
-                          onChange={(e) => handleItemChange(index, 'unit', e.target.value)}
-                          className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-orange-500"
-                        >
-                          {unitOptions.map((unit) => (
-                            <option key={unit} value={unit}>
-                              {unit}
-                            </option>
-                          ))}
-                        </select>
-                      </td>
-
-                      <td className="px-2 py-2">
-                        <input
-                          type="number"
-                          min="0"
-                          step="1"
-                          value={item.unit_price}
-                          onChange={(e) => handleItemChange(index, 'unit_price', Number(e.target.value))}
-                          required
-                          className="w-full px-2 py-1 border border-gray-300 rounded text-sm text-right focus:outline-none focus:ring-1 focus:ring-orange-500"
-                        />
-                      </td>
-
-                      <td className="px-2 py-2">
-                        <div className="text-sm text-right font-medium text-gray-900">
-                          ¥{item.amount.toLocaleString()}
-                        </div>
-                      </td>
-
-                      <td className="px-2 py-2 text-center">
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveItem(index)}
-                          disabled={formData.items.length === 1}
-                          className="text-red-600 hover:text-red-800 disabled:text-gray-400 disabled:cursor-not-allowed text-sm px-2"
-                          title="削除"
-                        >
-                          🗑️
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            <div className="mt-6 border-t pt-4">
-              <div className="flex flex-col items-end space-y-2">
-                <div className="flex justify-between w-64">
-                  <span className="text-sm text-gray-700">小計</span>
-                  <span className="text-sm font-medium text-gray-900">
-                    ¥{subtotal.toLocaleString()}
-                  </span>
-                </div>
-                <div className="flex justify-between w-64">
-                  <span className="text-sm text-gray-700">消費税 (10%)</span>
-                  <span className="text-sm font-medium text-gray-900">
-                    ¥{taxAmount.toLocaleString()}
-                  </span>
-                </div>
-                <div className="flex justify-between w-64 pt-2 border-t">
-                  <span className="text-lg font-bold text-gray-900">合計</span>
-                  <span className="text-lg font-bold text-orange-600">
-                    ¥{totalAmount.toLocaleString()}
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="flex justify-end gap-4">
-            <button
-              type="button"
-              onClick={() => navigate('/invoices')}
-              disabled={loading}
-              className="px-6 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              キャンセル
-            </button>
-            <button
-              type="submit"
-              disabled={loading || sites.length === 0}
-              className="px-6 py-2 bg-orange-500 text-white rounded-md hover:bg-orange-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
-            >
-              {loading ? (
-                <>
-                  <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  作成中...
-                </>
-              ) : (
-                '請求書を作成'
-              )}
-            </button>
-          </div>
-        </form>
+        </div>
       </div>
+
+      {/* 却下モーダル */}
+      {showRejectModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6">
+            <h3 className="text-xl font-bold text-gray-900 mb-4">却下理由を入力</h3>
+            <textarea
+              value={rejectReason}
+              onChange={(e) => setRejectReason(e.target.value)}
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent resize-none"
+              rows={4}
+              placeholder="却下の理由を入力してください（必須）"
+            />
+            <div className="flex space-x-3 mt-6">
+              <button
+                onClick={() => setShowRejectModal(false)}
+                disabled={processing}
+                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                キャンセル
+              </button>
+              <button
+                onClick={handleReject}
+                disabled={processing}
+                className="flex-1 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
+              >
+                {processing ? '処理中...' : '却下する'}
+              </button>
+        </div>
+      </div>
+    </div>
+      )}
     </Layout>
   );
 };
 
-export default InvoiceCreatePage;
+export default InvoiceDetailPage;

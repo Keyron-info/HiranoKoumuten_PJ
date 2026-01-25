@@ -7,7 +7,7 @@ export interface User {
   email: string;
   first_name: string;
   last_name: string;
-  user_type: 'internal' | 'customer';
+  user_type: 'internal' | 'customer' | 'admin';
   user_type_display: string;
   position: string;
   position_display: string;
@@ -55,6 +55,7 @@ export interface ConstructionSite {
   company_name: string;
   supervisor: string | null;
   supervisor_name: string | null;
+  site_password?: string;
   is_active: boolean;
   created_at: string;
 }
@@ -123,11 +124,20 @@ export interface InvoiceComment {
   comment: string;
   is_private: boolean;
   timestamp: string;
+  mentioned_usernames?: string[];
+}
+
+// メンション可能ユーザー型
+export interface MentionableUser {
+  id: number;
+  username: string;
+  display_name: string;
+  position: string;
 }
 
 // 請求書型（一覧用）
 export interface InvoiceListItem {
-  id: string;
+  id: number;
   invoice_number: string;
   customer_company_name: string;
   construction_site_name_display: string;
@@ -139,6 +149,7 @@ export interface InvoiceListItem {
   total_amount: number;
   current_approver_name: string | null;
   created_by_name: string;
+  submitted_at?: string;  // 提出日時
   created_at: string;
   updated_at: string;
 }
@@ -176,7 +187,7 @@ export interface Invoice {
 }
 
 // 請求書ステータス型
-export type InvoiceStatus = 
+export type InvoiceStatus =
   | 'draft'
   | 'submitted'
   | 'pending_approval'
@@ -276,4 +287,228 @@ export const STATUS_LABELS: Record<InvoiceStatus, string> = {
   returned: '差し戻し',
   payment_preparing: '支払い準備中',
   paid: '支払い済み',
+};
+
+// ==========================================
+// Phase 3: 新要件の型定義
+// ==========================================
+
+// 工種型（15種類）
+export interface ConstructionType {
+  id: number;
+  code: string;
+  name: string;
+  description: string;
+  usage_count: number;
+  is_active: boolean;
+  display_order: number;
+}
+
+// 注文書型
+export interface PurchaseOrder {
+  id: number;
+  order_number: string;
+  customer_company: number;
+  customer_company_name: string;
+  issuing_company: number;
+  construction_site: number;
+  construction_site_name: string;
+  construction_type: number | null;
+  construction_type_name: string | null;
+  subtotal: number;
+  tax_amount: number;
+  total_amount: number;
+  issue_date: string;
+  delivery_date: string | null;
+  status: 'draft' | 'issued' | 'accepted' | 'completed' | 'cancelled';
+  status_display: string;
+  pdf_file: string | null;
+  notes: string;
+  items: PurchaseOrderItem[];
+  invoiced_amount: number;
+  remaining_amount: number;
+  created_by: number;
+  created_by_name: string;
+  created_at: string;
+  updated_at: string;
+}
+
+// 注文書明細型
+export interface PurchaseOrderItem {
+  id?: number;
+  item_number: number;
+  description: string;
+  quantity: number;
+  unit: string;
+  unit_price: number;
+  amount: number;
+}
+
+// 変更履歴型
+export interface InvoiceChangeHistory {
+  id: number;
+  invoice: number;
+  change_type: string;
+  change_type_display: string;
+  field_name: string;
+  old_value: string;
+  new_value: string;
+  change_reason: string;
+  changed_by: number;
+  changed_by_name: string;
+  changed_at: string;
+}
+
+// システム通知型
+export interface SystemNotification {
+  id: number;
+  recipient: number;
+  notification_type: 'reminder' | 'deadline' | 'approval' | 'alert' | 'info';
+  notification_type_display: string;
+  priority: 'low' | 'medium' | 'high';
+  priority_display: string;
+  title: string;
+  message: string;
+  action_url: string;
+  related_invoice: number | null;
+  is_read: boolean;
+  read_at: string | null;
+  created_at: string;
+}
+
+// アクセスログ型
+export interface AccessLog {
+  id: number;
+  user: number;
+  user_name: string;
+  action: string;
+  action_display: string;
+  resource_type: string;
+  resource_id: string;
+  ip_address: string | null;
+  user_agent: string;
+  details: Record<string, any>;
+  timestamp: string;
+}
+
+// 一斉承認スケジュール型
+export interface BatchApprovalSchedule {
+  id: number;
+  period: number;
+  period_name: string;
+  scheduled_datetime: string;
+  is_executed: boolean;
+  executed_at: string | null;
+  executed_by: number | null;
+  executed_by_name: string | null;
+  target_supervisor_count: number;
+  target_invoice_count: number;
+  notes: string;
+  created_at: string;
+}
+
+// 工事現場詳細型（予算情報付き）
+export interface ConstructionSiteDetail extends ConstructionSite {
+  is_completed: boolean;
+  completion_date: string | null;
+  completed_by: number | null;
+  completed_by_name: string | null;
+  total_budget: number;
+  budget_alert_threshold: number;
+  total_invoiced_amount: number;
+  budget_consumption_rate: number;
+  is_budget_exceeded: boolean;
+  is_budget_alert: boolean;
+}
+
+// 請求書詳細型（拡張版）
+export interface InvoiceDetail extends Invoice {
+  document_type: 'invoice' | 'delivery_note';
+  document_type_display: string;
+  construction_type: number | null;
+  construction_type_name: string | null;
+  construction_type_other: string;
+  purchase_order: number | null;
+  purchase_order_number: string | null;
+  purchase_order_amount: number | null;
+  received_at: string | null;
+  correction_deadline: string | null;
+  is_correction_allowed: boolean;
+  is_correction_allowed_now: boolean;
+  correction_deadline_display: string | null;
+  amount_check_result: 'not_checked' | 'matched' | 'over' | 'under' | 'no_order';
+  amount_check_result_display: string;
+  amount_difference: number;
+  safety_cooperation_fee: number;
+  safety_fee_notified: boolean;
+  change_histories: InvoiceChangeHistory[];
+}
+
+// 現場別支払い集計型（円グラフ用）
+export interface SitePaymentSummary {
+  site_id: number;
+  site_name: string;
+  total_amount: number;
+  percentage: number;
+  budget: number | null;
+  budget_rate: number | null;
+  is_alert: boolean;
+}
+
+// 月別業者別集計型
+export interface MonthlyCompanySummary {
+  company_id: number;
+  company_name: string;
+  month: string;
+  invoice_count: number;
+  total_amount: number;
+  approved_count: number;
+  pending_count: number;
+}
+
+// アラート現場型
+export interface AlertSite {
+  id: number;
+  name: string;
+  budget: number;
+  invoiced: number;
+  consumption_rate: number;
+  is_exceeded: boolean;
+  alert_type: 'exceeded' | 'warning';
+}
+
+// 金額照合結果型
+export interface AmountVerificationResult {
+  status: 'matched' | 'over' | 'under' | 'no_order';
+  message: string;
+  invoice_amount: number;
+  order_amount: number | null;
+  difference: number | null;
+  order_number?: string;
+  auto_approve?: boolean;
+  requires_additional_approval?: boolean;
+  alert?: string;
+}
+
+// 請求書作成フォーム型（拡張版）
+export interface InvoiceCreateFormExtended extends InvoiceCreateForm {
+  document_type: 'invoice' | 'delivery_note';
+  construction_type: number | null;
+  construction_type_other: string;
+  purchase_order: number | null;
+}
+
+// 金額照合結果の色
+export const AMOUNT_CHECK_COLORS: Record<string, string> = {
+  not_checked: 'gray',
+  matched: 'green',
+  over: 'red',
+  under: 'yellow',
+  no_order: 'gray',
+};
+
+// 書類タイプ
+export const DOCUMENT_TYPES = {
+  invoice: '請求書',
+  delivery_note: '納品書',
 };

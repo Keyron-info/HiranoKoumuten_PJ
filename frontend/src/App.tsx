@@ -7,11 +7,20 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
+import RegisterCompletePage from './pages/RegisterCompletePage';
 import DashboardPage from './pages/DashboardPage';
+import MyProfilePage from './pages/MyProfilePage';
 import InvoiceListPage from './pages/InvoiceListPage';
 import InvoiceCreatePage from './pages/InvoiceCreatePage';
 import InvoiceDetailPage from './pages/InvoiceDetailPage';
 import InvoicePeriods from './pages/InvoicePeriods';
+import MyPendingApprovalsPage from './pages/MyPendingApprovalsPage';
+import InvoiceCorrectionReviewPage from './pages/InvoiceCorrectionReviewPage';
+import InvoiceEditWithCorrectionPage from './pages/InvoiceEditWithCorrectionPage';
+import RegistrationRequestsPage from './pages/admin/RegistrationRequestsPage';
+import PaymentCalendar from './components/PaymentCalendar';
+import CalendarManagementPage from './pages/admin/CalendarManagementPage';
+import SiteManagementPage from './pages/admin/SiteManagementPage';
 
 // ====================
 // 認証保護ルート
@@ -101,6 +110,14 @@ const AppRoutes: React.FC = () => {
           </PublicRoute>
         }
       />
+      <Route
+        path="/register-complete"
+        element={
+          <PublicRoute>
+            <RegisterCompletePage />
+          </PublicRoute>
+        }
+      />
 
       {/* 保護ルート */}
       <Route
@@ -108,6 +125,14 @@ const AppRoutes: React.FC = () => {
         element={
           <ProtectedRoute>
             <DashboardPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/my-profile"
+        element={
+          <ProtectedRoute>
+            <MyProfilePage />
           </ProtectedRoute>
         }
       />
@@ -135,6 +160,22 @@ const AppRoutes: React.FC = () => {
           </ProtectedRoute>
         }
       />
+      <Route
+        path="/invoices/:id/correction-review"
+        element={
+          <ProtectedRoute>
+            <InvoiceCorrectionReviewPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/invoices/:id/edit-correction"
+        element={
+          <InternalRoute>
+            <InvoiceEditWithCorrectionPage />
+          </InternalRoute>
+        }
+      />
 
       {/* 内部ユーザー専用 */}
       <Route
@@ -142,6 +183,46 @@ const AppRoutes: React.FC = () => {
         element={
           <InternalRoute>
             <InvoicePeriods />
+          </InternalRoute>
+        }
+      />
+      <Route
+        path="/my-approvals"
+        element={
+          <InternalRoute>
+            <MyPendingApprovalsPage />
+          </InternalRoute>
+        }
+      />
+      <Route
+        path="/admin/registration-requests"
+        element={
+          <InternalRoute>
+            <RegistrationRequestsPage />
+          </InternalRoute>
+        }
+      />
+      <Route
+        path="/payment-calendar"
+        element={
+          <ProtectedRoute>
+            <PaymentCalendar />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/calendar-management"
+        element={
+          <InternalRoute>
+            <CalendarManagementPage />
+          </InternalRoute>
+        }
+      />
+      <Route
+        path="/admin/sites"
+        element={
+          <InternalRoute>
+            <SiteManagementPage />
           </InternalRoute>
         }
       />

@@ -29,7 +29,8 @@ const InvoicePeriods: React.FC = () => {
   const [periods, setPeriods] = useState<InvoicePeriod[]>([]);
   const [loading, setLoading] = useState(true);
   const [showNewPeriodForm, setShowNewPeriodForm] = useState(false);
-  const [selectedPeriod, setSelectedPeriod] = useState<InvoicePeriod | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [_selectedPeriod, _setSelectedPeriod] = useState<InvoicePeriod | null>(null);
   const [unsubmittedCompanies, setUnsubmittedCompanies] = useState<UnsubmittedCompany[]>([]);
   const [showUnsubmittedModal, setShowUnsubmittedModal] = useState(false);
 

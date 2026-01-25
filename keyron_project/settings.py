@@ -10,8 +10,9 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
-from pathlib import Path
 import os
+import dj_database_url
+from pathlib import Path
 from datetime import timedelta
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -22,12 +23,12 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-k=7l0(k#%0(^)woy)ktw#y@_s+)el935so!k5+sg8%nf8c(k1^'
+SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-k=7l0(k#%0(^)woy)ktw#y@_s+)el935so!k5+sg8%nf8c(k1^')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.environ.get('DEBUG', 'True') == 'True'
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', '*').split(',')
 
 
 # Application definition
@@ -52,6 +53,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',  # WhiteNoise追加
     'django.contrib.sessions.middleware.SessionMiddleware',
     'corsheaders.middleware.CorsMiddleware',  # CORS対応
     'django.middleware.common.CommonMiddleware',
@@ -85,11 +87,14 @@ WSGI_APPLICATION = 'keyron_project.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
+# Database
+# https://docs.djangoproject.com/en/5.2/ref/settings/#databases
+
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
-    }
+    'default': dj_database_url.config(
+        default=f'sqlite:///{BASE_DIR / "db.sqlite3"}',
+        conn_max_age=600
+    )
 }
 
 
@@ -132,6 +137,7 @@ STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 STATICFILES_DIRS = [
     os.path.join(BASE_DIR, 'static'),
 ]
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 
 # Media files (User uploaded files)
@@ -194,3 +200,80 @@ CORS_ALLOWED_ORIGINS = [
     "http://127.0.0.1:3002",
 ]
 CORS_ALLOW_CREDENTIALS = True
+
+# ====================
+# メール設定
+# ====================
+# 開発環境: コンソールに出力
+EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+
+# 本番環境用（SMTPサーバー設定）
+# EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+# EMAIL_HOST = 'smtp.example.com'
+# EMAIL_PORT = 587
+# EMAIL_USE_TLS = True
+# EMAIL_HOST_USER = 'your-email@example.com'
+# EMAIL_HOST_PASSWORD = 'your-password'
+
+DEFAULT_FROM_EMAIL = 'noreply@hirano-koumuten.co.jp'
+EMAIL_SUBJECT_PREFIX = '[KEYRON BIM] '
+
+# フロントエンドURL（ユーザー登録完了メール用）
+FRONTEND_URL = os.environ.get('FRONTEND_URL', 'http://localhost:3000')
+
+# 管理者メールアドレス（ユーザー登録申請通知用）
+ADMIN_EMAIL = os.environ.get('ADMIN_EMAIL', 'admin@hirano-koumuten.co.jp')
+
+# ====================
+# 請求書システム設定
+# ====================
+INVOICE_SETTINGS = {
+    # 月次締め日（毎月25日）
+    'MONTHLY_DEADLINE_DAY': 25,
+    
+    # 訂正可能期間（日数）
+    'CORRECTION_PERIOD_DAYS': 2,
+    
+    # 安全衛生協力会費
+    'SAFETY_FEE_THRESHOLD': 100000,  # 10万円以上
+    'SAFETY_FEE_RATE': 0.003,  # 3/1000
+    
+    # 予算アラート閾値
+    'BUDGET_ALERT_80': 80,
+    'BUDGET_ALERT_90': 90,
+    'BUDGET_ALERT_100': 100,
+    
+    # 承認リマインド（日数）
+    'APPROVAL_REMINDER_DAYS': [3, 1],  # 締切3日前、1日前
+}
+
+# ====================
+# ログ設定
+# ====================
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '{levelname} {asctime} {module} {message}',
+            'style': '{',
+        },
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'verbose',
+        },
+        'file': {
+            'class': 'logging.FileHandler',
+            'filename': BASE_DIR / 'logs' / 'app.log',
+            'formatter': 'verbose',
+        },
+    },
+    'loggers': {
+        'invoices': {
+            'handlers': ['console'],
+            'level': 'INFO',
+        },
+    },
+}

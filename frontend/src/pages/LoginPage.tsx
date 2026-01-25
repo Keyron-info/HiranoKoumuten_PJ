@@ -1,228 +1,207 @@
-// src/pages/LoginPage.tsx
-// KEYRON BIM ログインページ（機能統合版）
-
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import axios from 'axios';
+import { Eye, EyeOff, Lock, Mail, AlertCircle } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
 
 const LoginPage: React.FC = () => {
   const navigate = useNavigate();
-  const [formData, setFormData] = useState({
-    username: '',
-    password: '',
-  });
-  const [error, setError] = useState<string>('');
-  const [loading, setLoading] = useState<boolean>(false);
+  const { login } = useAuth();
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value,
-    });
-    setError('');
-  };
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    setLoading(true);
+
+    if (!email || !password) {
+      setError('メールアドレスとパスワードを入力してください');
+      return;
+    }
 
     try {
-      // 🔹 1. JWTトークン取得
-      const tokenResponse = await axios.post('http://localhost:8000/api/token/', {
-        username: formData.username,
-        password: formData.password,
-      });
+      setLoading(true);
+      await login({ username: email, password });
 
-      localStorage.setItem('token', tokenResponse.data.access);
-      localStorage.setItem('refresh', tokenResponse.data.refresh);
+      // ログインを保持する場合の処理
+      if (rememberMe) {
+        localStorage.setItem('rememberEmail', email);
+      } else {
+        localStorage.removeItem('rememberEmail');
+      }
 
-      // 🔹 2. ユーザー情報取得
-      const userResponse = await axios.get('http://localhost:8000/api/users/me/', {
-        headers: { Authorization: `Bearer ${tokenResponse.data.access}` },
-      });
-
-      localStorage.setItem('user_type', userResponse.data.user_type);
-      localStorage.setItem(
-        'user_name',
-        `${userResponse.data.first_name} ${userResponse.data.last_name}`
-      );
-
-      // 🔹 3. ダッシュボードへ遷移
       navigate('/dashboard');
     } catch (err: any) {
       console.error('Login error:', err);
+
       if (err.response?.status === 401) {
-        setError('ユーザー名またはパスワードが正しくありません');
+        setError('メールアドレスまたはパスワードが正しくありません。もう一度お試しください。');
       } else if (err.response?.status === 400) {
-        setError('入力内容に誤りがあります');
+        setError('入力内容を確認してください。');
+      } else if (err.code === 'ERR_NETWORK') {
+        setError('サーバーに接続できません。しばらく待ってからお試しください。');
       } else {
-        setError('ログインに失敗しました。もう一度お試しください。');
+        setError('ログインに失敗しました。お手数ですが、システム管理者にお問い合わせください。');
       }
     } finally {
       setLoading(false);
     }
   };
 
+  // 保存されたメールアドレスを復元
+  React.useEffect(() => {
+    const savedEmail = localStorage.getItem('rememberEmail');
+    if (savedEmail) {
+      setEmail(savedEmail);
+      setRememberMe(true);
+    }
+  }, []);
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-orange-50 via-white to-orange-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8">
-        {/* ロゴ・タイトル */}
-        <div className="text-center">
-          <div className="inline-block bg-gradient-to-r from-orange-500 to-orange-400 p-3 rounded-2xl mb-4 shadow-lg">
-            <svg className="w-12 h-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
+    <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4 relative overflow-hidden">
+      {/* 背景装飾 */}
+      <div className="absolute top-0 left-0 w-full h-full z-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-[-10%] right-[-5%] w-[500px] h-[500px] bg-primary-600/20 rounded-full blur-[100px] mix-blend-screen animate-pulse"></div>
+        <div className="absolute bottom-[-10%] left-[-5%] w-[500px] h-[500px] bg-primary-800/20 rounded-full blur-[100px] mix-blend-screen animate-pulse delay-700"></div>
+      </div>
+
+      <div className="max-w-md w-full relative z-10">
+        <div className="text-center mb-8">
+          <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-primary-500 to-primary-600 rounded-2xl mb-4 shadow-xl shadow-primary-500/20 transform rotate-3">
+            <span className="text-white text-3xl font-bold tracking-wider">KB</span>
           </div>
-          <h2 className="text-4xl font-extrabold text-gray-900 mb-2">KEYRON BIM</h2>
-          <p className="text-base text-gray-600">請求書管理・承認システム</p>
+          <h1 className="text-3xl font-bold text-white mb-2 tracking-tight">KEYRON BIM</h1>
+          <p className="text-slate-400">請求書管理システムへログイン</p>
         </div>
 
-        {/* ログインフォーム */}
-        <div className="bg-white rounded-2xl shadow-2xl p-8 border border-gray-100">
-          <div className="mb-8">
-            <h3 className="text-2xl font-bold text-gray-900 text-center">ログイン</h3>
-            <p className="text-sm text-gray-500 text-center mt-2">アカウント情報を入力してください</p>
-          </div>
-
-          {error && (
-            <div className="mb-6 bg-red-50 border-l-4 border-red-500 text-red-800 px-4 py-3 rounded-lg flex items-start">
-              <svg className="w-5 h-5 mr-2 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
-                <path
-                  fillRule="evenodd"
-                  d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
-                  clipRule="evenodd"
-                />
-              </svg>
-              <span className="text-sm">{error}</span>
-            </div>
-          )}
-
-          <form onSubmit={handleSubmit} className="space-y-6">
-            {/* ユーザー名 */}
-            <div>
-              <label htmlFor="username" className="block text-sm font-semibold text-gray-700 mb-2">
-                ユーザー名
-              </label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
-                    />
-                  </svg>
+        <div className="bg-white/10 backdrop-blur-md border border-white/10 rounded-2xl shadow-2xl overflow-hidden">
+          <div className="p-8">
+            {/* エラーメッセージ */}
+            {error && (
+              <div className="mb-6 p-4 bg-rose-500/10 border border-rose-500/20 rounded-lg flex items-start gap-3">
+                <div className="text-rose-400 mt-0.5">
+                  <AlertCircle size={18} />
                 </div>
-                <input
-                  id="username"
-                  name="username"
-                  type="text"
-                  required
-                  value={formData.username}
-                  onChange={handleChange}
-                  className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-colors"
-                  placeholder="kyouryoku_test"
-                />
+                <p className="text-rose-200 text-sm flex-1">{error}</p>
               </div>
-            </div>
+            )}
 
-            {/* パスワード */}
-            <div>
-              <label htmlFor="password" className="block text-sm font-semibold text-gray-700 mb-2">
-                パスワード
-              </label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
-                    />
-                  </svg>
+            <form onSubmit={handleSubmit} className="space-y-6">
+              {/* メールアドレス */}
+              <div className="space-y-2">
+                <label htmlFor="email" className="block text-sm font-medium text-slate-300">
+                  メールアドレス
+                </label>
+                <div className="relative group">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500 group-focus-within:text-primary-400 transition-colors">
+                    <Mail size={18} />
+                  </div>
+                  <input
+                    id="email"
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="w-full pl-10 pr-4 py-3 bg-slate-800/50 border border-slate-700 rounded-lg focus:bg-slate-800 focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all outline-none text-white placeholder-slate-600"
+                    placeholder="example@hirano-koumuten.co.jp"
+                    autoComplete="email"
+                  />
                 </div>
-                <input
-                  id="password"
-                  name="password"
-                  type="password"
-                  required
-                  value={formData.password}
-                  onChange={handleChange}
-                  className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-colors"
-                  placeholder="••••••••"
-                />
               </div>
-            </div>
 
-            {/* ボタン */}
-            <div>
+              {/* パスワード */}
+              <div className="space-y-2">
+                <label htmlFor="password" className="block text-sm font-medium text-slate-300">
+                  パスワード
+                </label>
+                <div className="relative group">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500 group-focus-within:text-primary-400 transition-colors">
+                    <Lock size={18} />
+                  </div>
+                  <input
+                    id="password"
+                    type={showPassword ? 'text' : 'password'}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="w-full pl-10 pr-12 py-3 bg-slate-800/50 border border-slate-700 rounded-lg focus:bg-slate-800 focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all outline-none text-white placeholder-slate-600"
+                    placeholder="パスワードを入力"
+                    autoComplete="current-password"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition-colors p-1"
+                    tabIndex={-1}
+                  >
+                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
+                </div>
+              </div>
+
+              {/* オプション */}
+              <div className="flex items-center justify-between">
+                <label className="flex items-center cursor-pointer group">
+                  <input
+                    type="checkbox"
+                    checked={rememberMe}
+                    onChange={(e) => setRememberMe(e.target.checked)}
+                    className="w-4 h-4 text-primary-500 border-slate-600 rounded focus:ring-primary-500 bg-slate-700"
+                  />
+                  <span className="ml-2 text-sm text-slate-400 group-hover:text-slate-300 transition-colors">ログインを保持</span>
+                </label>
+                <button
+                  type="button"
+                  onClick={() => {
+                    alert('パスワードのリセットはシステム管理者にお問い合わせください。');
+                  }}
+                  className="text-sm text-primary-400 hover:text-primary-300 font-medium transition-colors hover:underline"
+                >
+                  パスワードをお忘れですか？
+                </button>
+              </div>
+
+              {/* ログインボタン */}
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full flex justify-center items-center py-3 px-4 border border-transparent rounded-lg shadow-md text-base font-medium text-white bg-gradient-to-r from-orange-500 to-orange-400 hover:from-orange-600 hover:to-orange-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
+                className="w-full bg-gradient-to-r from-primary-600 to-primary-500 text-white py-3.5 rounded-lg font-bold hover:from-primary-500 hover:to-primary-400 transition-all shadow-lg hover:shadow-primary-500/25 transform hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none flex items-center justify-center gap-2"
               >
                 {loading ? (
                   <>
-                    <svg
-                      className="animate-spin -ml-1 mr-3 h-5 w-5 text-white"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                    >
-                      <circle
-                        className="opacity-25"
-                        cx="12"
-                        cy="12"
-                        r="10"
-                        stroke="currentColor"
-                        strokeWidth="4"
-                      ></circle>
-                      <path
-                        className="opacity-75"
-                        fill="currentColor"
-                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                      ></path>
+                    <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                     </svg>
-                    ログイン中...
+                    <span>ログイン中...</span>
                   </>
                 ) : (
-                  'ログイン'
+                  <span>ログイン</span>
                 )}
               </button>
-            </div>
-          </form>
-
-          {/* テストアカウント情報 */}
-          <div className="mt-6 p-4 bg-orange-50 rounded-lg border border-orange-200">
-            <p className="text-xs font-semibold text-orange-800 mb-2">💡 テストアカウント</p>
-            <div className="space-y-1 text-xs text-orange-700">
-              <p>
-                <span className="font-mono bg-white px-2 py-0.5 rounded">kyouryoku_test</span> /{' '}
-                <span className="font-mono bg-white px-2 py-0.5 rounded">test1234</span> (協力会社)
-              </p>
-              <p>
-                <span className="font-mono bg-white px-2 py-0.5 rounded">genba_test</span> /{' '}
-                <span className="font-mono bg-white px-2 py-0.5 rounded">test1234</span> (現場監督)
-              </p>
-            </div>
+            </form>
           </div>
 
-          <div className="mt-6 text-center">
-            <p className="text-sm text-gray-600">
-              アカウントをお持ちでない方は{' '}
+          {/* 新規登録リンク */}
+          <div className="px-8 py-6 bg-slate-900/50 border-t border-slate-700/50">
+            <p className="text-center text-sm text-slate-400">
+              アカウントをお持ちでない方は<br className="sm:hidden" />
               <Link
                 to="/register"
-                className="text-orange-600 hover:text-orange-700 font-semibold transition-colors"
+                className="ml-1 text-primary-400 hover:text-primary-300 font-bold transition-colors hover:underline"
               >
-                新規登録
+                新規登録はこちら
               </Link>
             </p>
           </div>
         </div>
 
-        <p className="text-center text-xs text-gray-500">© 2025 KEYRON BIM. All rights reserved.</p>
+        {/* フッター */}
+        <p className="text-center text-xs text-slate-600 mt-8">
+          © 2025 平野工務店. All rights reserved.
+        </p>
       </div>
     </div>
   );

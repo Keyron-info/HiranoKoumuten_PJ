@@ -25,6 +25,7 @@ const TemplateSelector: React.FC<TemplateSelectorProps> = ({
 
   useEffect(() => {
     fetchTemplates();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const fetchTemplates = async () => {

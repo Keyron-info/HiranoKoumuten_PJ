@@ -4,7 +4,12 @@ from django.contrib import admin
 from .models import (
     Company, Department, CustomerCompany, User, 
     ApprovalRoute, ApprovalStep, Invoice, InvoiceItem,
-    ApprovalHistory, InvoiceComment, ConstructionSite
+    ApprovalHistory, InvoiceComment, ConstructionSite,
+    # タスク2追加
+    UserRegistrationRequest,
+    # タスク3追加
+    PaymentCalendar,
+    DeadlineNotificationBanner
 )
 
 @admin.register(Company)
@@ -236,3 +241,102 @@ class PDFGenerationLogAdmin(admin.ModelAdmin):
     def has_change_permission(self, request, obj=None):
         """編集不可"""
         return False
+
+
+# ==========================================
+# タスク2: ユーザー登録申請管理
+# ==========================================
+
+@admin.register(UserRegistrationRequest)
+class UserRegistrationRequestAdmin(admin.ModelAdmin):
+    """ユーザー登録申請管理"""
+    list_display = [
+        'company_name', 'full_name', 'email', 'status',
+        'submitted_at', 'reviewed_at', 'reviewed_by'
+    ]
+    list_filter = ['status', 'submitted_at', 'reviewed_at']
+    search_fields = ['company_name', 'full_name', 'email']
+    readonly_fields = ['submitted_at', 'reviewed_at', 'reviewed_by', 'created_user']
+    date_hierarchy = 'submitted_at'
+    
+    fieldsets = (
+        ('申請者情報', {
+            'fields': ('company_name', 'full_name', 'email', 'phone_number',
+                      'postal_code', 'address', 'department', 'position', 'notes')
+        }),
+        ('承認管理', {
+            'fields': ('status', 'submitted_at', 'reviewed_at', 'reviewed_by',
+                      'rejection_reason', 'created_user')
+        }),
+    )
+
+
+# ==========================================
+# タスク3: 支払いカレンダー・締め日管理
+# ==========================================
+
+@admin.register(PaymentCalendar)
+class PaymentCalendarAdmin(admin.ModelAdmin):
+    """支払いカレンダー管理"""
+    list_display = [
+        'year', 'month', 'deadline_date', 'payment_date',
+        'is_non_standard_deadline', 'is_holiday_period', 'created_at'
+    ]
+    list_filter = ['year', 'is_holiday_period']
+    search_fields = ['holiday_note']
+    readonly_fields = ['is_non_standard_deadline', 'created_at', 'updated_at']
+    date_hierarchy = 'deadline_date'
+    
+    fieldsets = (
+        ('基本情報', {
+            'fields': ('year', 'month', 'deadline_date', 'payment_date')
+        }),
+        ('休暇期間', {
+            'fields': ('is_holiday_period', 'holiday_note')
+        }),
+        ('システム情報', {
+            'fields': ('is_non_standard_deadline', 'created_at', 'updated_at'),
+            'classes': ('collapse',)
+        }),
+    )
+
+
+@admin.register(DeadlineNotificationBanner)
+class DeadlineNotificationBannerAdmin(admin.ModelAdmin):
+    """締め日変更バナー管理"""
+    list_display = [
+        'target_year', 'target_month', 'period_name',
+        'is_active', 'created_by', 'created_at'
+    ]
+    list_filter = ['is_active', 'target_year', 'target_month']
+    search_fields = ['period_name', 'custom_message']
+    readonly_fields = ['display_message', 'created_at', 'updated_at', 'created_by']
+    
+    fieldsets = (
+        ('基本情報', {
+            'fields': ('target_year', 'target_month', 'is_active')
+        }),
+        ('メッセージ設定', {
+            'fields': ('period_name', 'message_template', 'custom_message'),
+            'description': 'カスタムメッセージを指定した場合、テンプレートより優先されます。'
+        }),
+        ('プレビュー', {
+            'fields': ('display_message',),
+            'classes': ('collapse',)
+        }),
+        ('システム情報', {
+            'fields': ('created_by', 'created_at', 'updated_at'),
+            'classes': ('collapse',)
+        }),
+    )
+    
+    def display_message(self, obj):
+        """表示メッセージのプレビュー"""
+        return obj.get_display_message()
+    display_message.short_description = '表示メッセージ'
+    
+    def save_model(self, request, obj, form, change):
+        """保存時に作成者を自動設定"""
+        if not change:  # 新規作成時
+            obj.created_by = request.user
+        super().save_model(request, obj, form, change)

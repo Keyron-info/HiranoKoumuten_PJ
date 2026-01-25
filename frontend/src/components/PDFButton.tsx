@@ -1,8 +1,8 @@
 // src/components/PDFButton.tsx
-// PDF生成ボタンコンポーネント
+// PDF生成ボタンコンポーネント（修正版）
 
 import React, { useState } from 'react';
-import axios from 'axios';
+import apiClient from '../api/client';
 
 interface PDFButtonProps {
   invoiceId: number;
@@ -15,15 +15,15 @@ const PDFButton: React.FC<PDFButtonProps> = ({ invoiceId, invoiceNumber }) => {
   const handleGeneratePDF = async () => {
     setLoading(true);
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get(
-        `http://localhost:8000/api/invoices/${invoiceId}/generate_pdf/`,
+      // ✅ 修正: apiClient経由でAPI呼び出し（自動的にポート8001、トークン付与）
+      const response = await apiClient.get(
+        `/invoices/${invoiceId}/generate_pdf/`,
         {
-          headers: { Authorization: `Bearer ${token}` },
           responseType: 'blob',
         }
       );
 
+      // Blobからダウンロードリンクを作成
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement('a');
       link.href = url;
@@ -31,6 +31,9 @@ const PDFButton: React.FC<PDFButtonProps> = ({ invoiceId, invoiceNumber }) => {
       document.body.appendChild(link);
       link.click();
       link.remove();
+      
+      // URLをクリーンアップ
+      window.URL.revokeObjectURL(url);
 
       alert('PDFをダウンロードしました');
     } catch (error) {

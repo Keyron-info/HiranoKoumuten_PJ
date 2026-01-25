@@ -94,10 +94,45 @@ class ConstructionSiteViewSet(viewsets.ModelViewSet):
     serializer_class = ConstructionSiteSerializer
     permission_classes = [IsAuthenticated]
     
+    @action(detail=False, methods=['post'])
+    def verify_password(self, request):
+        """現場パスワードで現場を検索・検証"""
+        password = request.data.get('password')
+        if not password:
+             return Response({'error': 'パスワードを入力してください'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # 現場パスワードで検索 (完全一致)
+        site = ConstructionSite.objects.filter(site_password=password, is_active=True).first()
+        
+        if not site:
+            return Response({'error': '該当する現場が見つかりません。パスワードを確認してください。'}, status=status.HTTP_404_NOT_FOUND)
+            
+        # 請求書作成可能チェック
+        can_create, message = site.can_create_invoice()
+        if not can_create:
+            return Response({'error': message}, status=status.HTTP_400_BAD_REQUEST)
+        
+        return Response(self.get_serializer(site).data)
+
     def get_queryset(self):
         """ユーザーに応じた工事現場を返す"""
         queryset = ConstructionSite.objects.filter(is_active=True)
         return queryset.select_related('company', 'supervisor')
+        
+    def perform_create(self, serializer):
+        """作成時に会社を自動設定"""
+        user = self.request.user
+        if user.company:
+            serializer.save(company=user.company)
+        else:
+            # 会社が紐付いていないユーザーの場合は最初の会社を使用（またはエラー）
+            # ここではデフォルトの挙動として最初の会社を取得
+            company = Company.objects.first()
+            if company:
+                serializer.save(company=company)
+            else:
+                 # 会社がない場合はエラーになるが、バリデーションで弾かれるはず
+                serializer.save()
 
 
 class InvoiceViewSet(viewsets.ModelViewSet):

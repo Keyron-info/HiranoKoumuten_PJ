@@ -15,6 +15,37 @@ from .api_views import (
     TemplateFieldViewSet,
     MonthlyInvoicePeriodViewSet,
     CustomFieldViewSet,
+    # Phase 3追加
+    ConstructionTypeViewSet,
+    PurchaseOrderViewSet,
+    SystemNotificationViewSet,
+    AccessLogViewSet,
+    BatchApprovalScheduleViewSet,
+    ReportViewSet,
+    # Phase 4追加（データベース設計書準拠）
+    ConstructionTypeUsageViewSet,
+    BudgetViewSet,
+    SafetyFeeModelViewSet,
+    FileAttachmentViewSet,
+    InvoiceApprovalWorkflowViewSet,
+    DepartmentViewSet,
+    # Phase 5追加（追加要件）
+    InvoiceCorrectionViewSet,
+    # Phase 6追加（追加機能）
+    CSVExportViewSet,
+    ChartDataViewSet,
+    AuditLogViewSet,
+    DocumentTypeViewSet,
+    MonthlyClosingViewSet,
+    SafetyFeeViewSet,
+    AmountVerificationViewSet,
+    BudgetAlertViewSet,
+    CommentMentionViewSet,
+    # タスク2追加
+    UserRegistrationRequestViewSet,
+    # タスク3追加
+    PaymentCalendarViewSet,
+    DeadlineNotificationBannerViewSet,
 )
 
 router = DefaultRouter()
@@ -28,14 +59,47 @@ router.register(r'templates', InvoiceTemplateViewSet, basename='template')
 router.register(r'template-fields', TemplateFieldViewSet, basename='template-field')
 router.register(r'invoice-periods', MonthlyInvoicePeriodViewSet, basename='invoice-period')
 router.register(r'custom-fields', CustomFieldViewSet, basename='custom-field')
+# Phase 3追加
+router.register(r'construction-types', ConstructionTypeViewSet, basename='construction-type')
+router.register(r'purchase-orders', PurchaseOrderViewSet, basename='purchase-order')
+router.register(r'notifications', SystemNotificationViewSet, basename='notification')
+router.register(r'access-logs', AccessLogViewSet, basename='access-log')
+router.register(r'batch-approvals', BatchApprovalScheduleViewSet, basename='batch-approval')
+router.register(r'reports', ReportViewSet, basename='report')
+# Phase 4追加（データベース設計書準拠）
+router.register(r'construction-type-usages', ConstructionTypeUsageViewSet, basename='construction-type-usage')
+router.register(r'budgets', BudgetViewSet, basename='budget')
+router.register(r'safety-fees', SafetyFeeModelViewSet, basename='safety-fee')
+router.register(r'file-attachments', FileAttachmentViewSet, basename='file-attachment')
+router.register(r'approval-workflows', InvoiceApprovalWorkflowViewSet, basename='approval-workflow')
+router.register(r'departments', DepartmentViewSet, basename='department')
+# Phase 5追加（追加要件）
+router.register(r'invoice-corrections', InvoiceCorrectionViewSet, basename='invoice-correction')
+# Phase 6追加（追加機能）
+router.register(r'csv-export', CSVExportViewSet, basename='csv-export')
+router.register(r'chart-data', ChartDataViewSet, basename='chart-data')
+router.register(r'audit-logs', AuditLogViewSet, basename='audit-log')
+router.register(r'document-types', DocumentTypeViewSet, basename='document-type')
+router.register(r'monthly-closing', MonthlyClosingViewSet, basename='monthly-closing')
+router.register(r'safety-fee', SafetyFeeViewSet, basename='safety-fee-calc')
+router.register(r'amount-verification', AmountVerificationViewSet, basename='amount-verification')
+router.register(r'budget-alerts', BudgetAlertViewSet, basename='budget-alert')
+router.register(r'comment-mentions', CommentMentionViewSet, basename='comment-mention')
+# タスク2追加
+router.register(r'user-registration-requests', UserRegistrationRequestViewSet, basename='user-registration-request')
+# タスク3追加
+router.register(r'payment-calendar', PaymentCalendarViewSet, basename='payment-calendar')
+router.register(r'deadline-banner', DeadlineNotificationBannerViewSet, basename='deadline-banner')
 
 urlpatterns = [
     # JWT認証
     path('auth/login/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('auth/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     
-    # ユーザー登録
+    # ユーザー登録（旧エンドポイント - 互換性のため残す）
     path('auth/register/', UserRegistrationViewSet.as_view({'post': 'register'}), name='register'),
+    # タスク2: 新規ユーザー登録申請
+    path('users/register/', UserRegistrationRequestViewSet.as_view({'post': 'register'}), name='user-register'),
     
     # Router URLs
     path('', include(router.urls)),

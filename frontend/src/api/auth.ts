@@ -4,7 +4,7 @@ import { User, AuthTokens, LoginForm, RegisterForm } from '../types';
 export const authAPI = {
   // ログイン
   login: async (credentials: LoginForm): Promise<AuthTokens> => {
-    const response = await apiClient.post<AuthTokens>('/auth/login/', credentials);
+    const response = await apiClient.post<AuthTokens>('/token/', credentials);
     const { access, refresh } = response.data;
     
     // トークンをローカルストレージに保存
@@ -61,7 +61,7 @@ export const authAPI = {
       throw new Error('No refresh token available');
     }
     
-    const response = await apiClient.post<{ access: string }>('/auth/refresh/', {
+    const response = await apiClient.post<{ access: string }>('/token/refresh/', {
       refresh: refreshToken,
     });
     

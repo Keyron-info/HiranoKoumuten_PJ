@@ -198,7 +198,13 @@ CORS_ALLOWED_ORIGINS = [
     "http://127.0.0.1:3000",
     "http://localhost:3002",  # React開発サーバー (別ポート)
     "http://127.0.0.1:3002",
+    "http://127.0.0.1:3002",
 ]
+# 環境変数から追加のOriginを読み込む
+env_origins = os.environ.get('CORS_ALLOWED_ORIGINS')
+if env_origins:
+    CORS_ALLOWED_ORIGINS.extend([origin.strip() for origin in env_origins.split(',')])
+
 CORS_ALLOW_CREDENTIALS = True
 
 # ====================

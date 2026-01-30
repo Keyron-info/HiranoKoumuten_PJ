@@ -98,3 +98,53 @@
 
 
 以上でデプロイは完了です！
+
+---
+
+## トラブルシューティング
+
+### 「サーバーに接続できません」エラーが出る場合
+
+このエラーは主に以下の原因で発生します：
+
+#### 1. フロントエンドのAPI URL設定
+
+**Amplify Console で確認:**
+1. AWS Console → Amplify → アプリを選択
+2. 左メニュー「環境変数」をクリック
+3. `REACT_APP_API_URL` が正しく設定されているか確認
+   - 値: `https://[App RunnerのURL]/api`
+   - 例: `https://xxxxx.us-east-1.awsapprunner.com/api`
+
+> ⚠️ 環境変数を変更したら、**必ず再デプロイ**してください（環境変数はビルド時に埋め込まれるため）
+
+#### 2. CORS設定
+
+**App Runner で確認:**
+1. AWS Console → App Runner → サービスを選択
+2. 「設定」タブ → 「環境変数」
+3. 以下の環境変数を追加/確認：
+   - `CORS_ALLOWED_ORIGINS`: `https://[AmplifyのURL]`
+   - 例: `https://main.xxxxx.amplifyapp.com`
+
+#### 3. VPCコネクター設定（RDS接続用）
+
+App RunnerがRDSに接続できない場合：
+1. App Runner → サービス → 「ネットワーク」タブ
+2. 「送信トラフィック」が「カスタムVPC」になっているか確認
+3. VPCコネクターがRDSと同じVPC/サブネットを使用しているか確認
+
+#### 4. RDSセキュリティグループ
+
+1. RDS → データベース → セキュリティグループ
+2. インバウンドルールで以下を許可：
+   - タイプ: PostgreSQL
+   - ソース: VPCコネクターのセキュリティグループ
+
+### デバッグ方法
+
+ブラウザの開発者ツール（F12）で確認：
+
+1. **Networkタブ**: APIリクエストのURLが正しいか
+2. **Consoleタブ**: CORSエラーが出ていないか
+3. **Application > Local Storage**: トークンが保存されているか

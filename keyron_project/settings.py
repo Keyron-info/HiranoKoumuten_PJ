@@ -193,19 +193,46 @@ SIMPLE_JWT = {
 # ====================
 # CORS設定
 # ====================
+# 開発環境用のデフォルトオリジン
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",  # React開発サーバー
     "http://127.0.0.1:3000",
     "http://localhost:3002",  # React開発サーバー (別ポート)
     "http://127.0.0.1:3002",
-    "http://127.0.0.1:3002",
 ]
-# 環境変数から追加のOriginを読み込む
+
+# 環境変数から追加のOriginを読み込む（本番用）
 env_origins = os.environ.get('CORS_ALLOWED_ORIGINS')
 if env_origins:
-    CORS_ALLOWED_ORIGINS.extend([origin.strip() for origin in env_origins.split(',')])
+    CORS_ALLOWED_ORIGINS.extend([origin.strip() for origin in env_origins.split(',') if origin.strip()])
+
+# 本番環境で全オリジン許可が必要な場合（テスト用）
+CORS_ALLOW_ALL_ORIGINS = os.environ.get('CORS_ALLOW_ALL_ORIGINS', 'False') == 'True'
 
 CORS_ALLOW_CREDENTIALS = True
+
+# 許可するヘッダー
+CORS_ALLOW_HEADERS = [
+    'accept',
+    'accept-encoding',
+    'authorization',
+    'content-type',
+    'dnt',
+    'origin',
+    'user-agent',
+    'x-csrftoken',
+    'x-requested-with',
+]
+
+# 許可するHTTPメソッド
+CORS_ALLOW_METHODS = [
+    'DELETE',
+    'GET',
+    'OPTIONS',
+    'PATCH',
+    'POST',
+    'PUT',
+]
 
 # ====================
 # メール設定

@@ -12,8 +12,9 @@ import os
 User = get_user_model()
 email = os.environ.get('DJANGO_SUPERUSER_EMAIL', 'admin@hirano-koumuten.co.jp')
 password = os.environ.get('DJANGO_SUPERUSER_PASSWORD', 'HiranoAdmin2024!')
+username = email.split('@')[0]
 if not User.objects.filter(email=email).exists():
-    User.objects.create_superuser(email=email, password=password, name='システム管理者')
+    User.objects.create_superuser(username=username, email=email, password=password)
     print(f'Admin user created: {email}')
 else:
     print(f'Admin user already exists: {email}')

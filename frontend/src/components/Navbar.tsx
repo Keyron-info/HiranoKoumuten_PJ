@@ -42,6 +42,11 @@ const Navbar: React.FC = () => {
                 <NavLink to="/invoices/create" label="請求書作成" />
               )}
 
+              {/* 承認待ち一覧は社内ユーザーのみ */}
+              {user?.user_type === 'internal' && (
+                <NavLink to="/my-approvals" label="承認待ち" />
+              )}
+
               {/* 月次管理は管理者または経理のみ */}
               {(user?.user_type === 'admin' || (user?.user_type === 'internal' && (user?.position === 'accountant' || user?.position === 'admin'))) && (
                 <NavLink to="/invoice-periods" label="月次管理" />
@@ -50,6 +55,26 @@ const Navbar: React.FC = () => {
               {/* 現場管理は管理者または経理のみ */}
               {(user?.user_type === 'admin' || (user?.user_type === 'internal' && (user?.position === 'accountant' || user?.position === 'admin'))) && (
                 <NavLink to="/admin/sites" label="現場管理" />
+              )}
+
+              {/* 登録申請管理は管理者または経理のみ */}
+              {(user?.user_type === 'admin' || (user?.user_type === 'internal' && (user?.position === 'accountant' || user?.position === 'admin'))) && (
+                <NavLink to="/admin/registration-requests" label="登録申請" />
+              )}
+
+              {/* カレンダー管理は管理者または経理のみ */}
+              {(user?.user_type === 'admin' || (user?.user_type === 'internal' && (user?.position === 'accountant' || user?.position === 'admin'))) && (
+                <NavLink to="/admin/calendar-management" label="カレンダー" />
+              )}
+
+              {/* ユーザー管理は管理者または経理のみ */}
+              {(user?.user_type === 'admin' || (user?.user_type === 'internal' && (user?.position === 'accountant' || user?.position === 'admin'))) && (
+                <NavLink to="/admin/users" label="ユーザー" />
+              )}
+
+              {/* 協力会社管理は管理者または経理のみ */}
+              {(user?.user_type === 'admin' || (user?.user_type === 'internal' && (user?.position === 'accountant' || user?.position === 'admin'))) && (
+                <NavLink to="/admin/partners" label="協力会社" />
               )}
             </div>
           </div>

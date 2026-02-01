@@ -21,6 +21,8 @@ import RegistrationRequestsPage from './pages/admin/RegistrationRequestsPage';
 import PaymentCalendar from './components/PaymentCalendar';
 import CalendarManagementPage from './pages/admin/CalendarManagementPage';
 import SiteManagementPage from './pages/admin/SiteManagementPage';
+import UserManagementPage from './pages/admin/UserManagementPage';
+import PartnerCompanyManagementPage from './pages/admin/PartnerCompanyManagementPage';
 
 // ====================
 // 認証保護ルート
@@ -223,6 +225,22 @@ const AppRoutes: React.FC = () => {
         element={
           <InternalRoute>
             <SiteManagementPage />
+          </InternalRoute>
+        }
+      />
+      <Route
+        path="/admin/users"
+        element={
+          <InternalRoute>
+            <UserManagementPage />
+          </InternalRoute>
+        }
+      />
+      <Route
+        path="/admin/partners"
+        element={
+          <InternalRoute>
+            <PartnerCompanyManagementPage />
           </InternalRoute>
         }
       />

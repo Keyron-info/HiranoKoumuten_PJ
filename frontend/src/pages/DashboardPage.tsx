@@ -452,9 +452,9 @@ const DashboardPage: React.FC = () => {
           {/* 右カラム: サイドウィジェット (1/3幅) */}
           <div className="space-y-6">
             {/* 予算消化率 (経営層のみ) */}
-            {user?.user_type === 'internal' && ['president_test', 'senmu_test', 'joumu_test', 'admin', 'keiri_test'].includes(user.username) && (
+            {user?.user_type === 'internal' && ['president', 'senior_managing_director', 'managing_director', 'director', 'admin', 'accountant'].includes(user.position || '') && (
               <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-                <h3 className="text-lg font-bold text-slate-800 mb-4">予算消化状況 (管理者・経営層のみ)</h3>
+                <h3 className="text-lg font-bold text-slate-800 mb-4">予算消化状況</h3>
                 <div className="space-y-5">
                   {budgetItems.length === 0 ? (
                     <p className="text-slate-500 text-center py-8 text-sm">予算データがありません</p>
@@ -489,7 +489,7 @@ const DashboardPage: React.FC = () => {
             )}
 
             {/* 現場別割合 (円グラフ) - 経営層のみ */}
-            {user?.user_type === 'internal' && ['president_test', 'senmu_test', 'joumu_test', 'admin'].includes(user.username) && sitePaymentData.length > 0 && (
+            {user?.user_type === 'internal' && ['president', 'senior_managing_director', 'managing_director', 'director', 'admin'].includes(user.position || '') && sitePaymentData.length > 0 && (
               <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
                 <div className="flex items-center justify-between mb-2">
                   <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
@@ -519,11 +519,11 @@ const DashboardPage: React.FC = () => {
             )}
 
             {/* レポート出力 (管理者・経理のみ) */}
-            {user?.user_type === 'internal' && ['admin', 'keiri_test'].includes(user.username) && (
+            {user?.user_type === 'internal' && ['admin', 'accountant'].includes(user.position || '') && (
               <div className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-xl shadow-sm p-6 text-white">
                 <h3 className="text-lg font-bold mb-2 flex items-center gap-2">
                   <Download size={20} className="text-emerald-400" />
-                  レポート出力 (管理者・経理のみ)
+                  レポート出力
                 </h3>
                 <p className="text-slate-300 text-sm mb-4">
                   各種集計データをCSV形式でダウンロード

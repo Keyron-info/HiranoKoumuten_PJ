@@ -153,6 +153,231 @@ class UserProfileViewSet(viewsets.GenericViewSet):
             serializer.save()
             return Response(serializer.data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    @action(detail=False, methods=['post'])
+    def change_password(self, request):
+        """パスワード変更"""
+        current_password = request.data.get('current_password')
+        new_password = request.data.get('new_password')
+        new_password_confirm = request.data.get('new_password_confirm')
+        
+        # バリデーション
+        if not current_password or not new_password or not new_password_confirm:
+            return Response(
+                {'error': 'すべてのフィールドを入力してください'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # 現在のパスワード確認
+        if not request.user.check_password(current_password):
+            return Response(
+                {'error': '現在のパスワードが正しくありません'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # 新しいパスワードの確認
+        if new_password != new_password_confirm:
+            return Response(
+                {'error': '新しいパスワードが一致しません'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # パスワードの長さチェック
+        if len(new_password) < 8:
+            return Response(
+                {'error': 'パスワードは8文字以上で入力してください'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # パスワード変更
+        request.user.set_password(new_password)
+        request.user.save()
+        
+        return Response({'message': 'パスワードを変更しました'})
+    
+    # ==========================================
+    # 管理者向けユーザー管理API
+    # ==========================================
+    
+    def _is_admin_user(self, user):
+        """管理者または経理かどうかを確認"""
+        if user.user_type != 'internal':
+            return False
+        return user.position in ['admin', 'accountant'] or user.is_superuser or user.is_super_admin
+    
+    @action(detail=False, methods=['get'])
+    def list_all(self, request):
+        """全ユーザー一覧（管理者・経理のみ）"""
+        if not self._is_admin_user(request.user):
+            return Response(
+                {'error': '権限がありません'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        # フィルター
+        user_type = request.query_params.get('user_type')
+        is_active = request.query_params.get('is_active')
+        search = request.query_params.get('search')
+        
+        queryset = User.objects.all().order_by('-date_joined')
+        
+        if user_type:
+            queryset = queryset.filter(user_type=user_type)
+        
+        if is_active is not None:
+            is_active_bool = is_active.lower() in ['true', '1', 'yes']
+            queryset = queryset.filter(is_active=is_active_bool)
+        
+        if search:
+            queryset = queryset.filter(
+                Q(username__icontains=search) |
+                Q(first_name__icontains=search) |
+                Q(last_name__icontains=search) |
+                Q(email__icontains=search)
+            )
+        
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
+    
+    @action(detail=False, methods=['post'])
+    def create_user(self, request):
+        """ユーザー作成（管理者・経理のみ）"""
+        if not self._is_admin_user(request.user):
+            return Response(
+                {'error': '権限がありません'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        data = request.data
+        
+        # 必須フィールドチェック
+        username = data.get('username')
+        password = data.get('password')
+        user_type = data.get('user_type')
+        
+        if not username or not password or not user_type:
+            return Response(
+                {'error': 'ユーザー名、パスワード、ユーザー種別は必須です'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # ユーザー名の重複チェック
+        if User.objects.filter(username=username).exists():
+            return Response(
+                {'error': 'このユーザー名は既に使用されています'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # パスワードの長さチェック
+        if len(password) < 8:
+            return Response(
+                {'error': 'パスワードは8文字以上で入力してください'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            user = User.objects.create_user(
+                username=username,
+                password=password,
+                email=data.get('email', ''),
+                first_name=data.get('first_name', ''),
+                last_name=data.get('last_name', ''),
+                user_type=user_type,
+                position=data.get('position', ''),
+                phone=data.get('phone', ''),
+                customer_company_id=data.get('customer_company') if user_type == 'customer' else None,
+                company_id=data.get('company') if user_type == 'internal' else None,
+            )
+            
+            serializer = self.get_serializer(user)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        except Exception as e:
+            return Response(
+                {'error': f'ユーザー作成に失敗しました: {str(e)}'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+    
+    @action(detail=True, methods=['patch'])
+    def update_user(self, request, pk=None):
+        """ユーザー編集（管理者・経理のみ）"""
+        if not self._is_admin_user(request.user):
+            return Response(
+                {'error': '権限がありません'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        try:
+            user = User.objects.get(pk=pk)
+        except User.DoesNotExist:
+            return Response(
+                {'error': 'ユーザーが見つかりません'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        data = request.data
+        
+        # 更新可能なフィールド
+        if 'email' in data:
+            user.email = data['email']
+        if 'first_name' in data:
+            user.first_name = data['first_name']
+        if 'last_name' in data:
+            user.last_name = data['last_name']
+        if 'phone' in data:
+            user.phone = data['phone']
+        if 'position' in data and user.user_type == 'internal':
+            user.position = data['position']
+        if 'customer_company' in data and user.user_type == 'customer':
+            user.customer_company_id = data['customer_company']
+        
+        # パスワードリセット（オプション）
+        if 'new_password' in data and data['new_password']:
+            if len(data['new_password']) < 8:
+                return Response(
+                    {'error': 'パスワードは8文字以上で入力してください'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            user.set_password(data['new_password'])
+        
+        user.save()
+        
+        serializer = self.get_serializer(user)
+        return Response(serializer.data)
+    
+    @action(detail=True, methods=['post'])
+    def toggle_active(self, request, pk=None):
+        """ユーザー有効/無効切り替え（管理者・経理のみ）"""
+        if not self._is_admin_user(request.user):
+            return Response(
+                {'error': '権限がありません'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        try:
+            user = User.objects.get(pk=pk)
+        except User.DoesNotExist:
+            return Response(
+                {'error': 'ユーザーが見つかりません'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # 自分自身は無効化できない
+        if user.id == request.user.id:
+            return Response(
+                {'error': '自分自身を無効化することはできません'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        user.is_active = not user.is_active
+        user.save()
+        
+        status_text = '有効' if user.is_active else '無効'
+        serializer = self.get_serializer(user)
+        return Response({
+            'message': f'ユーザーを{status_text}にしました',
+            'user': serializer.data
+        })
+
 
 
 class CustomerCompanyViewSet(viewsets.ModelViewSet):

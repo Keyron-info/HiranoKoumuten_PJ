@@ -20,6 +20,10 @@ RUN apt-get update && apt-get install -y \
 COPY requirements.txt /app/
 RUN pip install --no-cache-dir -r requirements.txt
 
+
+# キャッシュ破棄用の環境変数（コード変更を確実に反映させるため）
+ENV REFRESHED_AT 2026-02-03_0330
+
 # プロジェクトのコードをコピー
 COPY . /app/
 

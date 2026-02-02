@@ -87,54 +87,15 @@ WSGI_APPLICATION = 'keyron_project.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
-# DATABASE_URLが設定されている場合はそちらを使用、なければSQLiteを使用
-DATABASE_URL = os.environ.get('DATABASE_URL')
+# Database
+# https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
-import sys
-print(f"[SETTINGS] DATABASE_URL present: {bool(DATABASE_URL)}", file=sys.stderr)
-
-if DATABASE_URL:
-    try:
-        # DATABASE_URLからデータベース設定を取得
-        db_config = dj_database_url.parse(DATABASE_URL)
-        
-        print(f"[SETTINGS] Parsed DB config: {db_config}", file=sys.stderr)
-        
-        # [CRITICAL FIX] App Runner環境変数のDB名が間違っているため、postgresに強制変更
-        original_name = db_config.get('NAME', 'NOT_SET')
-        print(f"[SETTINGS] Original DB NAME: {original_name}", file=sys.stderr)
-        
-        # 強制的にpostgresに変更
-        db_config['NAME'] = 'postgres'
-        print(f"[SETTINGS] Overridden DB NAME: {db_config['NAME']}", file=sys.stderr)
-        
-        db_config['CONN_MAX_AGE'] = 600
-        
-        DATABASES = {
-            'default': db_config
-        }
-        
-        print(f"[SETTINGS] Final DATABASES config: {DATABASES}", file=sys.stderr)
-        
-    except Exception as e:
-        print(f"[SETTINGS ERROR] Failed to parse DATABASE_URL: {e}", file=sys.stderr)
-        # フォールバックとしてSQLiteを使用
-        DATABASES = {
-            'default': {
-                'ENGINE': 'django.db.backends.sqlite3',
-                'NAME': BASE_DIR / 'db.sqlite3',
-            }
-        }
-else:
-    # ローカル開発環境: SQLiteを使用
-    print("[SETTINGS] Using SQLite (no DATABASE_URL)", file=sys.stderr)
-    DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.sqlite3',
-            'NAME': BASE_DIR / 'db.sqlite3',
-        }
-    }
-
+DATABASES = {
+    'default': dj_database_url.config(
+        default=f'sqlite:///{BASE_DIR / "db.sqlite3"}',
+        conn_max_age=600
+    )
+}
 
 
 # Password validation
@@ -198,7 +159,8 @@ AUTHENTICATION_BACKENDS = [
     'django.contrib.auth.backends.ModelBackend',  # フォールバック
 ]
 
-
+# Custom User Model
+AUTH_USER_MODEL = 'invoices.User'
 
 
 # Login/Logout URLs
@@ -237,7 +199,6 @@ CORS_ALLOWED_ORIGINS = [
     "http://127.0.0.1:3000",
     "http://localhost:3002",  # React開発サーバー (別ポート)
     "http://127.0.0.1:3002",
-    "https://main.d16cyywei73ulq.amplifyapp.com", # Amplify Frontend
 ]
 
 # 環境変数から追加のOriginを読み込む（本番用）
@@ -353,15 +314,3 @@ LOGGING = {
         },
     },
 }
-
-# ====================
-# EMERGENCY DEBUG SETTINGS
-# ====================
-# エラー詳細を表示し、CORS/Host制限を全開放して接続を優先する
-DEBUG = True
-ALLOWED_HOSTS = ['*']
-CORS_ALLOW_ALL_ORIGINS = True
-
-# DB接続エラー回避：環境変数のDB名が間違っている可能性があるため強制的に修正
-if 'default' in DATABASES:
-    DATABASES['default']['NAME'] = 'postgres'

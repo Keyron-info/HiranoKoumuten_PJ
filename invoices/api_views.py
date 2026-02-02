@@ -9,6 +9,7 @@ from rest_framework.renderers import BaseRenderer
 from django.shortcuts import get_object_or_404
 from django.db.models import Q, Sum, Count, F
 from rest_framework import filters
+from django_filters.rest_framework import DjangoFilterBackend
 from django.core.mail import send_mail
 from django.conf import settings
 from django.utils import timezone

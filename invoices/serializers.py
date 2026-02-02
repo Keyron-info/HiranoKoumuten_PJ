@@ -380,66 +380,56 @@ class PDFGenerationLogSerializer(serializers.ModelSerializer):
 class InvoiceCreateSerializer(serializers.ModelSerializer):
     """請求書作成用シリアライザー（Phase 3対応）"""
     items = InvoiceItemSerializer(many=True)
+    # 🆕 現場パスワード（フォームから受け取る用、DB保存なし）
+    site_password = serializers.CharField(write_only=True, required=False, allow_blank=True)
     
     class Meta:
         model = Invoice
         fields = [
             'construction_site', 'project_name', 'invoice_date',
             'payment_due_date', 'notes', 'items',
+            'site_password', # 🆕
             # Phase 3追加フィールド
             'document_type', 'construction_type', 'construction_type_other',
             'purchase_order',
         ]
+        extra_kwargs = {
+            'construction_site': {'required': False, 'allow_null': True}
+        }
     
-    def create(self, validated_data):
-        items_data = validated_data.pop('items')
-        
-        # リクエストユーザーの情報を取得
-        user = self.context['request'].user
-        
-        # created_byを設定
-        validated_data['created_by'] = user
-        
-        # customer_companyを自動設定（協力会社ユーザーの場合）
-        if user.user_type == 'customer' and user.customer_company:
-            validated_data['customer_company'] = user.customer_company
-        
-        # receiving_company を自動設定
-        from .models import Company
-        receiving_company = Company.objects.first()
-        if receiving_company:
-            validated_data['receiving_company'] = receiving_company
-        
-        # 🆕 納品書の場合は承認不要（受領のみ）
-        document_type = validated_data.get('document_type', 'invoice')
-        if document_type == 'delivery_note':
-            validated_data['status'] = 'approved'  # 納品書は即座に受領済み扱い
-        
-        # invoiceを作成
-        invoice = Invoice.objects.create(**validated_data)
-        
-        # 明細を作成
-        for item_data in items_data:
-            InvoiceItem.objects.create(invoice=invoice, **item_data)
-        
-        # 金額計算
-        invoice.calculate_totals()
-        
-        # 🆕 変更履歴を記録（作成）
-        InvoiceChangeHistory.objects.create(
-            invoice=invoice,
-            change_type='created',
-            change_reason='新規作成',
-            changed_by=user
-        )
-        
-        return invoice
-
     def validate(self, attrs):
         """
         バリデーション
+        - 現場パスワードによる現場特定
         - 締め日チェック（25日締めルール強制）
         """
+        # 1. 現場パスワード処理
+        site_password = attrs.get('site_password')
+        construction_site = attrs.get('construction_site')
+        
+        if site_password and not construction_site:
+            from .models import ConstructionSite
+            # パスワードで有効な現場を検索
+            site = ConstructionSite.objects.filter(
+                site_password=site_password,
+                is_active=True,
+                is_completed=False,
+                is_cutoff=False
+            ).first()
+            
+            if not site:
+                raise serializers.ValidationError({"site_password": "パスワードに一致する有効な工事現場が見つかりません。"})
+            
+            attrs['construction_site'] = site
+            
+            # 現場名も自動設定
+            if not attrs.get('project_name'):
+                attrs['project_name'] = site.name
+        
+        # 現場必須チェック
+        if not attrs.get('construction_site'):
+            raise serializers.ValidationError({"construction_site": "工事現場を選択するか、正しい現場パスワードを入力してください。"})
+
         # ユーザータイプ確認
         user = self.context['request'].user
         

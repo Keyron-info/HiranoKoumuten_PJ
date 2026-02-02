@@ -221,7 +221,7 @@ class ConstructionSiteSerializer(serializers.ModelSerializer):
             'is_active', 'is_completed', 'completion_date',
             'created_at', 'updated_at'
         ]
-        read_only_fields = ['id', 'project_code', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'project_code', 'company', 'created_at', 'updated_at']
 
 
 class InvoiceItemSerializer(serializers.ModelSerializer):

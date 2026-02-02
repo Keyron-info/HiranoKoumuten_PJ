@@ -429,6 +429,18 @@ class ConstructionSiteViewSet(viewsets.ModelViewSet):
         
         return queryset.select_related('company', 'supervisor', 'completed_by')
     
+    def perform_create(self, serializer):
+        """作成時に会社を自動設定"""
+        user = self.request.user
+        company = None
+        if user.company:
+            company = user.company
+        else:
+            # 会社が設定されていないユーザー（スーパーユーザーなど）の場合は、最初の会社を使用
+            company = Company.objects.first()
+        
+        serializer.save(company=company)
+    
     @action(detail=True, methods=['post'], permission_classes=[IsInternalUser])
     def mark_complete(self, request, pk=None):
         """4.1 現場完成ボタン"""

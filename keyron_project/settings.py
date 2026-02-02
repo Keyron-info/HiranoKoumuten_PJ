@@ -217,6 +217,7 @@ CORS_ALLOWED_ORIGINS = [
     "http://127.0.0.1:3000",
     "http://localhost:3002",  # React開発サーバー (別ポート)
     "http://127.0.0.1:3002",
+    "https://main.d16cyywei73ulq.amplifyapp.com", # Amplify Frontend
 ]
 
 # 環境変数から追加のOriginを読み込む（本番用）

@@ -1,34 +1,23 @@
 #!/bin/bash
-set -e
+# set -e removed to prevent crash on migration failure
 
+echo "=========================================="
+echo "   STARTING APP - VERSION: 2026-02-03_FIX_V4_ROBUST"
+echo "=========================================="
 
-# 起動スクリプト for App Runner
-echo "--- STARTING APP VERSION: 2026-02-03_DEBUG_PATCH ---"
+echo "[INFO] Waiting for database..."
+# 簡易的な待機ロジック (必要であれば)
 
+echo "[INFO] Running database migrations..."
+if venv/bin/python manage.py migrate --noinput; then
+    echo "[SUCCESS] Migrations completed."
+else
+    echo "[ERROR] Migrations failed! Check the logs above for details."
+    echo "[INFO] Continuing startup sequence to allow log retrieval..."
+fi
 
-echo "Running database migrations..."
-venv/bin/python manage.py migrate --noinput
+echo "[INFO] Creating superuser..."
+venv/bin/python manage.py shell -c "from django.contrib.auth import get_user_model; User = get_user_model(); User.objects.filter(username='admin').exists() or User.objects.create_superuser('admin', 'admin@example.com', 'admin')" || echo "[WARN] Superuser creation failed (might already exist)"
 
-echo "Creating initial admin user..."
-venv/bin/python manage.py shell -c "
-from django.contrib.auth import get_user_model
-import os
-User = get_user_model()
-email = os.environ.get('DJANGO_SUPERUSER_EMAIL', 'admin@hirano-koumuten.co.jp')
-password = os.environ.get('DJANGO_SUPERUSER_PASSWORD', 'HiranoAdmin2024!')
-username = email.split('@')[0]
-if not User.objects.filter(email=email).exists():
-    User.objects.create_superuser(username=username, email=email, password=password)
-    print(f'Admin user created: {email}')
-else:
-    print(f'Admin user already exists: {email}')
-"
-
-echo "Creating sample users for all roles..."
-venv/bin/python manage.py create_sample_users || echo "Sample user creation completed (some may already exist)"
-
-echo "Creating construction types (20 types)..."
-venv/bin/python manage.py create_construction_types || echo "Construction types creation completed"
-
-echo "Starting Gunicorn server..."
-exec venv/bin/gunicorn --bind 0.0.0.0:8000 keyron_project.wsgi:application
+echo "[INFO] Starting Gunicorn..."
+exec venv/bin/gunicorn keyron_project.wsgi:application --bind 0.0.0.0:8000

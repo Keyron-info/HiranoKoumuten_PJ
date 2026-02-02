@@ -2911,3 +2911,50 @@ class DeadlineNotificationBanner(models.Model):
             )
         except PaymentCalendar.DoesNotExist:
             return self.message_template
+
+
+# ==========================================
+# Phase 6: コア機能強化（ログ・監査）
+# ==========================================
+
+class AuditLog(models.Model):
+    """操作ログ・監査ログ"""
+    ACTION_CHOICES = [
+        ('create', '作成'),
+        ('update', '更新'),
+        ('delete', '削除'),
+        ('login', 'ログイン'),
+        ('logout', 'ログアウト'),
+        ('approve', '承認'),
+        ('reject', '否認'),
+        ('remand', '差戻し'),
+        ('cancel', '取り消し'),
+        ('other', 'その他'),
+    ]
+
+    user = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        verbose_name="操作ユーザー",
+        related_name='audit_logs'
+    )
+    action = models.CharField(max_length=20, choices=ACTION_CHOICES, verbose_name="操作種別")
+    target_model = models.CharField(max_length=50, verbose_name="対象モデル名")
+    target_id = models.CharField(max_length=50, verbose_name="対象ID", blank=True)
+    target_label = models.CharField(max_length=200, verbose_name="対象ラベル", blank=True, help_text="対象オブジェクトの文字列表現")
+    details = models.JSONField(verbose_name="詳細情報", default=dict, blank=True)
+    ip_address = models.GenericIPAddressField(verbose_name="IPアドレス", null=True, blank=True)
+    user_agent = models.TextField(verbose_name="ユーザーエージェント", blank=True)
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="操作日時")
+
+    class Meta:
+        db_table = 'audit_logs'
+        verbose_name = "操作ログ"
+        verbose_name_plural = "操作ログ一覧"
+        ordering = ['-created_at']
+
+    def __str__(self):
+        user_name = self.user.get_full_name() if self.user else 'System'
+        return f"{self.created_at} - {user_name} - {self.get_action_display()} - {self.target_model}"

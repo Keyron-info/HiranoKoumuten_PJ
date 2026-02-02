@@ -29,7 +29,7 @@ const Navbar: React.FC = () => {
                 K
               </div>
               <span className="text-xl font-bold text-white tracking-tight group-hover:text-primary-400 transition-colors">
-                KEYRON BIM
+                KAKIEMON-BIM
               </span>
             </Link>
 
@@ -75,6 +75,11 @@ const Navbar: React.FC = () => {
               {/* 協力会社管理は管理者または経理のみ */}
               {(user?.user_type === 'admin' || (user?.user_type === 'internal' && (user?.position === 'accountant' || user?.position === 'admin'))) && (
                 <NavLink to="/admin/partners" label="協力会社" />
+              )}
+
+              {/* 操作ログは管理者または経理のみ */}
+              {(user?.user_type === 'admin' || (user?.user_type === 'internal' && (user?.position === 'accountant' || user?.position === 'admin'))) && (
+                <NavLink to="/audit-logs" label="操作ログ" />
               )}
             </div>
           </div>

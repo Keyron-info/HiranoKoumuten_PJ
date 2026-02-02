@@ -22,7 +22,9 @@ from .models import (
     UserRegistrationRequest,
     # タスク3追加
     PaymentCalendar,
-    DeadlineNotificationBanner
+    DeadlineNotificationBanner,
+    # Phase 6追加
+    AuditLog
 )
 
 User = get_user_model()
@@ -1230,3 +1232,21 @@ class DeadlineNotificationBannerSerializer(serializers.ModelSerializer):
     
     def get_display_message(self, obj):
         return obj.get_display_message()
+
+
+# ==========================================
+# Phase 6: コア機能強化（ログ・監査）
+# ==========================================
+
+class AuditLogSerializer(serializers.ModelSerializer):
+    user_name = serializers.CharField(source='user.get_full_name', read_only=True)
+    action_display = serializers.CharField(source='get_action_display', read_only=True)
+    
+    class Meta:
+        model = AuditLog
+        fields = [
+            'id', 'user', 'user_name', 'action', 'action_display',
+            'target_model', 'target_id', 'target_label',
+            'details', 'ip_address', 'user_agent', 'created_at'
+        ]
+        read_only_fields = fields

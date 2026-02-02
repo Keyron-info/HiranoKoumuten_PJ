@@ -15,6 +15,9 @@ const MyPendingApprovalsPage: React.FC = () => {
   const [processingId, setProcessingId] = useState<number | null>(null);
   const [showRejectModal, setShowRejectModal] = useState<number | null>(null);
   const [rejectReason, setRejectReason] = useState('');
+  // 一括承認用
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [isBulkProcessing, setIsBulkProcessing] = useState(false);
 
   useEffect(() => {
     fetchPendingApprovals();
@@ -52,7 +55,7 @@ const MyPendingApprovalsPage: React.FC = () => {
       alert('却下理由を入力してください');
       return;
     }
-    
+
     try {
       setProcessingId(invoiceId);
       await invoiceAPI.rejectInvoice(String(invoiceId), rejectReason);
@@ -64,6 +67,52 @@ const MyPendingApprovalsPage: React.FC = () => {
       alert(err.response?.data?.error || '却下に失敗しました');
     } finally {
       setProcessingId(null);
+    }
+  };
+
+  // 一括選択・解除
+  const toggleSelection = (id: number) => {
+    const newSelected = new Set(selectedIds);
+    if (newSelected.has(id)) {
+      newSelected.delete(id);
+    } else {
+      newSelected.add(id);
+    }
+    setSelectedIds(newSelected);
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === pendingApprovals.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(pendingApprovals.map(inv => inv.id)));
+    }
+  };
+
+  // 一括承認実行
+  const handleBulkApprove = async () => {
+    if (selectedIds.size === 0) return;
+    if (!window.confirm(`${selectedIds.size}件の請求書を一括承認しますか？`)) return;
+
+    try {
+      setIsBulkProcessing(true);
+      const result = await invoiceAPI.bulkApprove(Array.from(selectedIds));
+
+      let message = result.message;
+      if (result.failure_count > 0) {
+        message += `\n失敗: ${result.failure_count}件`;
+        // 詳細エラーはコンソールに出すか、必要ならアラートに含める
+        console.error('Bulk approve errors:', result.errors);
+      }
+      alert(message);
+
+      setSelectedIds(new Set());
+      fetchPendingApprovals();
+    } catch (err: any) {
+      console.error(err);
+      alert('一括承認に失敗しました');
+    } finally {
+      setIsBulkProcessing(false);
     }
   };
 
@@ -120,6 +169,33 @@ const MyPendingApprovalsPage: React.FC = () => {
           </div>
         </div>
 
+        {/* 一括承認アクションバー */}
+        {!isEmpty && (
+          <div className="bg-white p-4 rounded-xl shadow-sm mb-6 flex items-center justify-between sticky top-20 z-10 border border-slate-200">
+            <div className="flex items-center space-x-4">
+              <label className="flex items-center space-x-2 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={selectedIds.size > 0 && selectedIds.size === pendingApprovals.length}
+                  onChange={toggleSelectAll}
+                  className="w-5 h-5 text-orange-500 rounded border-gray-300 focus:ring-orange-500"
+                />
+                <span className="font-medium text-gray-700">
+                  すべて選択 ({selectedIds.size}/{pendingApprovals.length})
+                </span>
+              </label>
+            </div>
+            <button
+              onClick={handleBulkApprove}
+              disabled={selectedIds.size === 0 || isBulkProcessing}
+              className="bg-gradient-to-r from-orange-500 to-orange-600 text-white px-6 py-2.5 rounded-lg font-bold hover:from-orange-600 hover:to-orange-700 transition-all shadow-md disabled:opacity-50 disabled:shadow-none flex items-center space-x-2"
+            >
+              <CheckCircle size={20} />
+              <span>{isBulkProcessing ? '処理中...' : '一括承認する'}</span>
+            </button>
+          </div>
+        )}
+
         {error && (
           <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6 text-red-700">
             {error}
@@ -140,15 +216,24 @@ const MyPendingApprovalsPage: React.FC = () => {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {pendingApprovals.map((invoice) => {
               const daysWaiting = getDaysWaiting(invoice.submitted_at || invoice.created_at);
-              
+
               return (
-                <div 
-                  key={invoice.id} 
+                <div
+                  key={invoice.id}
                   className="bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow border-l-4 border-orange-500"
                 >
-                  <div className="p-6">
-                    {/* ヘッダー */}
-                    <div className="flex items-start justify-between mb-4">
+                  <div className="p-6 relative">
+                    {/* チェックボックス（絶対配置） */}
+                    <div className="absolute top-6 left-4">
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.has(invoice.id)}
+                        onChange={() => toggleSelection(invoice.id)}
+                        className="w-5 h-5 text-orange-500 rounded border-gray-300 focus:ring-orange-500 cursor-pointer"
+                      />
+                    </div>
+                    {/* ヘッダー (左マージン追加) */}
+                    <div className="flex items-start justify-between mb-4 pl-8">
                       <div>
                         <div className="flex items-center space-x-2 mb-1">
                           <FileText size={20} className="text-orange-600" />
@@ -165,7 +250,7 @@ const MyPendingApprovalsPage: React.FC = () => {
                         </span>
                       )}
                     </div>
-                    
+
                     {/* 詳細情報 */}
                     <div className="space-y-3 mb-6">
                       <div className="flex items-center space-x-3 text-gray-700">
@@ -201,10 +286,10 @@ const MyPendingApprovalsPage: React.FC = () => {
                         </div>
                       </div>
                     </div>
-                    
+
                     {/* アクションボタン */}
                     <div className="flex space-x-3">
-                      <button 
+                      <button
                         onClick={() => handleApprove(invoice.id)}
                         disabled={processingId === invoice.id}
                         className="flex-1 bg-gradient-to-r from-green-500 to-green-600 text-white py-3 rounded-lg font-medium hover:from-green-600 hover:to-green-700 transition-all shadow-sm hover:shadow-md flex items-center justify-center space-x-2 disabled:opacity-50"
@@ -212,7 +297,7 @@ const MyPendingApprovalsPage: React.FC = () => {
                         <CheckCircle size={20} />
                         <span>{processingId === invoice.id ? '処理中...' : '承認する'}</span>
                       </button>
-                      <button 
+                      <button
                         onClick={() => setShowRejectModal(invoice.id)}
                         disabled={processingId === invoice.id}
                         className="flex-1 bg-gradient-to-r from-red-500 to-red-600 text-white py-3 rounded-lg font-medium hover:from-red-600 hover:to-red-700 transition-all shadow-sm hover:shadow-md flex items-center justify-center space-x-2 disabled:opacity-50"
@@ -221,9 +306,9 @@ const MyPendingApprovalsPage: React.FC = () => {
                         <span>却下</span>
                       </button>
                     </div>
-                    
+
                     {/* 詳細リンク */}
-                    <button 
+                    <button
                       onClick={() => navigate(`/invoices/${invoice.id}`)}
                       className="w-full mt-3 text-blue-600 hover:text-blue-700 font-medium text-sm py-2 hover:bg-blue-50 rounded-lg transition-colors"
                     >

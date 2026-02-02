@@ -5,6 +5,7 @@ import { InvoiceCreateForm, ConstructionSite, InvoiceItem, ConstructionType, Pur
 import Layout from '../components/common/Layout';
 import { useAuth } from '../contexts/AuthContext';
 import InvoiceSuccessModal from '../components/InvoiceSuccessModal';
+import SearchableSelect from '../components/common/SearchableSelect';
 
 const InvoiceCreatePage: React.FC = () => {
   const navigate = useNavigate();
@@ -510,29 +511,25 @@ const InvoiceCreatePage: React.FC = () => {
                   </div>
                 ) : (
                   /* 社内ユーザーまたは認証済み: ドロップダウン表示 */
-                  <div className="flex gap-2">
-                    <select
-                      required
-                      value={formData.construction_site}
-                      onChange={(e) => {
-                        setFormData({ ...formData, construction_site: e.target.value });
-                        setSelectedPurchaseOrder(null);
-                      }}
-                      disabled={user?.user_type === 'customer'} // 協力会社は変更不可（再検索が必要）
-                      className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 ${user?.user_type === 'customer' ? 'bg-gray-100' : ''}`}
-                    >
-                      <option value="">選択してください</option>
-                      {sites && sites.length > 0 ? (
-                        sites.map((site) => (
-                          <option key={site.id} value={site.id}>
-                            {site.name}
-                            {site.supervisor_name && ` - 担当: ${site.supervisor_name}`}
-                          </option>
-                        ))
-                      ) : (
-                        <option value="" disabled>工事現場がありません</option>
-                      )}
-                    </select>
+                  <div className="flex gap-2 items-start">
+                    <div className="flex-1">
+                      <SearchableSelect
+                        required
+                        options={sites.map(site => ({
+                          value: site.id,
+                          label: site.name,
+                          subLabel: site.supervisor_name ? `担当: ${site.supervisor_name}` : undefined
+                        }))}
+                        value={formData.construction_site ? Number(formData.construction_site) : ''}
+                        onChange={(val) => {
+                          setFormData({ ...formData, construction_site: String(val) });
+                          setSelectedPurchaseOrder(null);
+                        }}
+                        disabled={user?.user_type === 'customer'}
+                        placeholder="工事現場を検索・選択"
+                        className="w-full"
+                      />
+                    </div>
                     {user?.user_type === 'customer' && (
                       <button
                         type="button"
@@ -541,7 +538,7 @@ const InvoiceCreatePage: React.FC = () => {
                           setSitePassword('');
                           setSites([]); // 検索結果をクリア
                         }}
-                        className="px-3 py-2 border border-gray-300 text-gray-600 rounded-md hover:bg-gray-50 whitespace-nowrap"
+                        className="px-3 py-2 border border-gray-300 text-gray-600 rounded-md hover:bg-gray-50 whitespace-nowrap bg-white h-[38px] mt-6"
                       >
                         再検索
                       </button>

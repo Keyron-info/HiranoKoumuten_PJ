@@ -191,13 +191,14 @@ export const invoiceAPI = {
   // 🆕 Phase 6: 一括承認API
 
   // 一括承認
-  batchApprove: async (invoiceIds: number[], comment: string = '一括承認'): Promise<{
+  // 一括承認
+  bulkApprove: async (invoiceIds: number[], comment: string = '一括承認'): Promise<{
     message: string;
-    approved_count: number;
-    failed_count: number;
-    results: Array<{ invoice_id: number; invoice_number: string; status: string; error?: string }>;
+    success_count: number;
+    failure_count: number;
+    errors: Array<{ id: number; invoice_number: string; error: string }>;
   }> => {
-    const response = await apiClient.post('/invoices/batch_approve/', {
+    const response = await apiClient.post('/invoices/bulk_approve/', {
       invoice_ids: invoiceIds,
       comment,
     });

@@ -25,6 +25,7 @@ import CalendarManagementPage from './pages/admin/CalendarManagementPage';
 import SiteManagementPage from './pages/admin/SiteManagementPage';
 import UserManagementPage from './pages/admin/UserManagementPage';
 import PartnerCompanyManagementPage from './pages/admin/PartnerCompanyManagementPage';
+import AuditLogPage from './pages/AuditLogPage';
 
 // ====================
 // 認証保護ルート
@@ -259,6 +260,14 @@ const AppRoutes: React.FC = () => {
         element={
           <InternalRoute>
             <PartnerCompanyManagementPage />
+          </InternalRoute>
+        }
+      />
+      <Route
+        path="/audit-logs"
+        element={
+          <InternalRoute>
+            <AuditLogPage />
           </InternalRoute>
         }
       />

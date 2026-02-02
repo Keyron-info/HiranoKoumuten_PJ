@@ -51,7 +51,9 @@ from .models import (
     UserRegistrationRequest,
     # タスク3追加
     PaymentCalendar,
-    DeadlineNotificationBanner
+    DeadlineNotificationBanner,
+    # Phase 6追加
+    AuditLog
 )
 from .serializers import (
     CompanySerializer, DepartmentSerializer, CustomerCompanySerializer,
@@ -80,7 +82,9 @@ from .serializers import (
     UserRegistrationRequestSerializer,
     # タスク3追加
     PaymentCalendarSerializer,
-    DeadlineNotificationBannerSerializer
+    DeadlineNotificationBannerSerializer,
+    # Phase 6追加
+    AuditLogSerializer
 )
 
 
@@ -842,6 +846,121 @@ class InvoiceViewSet(viewsets.ModelViewSet):
             'invoice': InvoiceSerializer(invoice).data
         })
     
+        return Response({
+            'message': '請求書を提出しました。承認をお待ちください。',
+            'invoice': InvoiceSerializer(invoice).data
+        })
+    
+    @action(detail=False, methods=['post'], permission_classes=[IsInternalUser])
+    def bulk_approve(self, request):
+        """
+        請求書一括承認
+        - 指定された複数の請求書をまとめて承認する
+        """
+        invoice_ids = request.data.get('invoice_ids', [])
+        comment = request.data.get('comment', '一括承認')
+        
+        if not invoice_ids:
+            return Response({'error': '請求書IDが指定されていません'}, status=status.HTTP_400_BAD_REQUEST)
+            
+        success_count = 0
+        errors = []
+        
+        user = request.user
+        
+        # 対象の請求書を取得（閲覧権限のあるものに限定）
+        invoices = self.get_queryset().filter(id__in=invoice_ids)
+        
+        for invoice in invoices:
+            # 承認待ち状態のみ
+            if invoice.status != 'pending_approval':
+                errors.append({'id': invoice.id, 'invoice_number': invoice.invoice_number, 'error': '承認待ちではありません'})
+                continue
+            
+            # 権限チェック
+            can_approve = False
+            if invoice.current_approver == user:
+                can_approve = True
+            if user.position == 'accountant':
+                can_approve = True
+                
+            if not can_approve:
+                errors.append({'id': invoice.id, 'invoice_number': invoice.invoice_number, 'error': '承認権限がありません'})
+                continue
+                
+            try:
+                # 承認処理（approveメソッドと同様のロジック）
+                ApprovalHistory.objects.create(
+                    invoice=invoice,
+                    approval_step=invoice.current_approval_step,
+                    user=user,
+                    action='approved',
+                    comment=comment
+                )
+                
+                # 次のステップへ
+                current_step_order = invoice.current_approval_step.step_order
+                next_step = invoice.approval_route.steps.filter(
+                    step_order=current_step_order + 1
+                ).first()
+                
+                if next_step:
+                    invoice.current_approval_step = next_step
+                    if next_step.approver_user:
+                        invoice.current_approver = next_step.approver_user
+                    else:
+                        next_approver = User.objects.filter(
+                            user_type='internal',
+                            company=invoice.receiving_company,
+                            position=next_step.approver_position,
+                            is_active=True
+                        ).first()
+                        if next_approver:
+                            invoice.current_approver = next_approver
+                    
+                    invoice.save()
+                    
+                    # 通知
+                    self._send_notification_email(
+                        recipient=invoice.current_approver,
+                        subject=f'【請求書承認依頼】{invoice.invoice_number}',
+                        message=f'一括承認により承認依頼が届いています。'
+                    )
+                else:
+                    # 完了
+                    invoice.status = 'approved'
+                    invoice.current_approval_step = None
+                    invoice.current_approver = None
+                    invoice.save()
+                    
+                    # 完了通知
+                    self._send_notification_email(
+                        recipient=invoice.created_by,
+                        subject=f'【承認完了】{invoice.invoice_number}',
+                        message=f'請求書が一括承認されました。'
+                    )
+                
+                # ログ記録
+                AccessLog.log(user, 'bulk_approve', 'Invoice', invoice.id, {'comment': comment})
+                if 'AuditLog' in globals():
+                     AuditLog.objects.create(
+                        user=user, action='approve', target_model='Invoice', 
+                        target_id=str(invoice.id), target_label=invoice.invoice_number,
+                        details={'comment': comment, 'type': 'bulk'}
+                     )
+                
+                success_count += 1
+                
+            except Exception as e:
+                errors.append({'id': invoice.id, 'invoice_number': invoice.invoice_number, 'error': str(e)})
+        
+        return Response({
+            'success_count': success_count,
+            'failure_count': len(errors),
+            'errors': errors,
+            'message': f'{success_count}件承認しました'
+        })
+
     @action(detail=True, methods=['post'], permission_classes=[IsInternalUser])
     def approve(self, request, pk=None):
         """
@@ -4036,3 +4155,24 @@ class PasswordResetConfirmView(APIView):
                 return Response({'error': form.errors}, status=status.HTTP_400_BAD_REQUEST)
         else:
             return Response({'error': '無効なリンクか、期限切れです'}, status=status.HTTP_400_BAD_REQUEST)
+
+
+# ==========================================
+# Phase 6: コア機能強化（ログ・監査）
+# ==========================================
+
+class AuditLogViewSet(viewsets.ReadOnlyModelViewSet):
+    """操作ログ・監査ログViewSet"""
+    queryset = AuditLog.objects.all()
+    serializer_class = AuditLogSerializer
+    permission_classes = [IsAuthenticated]
+    filter_backends = [filters.SearchFilter, filters.OrderingFilter, DjangoFilterBackend]
+    search_fields = ['user__username', 'user__last_name', 'user__first_name', 'target_model', 'details']
+    filterset_fields = ['action', 'target_model', 'user']
+    
+    def get_queryset(self):
+        # Admin or Accountant or Superuser only
+        user = self.request.user
+        if user.is_superuser or user.is_staff or getattr(user, 'position', '') == 'accountant':
+            return AuditLog.objects.all().order_by('-created_at')
+        return AuditLog.objects.none()

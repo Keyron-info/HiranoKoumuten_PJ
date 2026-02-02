@@ -720,7 +720,7 @@ const InvoiceCreatePage: React.FC = () => {
                         <input
                           type="number"
                           min="0"
-                          step="0.01"
+                          step="1"
                           value={item.quantity}
                           onChange={(e) => handleItemChange(index, 'quantity', Number(e.target.value))}
                           required

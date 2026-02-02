@@ -23,5 +23,8 @@ else:
 echo "Creating sample users for all roles..."
 venv/bin/python manage.py create_sample_users || echo "Sample user creation completed (some may already exist)"
 
+echo "Creating construction types (20 types)..."
+venv/bin/python manage.py create_construction_types || echo "Construction types creation completed"
+
 echo "Starting Gunicorn server..."
 exec venv/bin/gunicorn --bind 0.0.0.0:8000 keyron_project.wsgi:application

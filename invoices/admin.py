@@ -1,6 +1,9 @@
 # invoices/admin.py
 
 from django.contrib import admin
+from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
+from django.contrib.auth.forms import UserCreationForm, UserChangeForm
+from django import forms
 from .models import (
     Company, Department, CustomerCompany, User, 
     ApprovalRoute, ApprovalStep, Invoice, InvoiceItem,
@@ -11,6 +14,25 @@ from .models import (
     PaymentCalendar,
     DeadlineNotificationBanner
 )
+
+
+# ==========================================
+# カスタムユーザー作成・変更フォーム
+# ==========================================
+
+class CustomUserCreationForm(UserCreationForm):
+    """カスタムユーザー作成フォーム（パスワード設定可能）"""
+    class Meta(UserCreationForm.Meta):
+        model = User
+        fields = ('username', 'email', 'first_name', 'last_name')
+
+
+class CustomUserChangeForm(UserChangeForm):
+    """カスタムユーザー変更フォーム"""
+    class Meta(UserChangeForm.Meta):
+        model = User
+        fields = '__all__'
+
 
 @admin.register(Company)
 class CompanyAdmin(admin.ModelAdmin):
@@ -31,10 +53,42 @@ class CustomerCompanyAdmin(admin.ModelAdmin):
     search_fields = ['name']
 
 @admin.register(User)
-class UserAdmin(admin.ModelAdmin):
-    list_display = ['username', 'email', 'user_type', 'company', 'position']
-    list_filter = ['user_type', 'position', 'is_active']
-    search_fields = ['username', 'email']
+class UserAdmin(BaseUserAdmin):
+    """カスタムユーザー管理（パスワード設定可能）"""
+    form = CustomUserChangeForm
+    add_form = CustomUserCreationForm
+    
+    list_display = ['username', 'email', 'user_type', 'company', 'position', 'is_active']
+    list_filter = ['user_type', 'position', 'is_active', 'is_staff', 'is_superuser']
+    search_fields = ['username', 'email', 'first_name', 'last_name']
+    ordering = ['-date_joined']
+    
+    # 既存ユーザー編集時のフィールドセット
+    fieldsets = (
+        (None, {'fields': ('username', 'password')}),
+        ('個人情報', {'fields': ('first_name', 'last_name', 'email', 'phone')}),
+        ('所属情報', {'fields': ('user_type', 'company', 'department', 'position', 'customer_company', 'is_primary_contact')}),
+        ('権限', {'fields': ('is_active', 'is_staff', 'is_superuser', 'is_super_admin', 'can_save_data', 'groups', 'user_permissions')}),
+        ('日時', {'fields': ('last_login', 'date_joined'), 'classes': ('collapse',)}),
+    )
+    
+    # 新規ユーザー作成時のフィールドセット（パスワード入力あり）
+    add_fieldsets = (
+        (None, {
+            'classes': ('wide',),
+            'fields': ('username', 'email', 'password1', 'password2'),
+        }),
+        ('個人情報', {
+            'fields': ('first_name', 'last_name', 'phone'),
+        }),
+        ('所属情報', {
+            'fields': ('user_type', 'company', 'department', 'position', 'customer_company'),
+        }),
+        ('権限', {
+            'fields': ('is_active', 'is_staff'),
+        }),
+    )
+
 
 @admin.register(ConstructionSite)
 class ConstructionSiteAdmin(admin.ModelAdmin):

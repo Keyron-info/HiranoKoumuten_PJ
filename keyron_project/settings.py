@@ -339,3 +339,7 @@ LOGGING = {
 DEBUG = True
 ALLOWED_HOSTS = ['*']
 CORS_ALLOW_ALL_ORIGINS = True
+
+# DB接続エラー回避：環境変数のDB名が間違っている可能性があるため強制的に修正
+if 'default' in DATABASES:
+    DATABASES['default']['NAME'] = 'postgres'

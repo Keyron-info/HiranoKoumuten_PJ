@@ -177,8 +177,7 @@ AUTHENTICATION_BACKENDS = [
     'django.contrib.auth.backends.ModelBackend',  # フォールバック
 ]
 
-# Custom User Model
-AUTH_USER_MODEL = 'invoices.User'
+
 
 
 # Login/Logout URLs
@@ -327,6 +326,8 @@ LOGGING = {
         },
     },
     'loggers': {
+        'invoices': {
+            'handlers': ['console'],
             'level': 'INFO',
         },
     },

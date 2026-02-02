@@ -1,14 +1,10 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import Layout from '../../components/common/Layout';
-import { useAuth } from '../../contexts/AuthContext';
-import { constructionSiteAPI, invoiceAPI } from '../../api/invoices';
-import { ConstructionSite } from '../../types';
+import { usersAPI, UserData } from '../../api/users'; // 🆕 Import
 
 const SiteManagementPage: React.FC = () => {
     const navigate = useNavigate();
     const { user } = useAuth();
     const [sites, setSites] = useState<ConstructionSite[]>([]);
+    const [supervisors, setSupervisors] = useState<UserData[]>([]); // 🆕 State
     const [loading, setLoading] = useState(true);
     const [showModal, setShowModal] = useState(false);
     const [editingSite, setEditingSite] = useState<ConstructionSite | null>(null);
@@ -18,6 +14,7 @@ const SiteManagementPage: React.FC = () => {
         name: '',
         location: '',
         site_password: '',
+        supervisor: '', // 🆕 Supervisor ID
         is_active: true,
     });
 
@@ -27,6 +24,7 @@ const SiteManagementPage: React.FC = () => {
             return;
         }
         fetchSites();
+        fetchSupervisors(); // 🆕 Fetch
     }, [user, navigate]);
 
     const fetchSites = async () => {
@@ -42,6 +40,19 @@ const SiteManagementPage: React.FC = () => {
         }
     };
 
+    // 🆕 現場監督（社内ユーザー）一覧取得
+    const fetchSupervisors = async () => {
+        try {
+            // 社内ユーザーかつ現場監督または管理者などを取得
+            // ここでは簡易的に全ての社内ユーザーを取得してフィルタリングするか、API側で対応するか
+            // usersAPI.listAll は管理者権限が必要な可能性が高いが、現場管理者は管理者であることが前提
+            const allUsers = await usersAPI.listAll({ is_active: 'true', user_type: 'internal' });
+            setSupervisors(allUsers);
+        } catch (error) {
+            console.error('Failed to fetch supervisors', error);
+        }
+    };
+
     const handleOpenModal = (site?: ConstructionSite) => {
         if (site) {
             setEditingSite(site);
@@ -49,6 +60,7 @@ const SiteManagementPage: React.FC = () => {
                 name: site.name,
                 location: site.location,
                 site_password: site.site_password || '',
+                supervisor: site.supervisor ? String(site.supervisor) : '', // 🆕 Set ID
                 is_active: site.is_active,
             });
         } else {
@@ -57,6 +69,7 @@ const SiteManagementPage: React.FC = () => {
                 name: '',
                 location: '',
                 site_password: '',
+                supervisor: '',
                 is_active: true,
             });
         }
@@ -76,30 +89,16 @@ const SiteManagementPage: React.FC = () => {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         try {
-            // API call to create or update (Note: Assuming we have create/update API in constructionSiteAPI or standard model viewset)
-            // Since constructionSiteAPI in invoices.ts might not have generic create/update exposed cleanly or needs update.
-            // We will use apiClient directly if needed, or better, update invoices.ts to support update.
-            // For now, assuming standard REST endpoints: POST /construction-sites/ or PATCH /construction-sites/:id/
-
-            // Let's check invoices.ts. It has updateBudget but not generic update. 
-            // I should have checked checks before writing. I will assume I can add it or use a generic approach.
-            // Wait, I can use a direct axios call or update the API file. I'll stick to a generic approach here for now 
-            // but to be safe I'll use a wrapper.
-
-            // Actually, let's implement the logic assuming the API exists or I will add it.
-            // Looking at invoices.ts, I don't see `createSite` or `updateSite`. I should add them.
-            // But I can't do that inside this WriteFile.
-            // I'll write the fetch logic here to use a helper function I'll define in this file or imports.
-            // Or I can use `apiClient` if I import it? No, apiClient is not exported from invoices.ts usually.
-            // I'll import apiClient from '../../api/client' if possible.
-
-            // Since I can't easily change imports in one go without errors,
-            // I will assume I will add `createSite` and `updateSite` to `constructionSiteAPI` in `invoices.ts` in the next step.
+            // APIに送信するデータ
+            const submitData = {
+                ...formData,
+                supervisor: formData.supervisor ? Number(formData.supervisor) : null
+            };
 
             if (editingSite) {
-                await constructionSiteAPI.updateSite(editingSite.id, formData); // Need to implement this
+                await constructionSiteAPI.updateSite(editingSite.id, submitData);
             } else {
-                await constructionSiteAPI.createSite(formData); // Need to implement this
+                await constructionSiteAPI.createSite(submitData);
             }
 
             setShowModal(false);
@@ -200,6 +199,25 @@ const SiteManagementPage: React.FC = () => {
                                             className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-orange-500 focus:border-orange-500 sm:text-sm"
                                         />
                                     </div>
+
+                                    {/* 🆕 現場監督選択 */}
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700">現場監督</label>
+                                        <select
+                                            value={formData.supervisor}
+                                            onChange={(e) => setFormData({ ...formData, supervisor: e.target.value })}
+                                            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-orange-500 focus:border-orange-500 sm:text-sm"
+                                        >
+                                            <option value="">選択してください</option>
+                                            {supervisors.map(user => (
+                                                <option key={user.id} value={user.id}>
+                                                    {user.last_name} {user.first_name} ({user.position_display || user.position})
+                                                </option>
+                                            ))}
+                                        </select>
+                                        <p className="mt-1 text-xs text-gray-500">請求書の一次承認者となります。</p>
+                                    </div>
+
                                     <div>
                                         <label className="block text-sm font-medium text-gray-700">現場パスワード</label>
                                         <div className="mt-1 flex rounded-md shadow-sm">

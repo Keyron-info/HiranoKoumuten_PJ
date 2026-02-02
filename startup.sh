@@ -1,4 +1,6 @@
 #!/bin/bash
+set -e
+
 
 # 起動スクリプト for App Runner
 

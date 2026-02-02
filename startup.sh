@@ -3,6 +3,8 @@ set -e
 
 
 # 起動スクリプト for App Runner
+echo "--- STARTING APP VERSION: 2026-02-03_DEBUG_PATCH ---"
+
 
 echo "Running database migrations..."
 venv/bin/python manage.py migrate --noinput

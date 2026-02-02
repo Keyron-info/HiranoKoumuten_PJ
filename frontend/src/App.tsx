@@ -18,6 +18,8 @@ import MyPendingApprovalsPage from './pages/MyPendingApprovalsPage';
 import InvoiceCorrectionReviewPage from './pages/InvoiceCorrectionReviewPage';
 import InvoiceEditWithCorrectionPage from './pages/InvoiceEditWithCorrectionPage';
 import RegistrationRequestsPage from './pages/admin/RegistrationRequestsPage';
+import PasswordResetRequestPage from './pages/PasswordResetRequestPage';
+import PasswordResetConfirmPage from './pages/PasswordResetConfirmPage';
 import PaymentCalendar from './components/PaymentCalendar';
 import CalendarManagementPage from './pages/admin/CalendarManagementPage';
 import SiteManagementPage from './pages/admin/SiteManagementPage';
@@ -117,6 +119,22 @@ const AppRoutes: React.FC = () => {
         element={
           <PublicRoute>
             <RegisterCompletePage />
+          </PublicRoute>
+        }
+      />
+      <Route
+        path="/forgot-password"
+        element={
+          <PublicRoute>
+            <PasswordResetRequestPage />
+          </PublicRoute>
+        }
+      />
+      <Route
+        path="/reset-password/:uid/:token"
+        element={
+          <PublicRoute>
+            <PasswordResetConfirmPage />
           </PublicRoute>
         }
       />
@@ -250,7 +268,7 @@ const AppRoutes: React.FC = () => {
 
       {/* 404 */}
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
-    </Routes>
+    </Routes >
   );
 };
 

@@ -6,11 +6,11 @@ export const authAPI = {
   login: async (credentials: LoginForm): Promise<AuthTokens> => {
     const response = await apiClient.post<AuthTokens>('/token/', credentials);
     const { access, refresh } = response.data;
-    
+
     // トークンをローカルストレージに保存
     localStorage.setItem('access_token', access);
     localStorage.setItem('refresh_token', refresh);
-    
+
     return response.data;
   },
 
@@ -60,14 +60,28 @@ export const authAPI = {
     if (!refreshToken) {
       throw new Error('No refresh token available');
     }
-    
+
     const response = await apiClient.post<{ access: string }>('/token/refresh/', {
       refresh: refreshToken,
     });
-    
+
     const newAccessToken = response.data.access;
     localStorage.setItem('access_token', newAccessToken);
-    
+
     return newAccessToken;
+  },
+
+  // パスワードリセットリクエスト
+  requestPasswordReset: async (email: string): Promise<void> => {
+    await apiClient.post('/auth/password-reset/', { email });
+  },
+
+  // パスワードリセット確定
+  confirmPasswordReset: async (uid: string, token: string, password: string): Promise<void> => {
+    await apiClient.post('/auth/password-reset/confirm/', {
+      uid,
+      token,
+      password,
+    });
   },
 };

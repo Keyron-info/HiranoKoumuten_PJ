@@ -152,15 +152,12 @@ const LoginPage: React.FC = () => {
                   />
                   <span className="ml-2 text-sm text-slate-400 group-hover:text-slate-300 transition-colors">ログインを保持</span>
                 </label>
-                <button
-                  type="button"
-                  onClick={() => {
-                    alert('パスワードのリセットはシステム管理者にお問い合わせください。');
-                  }}
+                <Link
+                  to="/forgot-password"
                   className="text-sm text-primary-400 hover:text-primary-300 font-medium transition-colors hover:underline"
                 >
                   パスワードをお忘れですか？
-                </button>
+                </Link>
               </div>
 
               {/* ログインボタン */}

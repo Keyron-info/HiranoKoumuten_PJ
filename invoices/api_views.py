@@ -1,6 +1,7 @@
 # invoices/api_views.py
 
 from rest_framework import viewsets, status, permissions
+from rest_framework.views import APIView
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
@@ -14,6 +15,12 @@ from django.http import HttpResponse
 from datetime import datetime, timedelta
 import io
 import csv
+from django.contrib.auth.forms import PasswordResetForm, SetPasswordForm
+from django.contrib.auth.tokens import default_token_generator
+from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
+from django.utils.encoding import force_bytes, force_str
+from django.views.decorators.csrf import csrf_exempt
+from django.utils.decorators import method_decorator
 
 
 class PassthroughRenderer(BaseRenderer):
@@ -3949,3 +3956,83 @@ class DeadlineNotificationBannerViewSet(viewsets.ModelViewSet):
     
     def perform_create(self, serializer):
         serializer.save(created_by=self.request.user)
+
+
+class PasswordResetView(APIView):
+    """パスワードリセットリクエスト（メール送信）API"""
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        email = request.data.get('email')
+        if not email:
+            return Response({'error': 'メールアドレスが必要です'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        form = PasswordResetForm({'email': email})
+        if form.is_valid():
+            users = form.get_users(email)
+            frontend_url = getattr(settings, 'FRONTEND_URL', 'http://localhost:3000')
+            
+            for user in users:
+                uid = urlsafe_base64_encode(force_bytes(user.pk))
+                token = default_token_generator.make_token(user)
+                reset_url = f"{frontend_url}/reset-password/{uid}/{token}"
+                
+                # メール送信
+                try:
+                    send_mail(
+                        subject='【KEYRON BIM】パスワード再設定のご案内',
+                        message=f'''{user.last_name} {user.first_name} 様
+
+平野工務店 請求書管理システムをご利用いただきありがとうございます。
+パスワード再設定のリクエストを受け付けました。
+
+以下のリンクをクリックして、新しいパスワードを設定してください。
+
+{reset_url}
+
+※このリンクの有効期限は24時間です。
+※心当たりがない場合は、このメールを破棄してください。
+
+---
+KEYRON BIM 運営チーム
+''',
+                        from_email=settings.DEFAULT_FROM_EMAIL,
+                        recipient_list=[email],
+                        fail_silently=False,
+                    )
+                except Exception as e:
+                    print(f"メール送信エラー: {e}")
+                    return Response({'error': 'メール送信に失敗しました'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            
+            return Response({'message': 'パスワード再設定メールを送信しました'})
+        
+        return Response({'error': '無効なメールアドレスです'}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class PasswordResetConfirmView(APIView):
+    """パスワード再設定（確認・変更）API"""
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        uidb64 = request.data.get('uid')
+        token = request.data.get('token')
+        password = request.data.get('password')
+        
+        if not (uidb64 and token and password):
+            return Response({'error': '必要な情報が不足しています'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            uid = force_str(urlsafe_base64_decode(uidb64))
+            user = User.objects.get(pk=uid)
+        except (TypeError, ValueError, OverflowError, User.DoesNotExist):
+            user = None
+        
+        if user is not None and default_token_generator.check_token(user, token):
+            form = SetPasswordForm(user, {'new_password1': password, 'new_password2': password})
+            if form.is_valid():
+                form.save()
+                return Response({'message': 'パスワードが正常に変更されました'})
+            else:
+                return Response({'error': form.errors}, status=status.HTTP_400_BAD_REQUEST)
+        else:
+            return Response({'error': '無効なリンクか、期限切れです'}, status=status.HTTP_400_BAD_REQUEST)

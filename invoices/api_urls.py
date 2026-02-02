@@ -46,6 +46,8 @@ from .api_views import (
     # タスク3追加
     PaymentCalendarViewSet,
     DeadlineNotificationBannerViewSet,
+    PasswordResetView,
+    PasswordResetConfirmView,
 )
 
 router = DefaultRouter()
@@ -98,6 +100,10 @@ urlpatterns = [
     
     # ユーザー登録（旧エンドポイント - 互換性のため残す）
     path('auth/register/', UserRegistrationViewSet.as_view({'post': 'register'}), name='register'),
+
+    # パスワードリセット
+    path('auth/password-reset/', PasswordResetView.as_view(), name='password_reset'),
+    path('auth/password-reset/confirm/', PasswordResetConfirmView.as_view(), name='password_reset_confirm'),
     # タスク2: 新規ユーザー登録申請
     path('users/register/', UserRegistrationRequestViewSet.as_view({'post': 'register'}), name='user-register'),
     

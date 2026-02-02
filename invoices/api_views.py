@@ -441,9 +441,31 @@ class ConstructionSiteViewSet(viewsets.ModelViewSet):
         
         serializer.save(company=company)
     
-    @action(detail=True, methods=['post'], permission_classes=[IsInternalUser])
-    def mark_complete(self, request, pk=None):
-        """4.1 現場完成ボタン"""
+    @action(detail=False, methods=['post'], permission_classes=[AllowAny])
+    def verify_password(self, request):
+        """現場パスワードによる現場特定"""
+        password = request.data.get('password')
+        if not password:
+            return Response({'error': 'パスワードを入力してください'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        # パスワードで有効な現場を検索
+        site = ConstructionSite.objects.filter(
+            site_password=password,
+            is_active=True,
+            is_completed=False,
+            is_cutoff=False
+        ).select_related('supervisor', 'company').first()
+        
+        if not site:
+            return Response({'error': '該当する現場が見つかりません'}, status=status.HTTP_404_NOT_FOUND)
+            
+        return Response({
+            'id': site.id,
+            'name': site.name,
+            'location': site.location,
+            'supervisor_name': site.supervisor.get_full_name() if site.supervisor else None,
+            'company_name': site.company.name
+        })
         site = self.get_object()
         
         if site.is_completed:
@@ -795,34 +817,63 @@ class InvoiceViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        # デフォルトの承認ルートを取得
-        approval_route = ApprovalRoute.objects.filter(
-            company=invoice.receiving_company,
-            is_default=True,
-            is_active=True
-        ).first()
-        
-        if not approval_route:
+        # 提出期間チェック (毎月15日以降)
+        today = timezone.now().date()
+        if today.day < 15 and not request.user.is_super_admin:
+             return Response(
+                {'error': '請求書の提出は毎月15日以降から可能です'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # 現場監督の確認
+        if not invoice.construction_site.supervisor:
             return Response(
-                {'error': '承認ルートが設定されていません'},
+                {'error': 'この工事現場には現場監督が設定されていません。システム管理者にお問い合わせください。'},
                 status=status.HTTP_400_BAD_REQUEST
             )
         
+        # 厳格な承認フローの構築 (Supervisor -> Managing Director -> Senior Managing Director -> President -> Accountant)
+        step_definitions = [
+            (1, '現場監督承認', 'site_supervisor'),
+            (2, '常務承認', 'managing_director'),
+            (3, '専務承認', 'senior_managing_director'),
+            (4, '社長承認', 'president'),
+            (5, '経理確認', 'accountant'),
+        ]
+        
+        # 既存または新規ルートの確保
+        route_name = f"Strict Approval Flow ({invoice.receiving_company.name})"
+        approval_route, _ = ApprovalRoute.objects.get_or_create(
+            company=invoice.receiving_company,
+            name=route_name,
+            defaults={'description': '現場監督→常務→専務→社長→経理', 'is_default': True}
+        )
+        
+        # ステップの再構築 (既存ステップをクリアして再作成)
+        approval_route.steps.all().delete()
+        
+        first_step = None
+        for order, name, position in step_definitions:
+            user_to_assign = None
+            # 現場監督は現場に紐付いたユーザーを指定
+            if position == 'site_supervisor':
+                user_to_assign = invoice.construction_site.supervisor
+            
+            step = ApprovalStep.objects.create(
+                route=approval_route,
+                step_order=order,
+                step_name=name,
+                approver_position=position,
+                approver_user=user_to_assign # 特定ユーザーがいれば紐付け
+            )
+            if order == 1:
+                first_step = step
+
         # 承認ルートを設定
         invoice.approval_route = approval_route
         
-        # 最初の承認ステップを取得
-        first_step = approval_route.steps.filter(step_order=1).first()
-        if not first_step:
-            return Response(
-                {'error': '承認ステップが設定されていません'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
         # 現在の承認ステップと承認者を設定
         invoice.current_approval_step = first_step
-        
-        # 現場監督を承認者として設定
         invoice.current_approver = invoice.construction_site.supervisor
         
         # ステータスを「承認待ち」に変更

@@ -90,28 +90,51 @@ WSGI_APPLICATION = 'keyron_project.wsgi.application'
 # DATABASE_URLが設定されている場合はそちらを使用、なければSQLiteを使用
 DATABASE_URL = os.environ.get('DATABASE_URL')
 
-if DATABASE_URL:
-    # DATABASE_URLからデータベース設定を取得
-    db_config = dj_database_url.parse(DATABASE_URL)
-    
-    # [DEBUG] App Runner環境変数のDB名(keyronnew)が実在しないため、postgresに強制変更
-    import sys
-    print(f"DEBUG: Original DB Config NAME: {db_config.get('NAME')}", file=sys.stderr)
-    db_config['NAME'] = 'postgres'
-    print(f"DEBUG: Overridden DB Config NAME: {db_config.get('NAME')}", file=sys.stderr)
+import sys
+print(f"[SETTINGS] DATABASE_URL present: {bool(DATABASE_URL)}", file=sys.stderr)
 
-    db_config['CONN_MAX_AGE'] = 600
-    DATABASES = {
-        'default': db_config
-    }
+if DATABASE_URL:
+    try:
+        # DATABASE_URLからデータベース設定を取得
+        db_config = dj_database_url.parse(DATABASE_URL)
+        
+        print(f"[SETTINGS] Parsed DB config: {db_config}", file=sys.stderr)
+        
+        # [CRITICAL FIX] App Runner環境変数のDB名が間違っているため、postgresに強制変更
+        original_name = db_config.get('NAME', 'NOT_SET')
+        print(f"[SETTINGS] Original DB NAME: {original_name}", file=sys.stderr)
+        
+        # 強制的にpostgresに変更
+        db_config['NAME'] = 'postgres'
+        print(f"[SETTINGS] Overridden DB NAME: {db_config['NAME']}", file=sys.stderr)
+        
+        db_config['CONN_MAX_AGE'] = 600
+        
+        DATABASES = {
+            'default': db_config
+        }
+        
+        print(f"[SETTINGS] Final DATABASES config: {DATABASES}", file=sys.stderr)
+        
+    except Exception as e:
+        print(f"[SETTINGS ERROR] Failed to parse DATABASE_URL: {e}", file=sys.stderr)
+        # フォールバックとしてSQLiteを使用
+        DATABASES = {
+            'default': {
+                'ENGINE': 'django.db.backends.sqlite3',
+                'NAME': BASE_DIR / 'db.sqlite3',
+            }
+        }
 else:
     # ローカル開発環境: SQLiteを使用
+    print("[SETTINGS] Using SQLite (no DATABASE_URL)", file=sys.stderr)
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.sqlite3',
             'NAME': BASE_DIR / 'db.sqlite3',
         }
     }
+
 
 
 # Password validation

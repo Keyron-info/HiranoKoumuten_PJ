@@ -93,15 +93,13 @@ DATABASE_URL = os.environ.get('DATABASE_URL')
 if DATABASE_URL:
     # DATABASE_URLからデータベース設定を取得
     db_config = dj_database_url.parse(DATABASE_URL)
-    # NAMEが空の場合はURLから取得を試みる（特殊文字対策）
-    if not db_config.get('NAME'):
-        # URLから直接データベース名を抽出（末尾のパス部分）
-        try:
-            from urllib.parse import urlparse
-            parsed = urlparse(DATABASE_URL)
-            db_config['NAME'] = parsed.path.lstrip('/')
-        except Exception:
-            pass
+    
+    # [DEBUG] App Runner環境変数のDB名(keyronnew)が実在しないため、postgresに強制変更
+    import sys
+    print(f"DEBUG: Original DB Config NAME: {db_config.get('NAME')}", file=sys.stderr)
+    db_config['NAME'] = 'postgres'
+    print(f"DEBUG: Overridden DB Config NAME: {db_config.get('NAME')}", file=sys.stderr)
+
     db_config['CONN_MAX_AGE'] = 600
     DATABASES = {
         'default': db_config

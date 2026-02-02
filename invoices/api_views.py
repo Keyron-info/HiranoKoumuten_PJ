@@ -8,6 +8,7 @@ from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.renderers import BaseRenderer
 from django.shortcuts import get_object_or_404
 from django.db.models import Q, Sum, Count, F
+from rest_framework import filters
 from django.core.mail import send_mail
 from django.conf import settings
 from django.utils import timezone
@@ -3428,7 +3429,7 @@ class ChartDataViewSet(viewsets.ViewSet):
         })
 
 
-class AuditLogViewSet(viewsets.ReadOnlyModelViewSet):
+class AccessLogViewSet(viewsets.ReadOnlyModelViewSet):
     """監査ログViewSet（スーパーアドミンのみ）"""
     serializer_class = AccessLogSerializer
     permission_classes = [IsAuthenticated, IsSuperAdmin]

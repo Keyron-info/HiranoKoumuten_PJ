@@ -302,7 +302,7 @@ class MonthlyInvoicePeriodSerializer(serializers.ModelSerializer):
             'total_invoices', 'submitted_invoices', 'pending_invoices',
             'created_at'
         ]
-        read_only_fields = ['closed_by', 'closed_at', 'created_at']
+        read_only_fields = ['company', 'closed_by', 'closed_at', 'created_at']
     
     def get_total_invoices(self, obj):
         """この期間の総請求書数"""

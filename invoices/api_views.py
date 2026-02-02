@@ -2297,13 +2297,32 @@ class MonthlyInvoicePeriodViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         user = self.request.user
         if user.user_type == 'internal':
-            return MonthlyInvoicePeriod.objects.filter(company=user.company)
+            if user.company:
+                return MonthlyInvoicePeriod.objects.filter(company=user.company)
+            else:
+                # 会社未割り当ての場合は最初の会社（管理者など）
+                first_company = Company.objects.first()
+                if first_company:
+                    return MonthlyInvoicePeriod.objects.filter(company=first_company)
+                return MonthlyInvoicePeriod.objects.none()
         else:
             # ✅ 修正: CustomerCompanyから受付会社を取得
             receiving_company = self._get_receiving_company(user)
             if receiving_company:
                 return MonthlyInvoicePeriod.objects.filter(company=receiving_company)
             return MonthlyInvoicePeriod.objects.none()
+
+    def perform_create(self, serializer):
+        """作成時に会社を自動設定"""
+        user = self.request.user
+        company = None
+        if user.company:
+            company = user.company
+        else:
+            # 会社が設定されていないユーザー（スーパーユーザーなど）の場合は、最初の会社を使用
+            company = Company.objects.first()
+        
+        serializer.save(company=company)
     
     def get_serializer_class(self):
         if self.action == 'list':

@@ -327,9 +327,15 @@ LOGGING = {
         },
     },
     'loggers': {
-        'invoices': {
-            'handlers': ['console'],
             'level': 'INFO',
         },
     },
 }
+
+# ====================
+# EMERGENCY DEBUG SETTINGS
+# ====================
+# エラー詳細を表示し、CORS/Host制限を全開放して接続を優先する
+DEBUG = True
+ALLOWED_HOSTS = ['*']
+CORS_ALLOW_ALL_ORIGINS = True

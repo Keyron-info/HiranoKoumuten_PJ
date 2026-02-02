@@ -497,7 +497,11 @@ class InvoiceCreateSerializer(serializers.ModelSerializer):
         # Items作成
         from .models import InvoiceItem
         for item_data in items_data:
-            InvoiceItem.objects.create(invoice=invoice, **item_data)
+            # amountはread_onlyなので手動計算して保存
+            quantity = item_data.get('quantity', 0)
+            unit_price = item_data.get('unit_price', 0)
+            amount = quantity * unit_price
+            InvoiceItem.objects.create(invoice=invoice, amount=amount, **item_data)
             
         # 合計計算とSafety Fee適用
         invoice.calculate_totals()

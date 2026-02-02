@@ -87,15 +87,33 @@ WSGI_APPLICATION = 'keyron_project.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
-# Database
-# https://docs.djangoproject.com/en/5.2/ref/settings/#databases
+# DATABASE_URLが設定されている場合はそちらを使用、なければSQLiteを使用
+DATABASE_URL = os.environ.get('DATABASE_URL')
 
-DATABASES = {
-    'default': dj_database_url.config(
-        default=f'sqlite:///{BASE_DIR / "db.sqlite3"}',
-        conn_max_age=600
-    )
-}
+if DATABASE_URL:
+    # DATABASE_URLからデータベース設定を取得
+    db_config = dj_database_url.parse(DATABASE_URL)
+    # NAMEが空の場合はURLから取得を試みる（特殊文字対策）
+    if not db_config.get('NAME'):
+        # URLから直接データベース名を抽出（末尾のパス部分）
+        try:
+            from urllib.parse import urlparse
+            parsed = urlparse(DATABASE_URL)
+            db_config['NAME'] = parsed.path.lstrip('/')
+        except Exception:
+            pass
+    db_config['CONN_MAX_AGE'] = 600
+    DATABASES = {
+        'default': db_config
+    }
+else:
+    # ローカル開発環境: SQLiteを使用
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
+        }
+    }
 
 
 # Password validation

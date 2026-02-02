@@ -379,6 +379,7 @@ class PDFGenerationLogSerializer(serializers.ModelSerializer):
 
 class InvoiceCreateSerializer(serializers.ModelSerializer):
     """請求書作成用シリアライザー（Phase 3対応）"""
+    # itemsはnested書き込みを行うため、read_only=Trueにしない（デフォルトでwritable）
     items = InvoiceItemSerializer(many=True)
     # 🆕 現場パスワード（フォームから受け取る用、DB保存なし）
     site_password = serializers.CharField(write_only=True, required=False, allow_blank=True)
@@ -477,7 +478,31 @@ class InvoiceCreateSerializer(serializers.ModelSerializer):
             if invoice_date <= deadline_date: # 締め日以前の日付で、締め日過ぎてから出そうとしている -> 完全に遅延
                 raise serializers.ValidationError(f"今月の締め日（{deadline_date.strftime('%m/%d')}）を過ぎているため、今月分の請求書は作成できません。")
                 
+                raise serializers.ValidationError(f"今月の締め日（{deadline_date.strftime('%m/%d')}）を過ぎているため、今月分の請求書は作成できません。")
+                
         return attrs
+
+    def create(self, validated_data):
+        """
+        カスタム作成メソッド
+        - ネストされたitemsの作成
+        - 合計金額の計算（Safety Fee適用のため）
+        """
+        items_data = validated_data.pop('items', [])
+        site_password = validated_data.pop('site_password', None) # 不要なフィールドを除外
+        
+        # Invoice作成
+        invoice = Invoice.objects.create(**validated_data)
+        
+        # Items作成
+        from .models import InvoiceItem
+        for item_data in items_data:
+            InvoiceItem.objects.create(invoice=invoice, **item_data)
+            
+        # 合計計算とSafety Fee適用
+        invoice.calculate_totals()
+        
+        return invoice
 
 
 class InvoiceListSerializer(serializers.ModelSerializer):

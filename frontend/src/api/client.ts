@@ -1,7 +1,19 @@
 import axios, { AxiosInstance, AxiosError, InternalAxiosRequestConfig } from 'axios';
 
 // APIベースURL（開発環境）
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
+const normalizeApiBaseUrl = (value?: string): string => {
+  if (!value) {
+    return `${window.location.origin}/api`;
+  }
+
+  const trimmed = value.replace(/\/+$/, '');
+  if (trimmed.endsWith('/api')) {
+    return trimmed;
+  }
+  return `${trimmed}/api`;
+};
+
+const API_BASE_URL = normalizeApiBaseUrl(process.env.REACT_APP_API_URL);
 
 // Axiosインスタンスの作成
 const apiClient: AxiosInstance = axios.create({
@@ -40,7 +52,7 @@ apiClient.interceptors.response.use(
       if (refreshToken) {
         try {
           // リフレッシュトークンで新しいアクセストークンを取得
-          const response = await axios.post(`${API_BASE_URL}/auth/token/refresh/`, {
+          const response = await axios.post(`${API_BASE_URL}/token/refresh/`, {
             refresh: refreshToken,
           });
 

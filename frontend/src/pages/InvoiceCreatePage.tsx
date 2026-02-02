@@ -300,10 +300,9 @@ const InvoiceCreatePage: React.FC = () => {
       };
       const invoice = await invoiceAPI.createInvoice(submitData as any);
 
-      // モーダル表示
-      setCreatedInvoiceId(invoice.id);
-      setCreatedInvoiceNumber(invoice.invoice_number);
-      setShowSuccessModal(true);
+      // 成功時の処理
+      navigate('/thank-you');
+      // setShowSuccessModal(true); // 直遷移に変更
 
     } catch (error: any) {
       console.error('Failed to create invoice:', error);

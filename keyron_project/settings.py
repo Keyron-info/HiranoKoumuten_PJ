@@ -234,6 +234,11 @@ env_origins = os.environ.get('CORS_ALLOWED_ORIGINS')
 if env_origins:
     CORS_ALLOWED_ORIGINS.extend([origin.strip() for origin in env_origins.split(',') if origin.strip()])
 
+# FRONTEND_URLが設定されている場合はCORS許可に追加
+frontend_url = os.environ.get('FRONTEND_URL')
+if frontend_url:
+    CORS_ALLOWED_ORIGINS.append(frontend_url.rstrip('/'))
+
 # 本番環境で全オリジン許可が必要な場合（テスト用）
 CORS_ALLOW_ALL_ORIGINS = os.environ.get('CORS_ALLOW_ALL_ORIGINS', 'False') == 'True'
 

@@ -26,6 +26,7 @@ import SiteManagementPage from './pages/admin/SiteManagementPage';
 import UserManagementPage from './pages/admin/UserManagementPage';
 import PartnerCompanyManagementPage from './pages/admin/PartnerCompanyManagementPage';
 import AuditLogPage from './pages/AuditLogPage';
+import ThankYouPage from './pages/ThankYouPage'; // 🆕 Import
 
 // ====================
 // 認証保護ルート
@@ -269,6 +270,15 @@ const AppRoutes: React.FC = () => {
           <InternalRoute>
             <AuditLogPage />
           </InternalRoute>
+        }
+      />
+
+      <Route
+        path="/thank-you"
+        element={
+          <ProtectedRoute>
+            <ThankYouPage />
+          </ProtectedRoute>
         }
       />
 

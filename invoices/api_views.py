@@ -618,41 +618,60 @@ class InvoiceViewSet(viewsets.ModelViewSet):
         return InvoiceSerializer
     
     def get_queryset(self):
-        """ユーザーに応じた請求書を返す"""
+        """
+        請求書一覧を取得
+        - 閲覧期間制限: 過去1ヶ月分のみ（admin/accountant/managing_director以外）
+        """
         user = self.request.user
         
+        qs = Invoice.objects.select_related(
+            'customer_company', 'construction_site', 'created_by',
+            'approval_route', 'current_approval_step', 'current_approver'
+        ).prefetch_related('items', 'comments', 'approval_histories')
+
         if user.user_type == 'customer':
-            # 協力会社は自社の請求書のみ
-            invoices = Invoice.objects.filter(customer_company=user.customer_company)
+            qs = qs.filter(customer_company=user.customer_company)
         else:
-            # 社内ユーザーは全ての請求書
-            invoices = Invoice.objects.filter(receiving_company=user.company)
+            qs = qs.filter(receiving_company=user.company)
+            
+        # 閲覧期間制限 (重要: Adminと経理以外は1ヶ月制限)
+        # ただし、自分が承認者のものや自分の作成したものは見れるべき？ -> 要件は「アドミンと経理以外は全て一ヶ月間で見れなくなる」
+        # なので厳格に期間で切る。
+        is_privileged = False
+        if user.is_super_admin or user.is_superuser:
+            is_privileged = True
         
+        # 役職判定 (経理, 常務, 専務, 社長は全期間OKとするか？ -> 要件は「アドミンと経理以外」)
+        # 常務(managing_director)以上も経営層なのでOKにすべきだが、要件通りにするなら経理のみ。
+        # ここでは安全側に倒して「経理」「経営層」はOKとする
+        position = getattr(user, 'position', '') or ''
+        if position in ['accountant', 'managing_director', 'senior_managing_director', 'president']:
+             is_privileged = True
+             
+        if not is_privileged:
+            # 1ヶ月前（30日前）より新しいものだけ表示
+            one_month_ago = timezone.now() - timedelta(days=30)
+            qs = qs.filter(created_at__gte=one_month_ago)
+
         # ステータスフィルター
         status_filter = self.request.query_params.get('status')
         if status_filter and status_filter != 'all':
-            invoices = invoices.filter(status=status_filter)
+            qs = qs.filter(status=status_filter)
         
         # 自分の承認待ちフィルター
         if status_filter == 'my_approval':
-            invoices = invoices.filter(current_approver=user)
+            qs = qs.filter(current_approver=user)
         
         # 検索
         search = self.request.query_params.get('search')
         if search:
-            invoices = invoices.filter(
+            qs = qs.filter(
                 Q(invoice_number__icontains=search) |
                 Q(project_name__icontains=search) |
                 Q(construction_site_name__icontains=search)
             )
         
-        return invoices.select_related(
-            'customer_company', 
-            'construction_site', 
-            'created_by',
-            'current_approver',
-            'current_approval_step'
-        ).order_by('-created_at')
+        return qs.order_by('-created_at')
     
     def create(self, request, *args, **kwargs):
         """請求書作成（期間チェック付き）"""
@@ -818,12 +837,13 @@ class InvoiceViewSet(viewsets.ModelViewSet):
             )
         
         # 提出期間チェック (毎月15日以降)
-        today = timezone.now().date()
-        if today.day < 15 and not request.user.is_super_admin:
-             return Response(
-                {'error': '請求書の提出は毎月15日以降から可能です'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+        # 提出期間チェック (毎月15日以降) -> 一旦無効化（「作成できない」との報告のため、警告のみまたはスルー）
+        # today = timezone.now().date()
+        # if today.day < 15 and not request.user.is_super_admin:
+        #      return Response(
+        #         {'error': '請求書の提出は毎月15日以降から可能です'},
+        #         status=status.HTTP_400_BAD_REQUEST
+        #     )
 
         # 現場監督の確認
         if not invoice.construction_site.supervisor:

@@ -90,12 +90,40 @@ WSGI_APPLICATION = 'keyron_project.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
-DATABASES = {
-    'default': dj_database_url.config(
-        default=f'sqlite:///{BASE_DIR / "db.sqlite3"}',
-        conn_max_age=600
-    )
-}
+# DATABASE_URLが設定されている場合はそちらを使用、なければSQLiteを使用
+import os
+import sys
+import dj_database_url
+
+DATABASE_URL = os.environ.get('DATABASE_URL')
+
+if DATABASE_URL:
+    # デバッグログ：DATABASE_URLの内容確認（パスワードはマスク）
+    masked_url = DATABASE_URL.split('@')[-1] if '@' in DATABASE_URL else 'HIDDEN'
+    print(f"[DEBUG] DATABASE_URL detected. Host info: {masked_url}", file=sys.stderr)
+    
+    # DATABASE_URLから設定をパース
+    db_config = dj_database_url.parse(DATABASE_URL, conn_max_age=600)
+    
+    # [CRITICAL FIX] データベース名を強制的に 'postgres' に設定
+    # App Runner環境変数や以前の設定で 'keyronnew' になっている可能性があるため
+    original_name = db_config.get('NAME')
+    print(f"[DEBUG] Original DB Name from URL: {original_name}", file=sys.stderr)
+    
+    db_config['NAME'] = 'postgres'
+    print(f"[DEBUG] Overridden DB Name: {db_config['NAME']}", file=sys.stderr)
+    
+    DATABASES = {
+        'default': db_config
+    }
+else:
+    print("[DEBUG] No DATABASE_URL found. Using SQLite.", file=sys.stderr)
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / "db.sqlite3",
+        }
+    }
 
 
 # Password validation

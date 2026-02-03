@@ -211,7 +211,8 @@ class ConstructionSiteSerializer(serializers.ModelSerializer):
         model = ConstructionSite
         fields = [
             'id', 'project_code', 'name', 'location',
-            'site_password', # 🆕
+            'site_password',
+            'special_access_password', 'special_access_expiry',
             'construction_type', 'construction_type_name',
             'company', 'company_name',
             'client_name', 'prime_contractor',
@@ -771,7 +772,8 @@ class ConstructionSiteDetailSerializer(serializers.ModelSerializer):
         model = ConstructionSite
         fields = [
             'id', 'project_code', 'name', 'location',
-            'site_password', # 🆕
+            'site_password',
+            'special_access_password', 'special_access_expiry',
             'construction_type', 'construction_type_name',
             'company', 'company_name',
             'client_name', 'prime_contractor',

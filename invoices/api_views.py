@@ -675,109 +675,120 @@ class InvoiceViewSet(viewsets.ModelViewSet):
     
     def create(self, request, *args, **kwargs):
         """請求書作成（期間チェック付き）"""
-        
-        # 1.2 月次締め処理のチェック（毎月25日締め、翌月1日以降は前月分制限）
-        # 特例パスワードの取得
-        special_password = request.data.get('special_password')
-
-        if request.user.user_type == 'customer':
-            invoice_date = request.data.get('invoice_date')
-            construction_site_id = request.data.get('construction_site')
-            
-            # 特例パスワードバイパスのチェック
-            is_bypassed = False
-            if construction_site_id and special_password:
-                try:
-                    site_for_auth = ConstructionSite.objects.get(id=construction_site_id)
-                    if site_for_auth.special_access_password and special_password == site_for_auth.special_access_password:
-                        # 期限チェック
-                        if not site_for_auth.special_access_expiry or timezone.now().date() <= site_for_auth.special_access_expiry:
-                            is_bypassed = True
-                except ConstructionSite.DoesNotExist:
-                    pass
-
-            if invoice_date and not is_bypassed:
-                try:
-                    date_obj = datetime.strptime(invoice_date, '%Y-%m-%d').date()
-                    year, month = date_obj.year, date_obj.month
-                    today = timezone.now().date()
-                    
-                    # 翌月1日以降で前月分の請求書を作成しようとしている場合
-                    if (today.month != month or today.year != year):
-                        # 前月分かどうかチェック
-                        if (today.year == year and today.month > month) or (today.year > year):
-                            # スーパー管理者以外は制限
-                            if not request.user.is_super_admin:
+        try:
+            # 1.2 月次締め処理のチェック（毎月25日締め、翌月1日以降は前月分制限）
+            # 特例パスワードの取得
+            special_password = request.data.get('special_password')
+    
+            if request.user.user_type == 'customer':
+                invoice_date = request.data.get('invoice_date')
+                construction_site_id = request.data.get('construction_site')
+                
+                # 特例パスワードバイパスのチェック
+                is_bypassed = False
+                if construction_site_id and special_password:
+                    try:
+                        site_for_auth = ConstructionSite.objects.get(id=construction_site_id)
+                        if site_for_auth.special_access_password and special_password == site_for_auth.special_access_password:
+                            # 期限チェック
+                            if not site_for_auth.special_access_expiry or timezone.now().date() <= site_for_auth.special_access_expiry:
+                                is_bypassed = True
+                    except ConstructionSite.DoesNotExist:
+                        pass
+    
+                if invoice_date and not is_bypassed:
+                    try:
+                        date_obj = datetime.strptime(invoice_date, '%Y-%m-%d').date()
+                        year, month = date_obj.year, date_obj.month
+                        today = timezone.now().date()
+                        
+                        # 翌月1日以降で前月分の請求書を作成しようとしている場合
+                        if (today.month != month or today.year != year):
+                            # 前月分かどうかチェック
+                            if (today.year == year and today.month > month) or (today.year > year):
+                                # スーパー管理者以外は制限
+                                if not request.user.is_super_admin:
+                                    return Response(
+                                        {
+                                            'error': f'{year}年{month}月分の請求書は作成できません',
+                                            'detail': '月が変わると前月分の請求書は作成できなくなります。特例パスワードをお持ちの場合は入力してください。',
+                                            'code': 'past_month_restriction'
+                                        },
+                                        status=status.HTTP_400_BAD_REQUEST
+                                    )
+                        
+                        # 25日締めチェック
+                        if today.day > 25 and today.month == month:
+                            # 当月25日以降は締め切り警告を出す（作成は許可）
+                            pass
+                        
+                        receiving_company = Company.objects.first()
+                        
+                        if receiving_company:
+                            period = MonthlyInvoicePeriod.objects.filter(
+                                company=receiving_company,
+                                year=year,
+                                month=month
+                            ).first()
+                            
+                            if period and period.is_closed and not request.user.is_super_admin and not is_bypassed:
                                 return Response(
                                     {
-                                        'error': f'{year}年{month}月分の請求書は作成できません',
-                                        'detail': '月が変わると前月分の請求書は作成できなくなります。特例パスワードをお持ちの場合は入力してください。',
-                                        'code': 'past_month_restriction'
+                                        'error': f'{period.period_name}は既に締め切られています',
+                                        'detail': '請求書の作成はできません。特例パスワードをお持ちの場合は入力してください。',
+                                        'code': 'period_closed' 
                                     },
                                     status=status.HTTP_400_BAD_REQUEST
                                 )
-                    
-                    # 25日締めチェック
-                    if today.day > 25 and today.month == month:
-                        # 当月25日以降は締め切り警告を出す（作成は許可）
+                                
+                    except ValueError:
                         pass
-                    
-                    receiving_company = Company.objects.first()
-                    
-                    if receiving_company:
-                        period = MonthlyInvoicePeriod.objects.filter(
-                            company=receiving_company,
-                            year=year,
-                            month=month
-                        ).first()
-                        
-                        if period and period.is_closed and not request.user.is_super_admin and not is_bypassed:
-                            return Response(
-                                {
-                                    'error': f'{period.period_name}は既に締め切られています',
-                                    'detail': '請求書の作成はできません。特例パスワードをお持ちの場合は入力してください。',
-                                    'code': 'period_closed' 
-                                },
-                                status=status.HTTP_400_BAD_REQUEST
-                            )
-                            
-                except ValueError:
-                    pass
-        
-        # 4.1 完成済み現場への請求書作成制限
-        construction_site_id = request.data.get('construction_site')
-        if construction_site_id:
-            try:
-                site = ConstructionSite.objects.get(id=construction_site_id)
-                if site.is_completed and not request.user.is_super_admin:
-                    return Response(
-                        {
-                            'error': f'{site.name}は完成済みです',
-                            'detail': '完成済みの現場には新規請求書を作成できません。'
-                        },
-                        status=status.HTTP_400_BAD_REQUEST
-                    )
-            except ConstructionSite.DoesNotExist:
-                    pass
-        
-        # 既存の作成処理を実行
-        serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        invoice = serializer.save()
-        
-        # アクセスログ記録
-        AccessLog.log(
-            user=request.user,
-            action='create',
-            resource_type='Invoice',
-            resource_id=invoice.id,
-            details={'invoice_number': invoice.invoice_number}
-        )
-        
-        return Response(
-            InvoiceSerializer(invoice).data,
-            status=status.HTTP_201_CREATED
-        )
+            
+            # 4.1 完成済み現場への請求書作成制限
+            construction_site_id = request.data.get('construction_site')
+            if construction_site_id:
+                try:
+                    site = ConstructionSite.objects.get(id=construction_site_id)
+                    if site.is_completed and not request.user.is_super_admin:
+                        return Response(
+                            {
+                                'error': f'{site.name}は完成済みです',
+                                'detail': '完成済みの現場には新規請求書を作成できません。'
+                            },
+                            status=status.HTTP_400_BAD_REQUEST
+                        )
+                except ConstructionSite.DoesNotExist:
+                        pass
+            
+            # 既存の作成処理を実行
+            serializer = self.get_serializer(data=request.data)
+            serializer.is_valid(raise_exception=True)
+            invoice = serializer.save()
+            
+            # アクセスログ記録
+            AccessLog.log(
+                user=request.user,
+                action='create',
+                resource_type='Invoice',
+                resource_id=invoice.id,
+                details={'invoice_number': invoice.invoice_number}
+            )
+            
+            return Response(
+                InvoiceSerializer(invoice).data,
+                status=status.HTTP_201_CREATED
+            )
+        except Exception as e:
+            import traceback
+            print(traceback.format_exc())
+            return Response(
+                {
+                    'message': f'Server Error: {str(e)}',
+                    'error': str(e),
+                    'trace': traceback.format_exc()
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
     
     def update(self, request, *args, **kwargs):
         """請求書更新（訂正期限チェック付き）"""

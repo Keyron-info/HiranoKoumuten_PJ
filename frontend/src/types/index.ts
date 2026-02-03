@@ -275,7 +275,7 @@ export const STATUS_COLORS: Record<InvoiceStatus, string> = {
   pending_approval: 'yellow',
   approved: 'green',
   rejected: 'red',
-  returned: 'orange',
+  returned: 'primary',
   payment_preparing: 'purple',
   paid: 'teal',
 };

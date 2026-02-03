@@ -80,7 +80,7 @@ const PartnerCompanyManagementPage: React.FC = () => {
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
                 <div className="flex justify-between items-center mb-6">
                     <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-                        <Building2 className="h-6 w-6 text-orange-600" />
+                        <Building2 className="h-6 w-6 text-primary-600" />
                         協力会社管理
                     </h1>
                 </div>
@@ -115,7 +115,7 @@ const PartnerCompanyManagementPage: React.FC = () => {
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
                             placeholder="会社名またはメールアドレスで検索"
-                            className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                            className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                         />
                     </div>
                 </div>
@@ -157,8 +157,8 @@ const PartnerCompanyManagementPage: React.FC = () => {
                                             </td>
                                             <td className="px-6 py-4 whitespace-nowrap">
                                                 <span className={`px-2 py-1 text-xs font-medium rounded-full ${company.is_active
-                                                        ? 'bg-green-100 text-green-800'
-                                                        : 'bg-red-100 text-red-800'
+                                                    ? 'bg-green-100 text-green-800'
+                                                    : 'bg-red-100 text-red-800'
                                                     }`}>
                                                     {company.is_active ? '有効' : '無効'}
                                                 </span>
@@ -166,7 +166,7 @@ const PartnerCompanyManagementPage: React.FC = () => {
                                             <td className="px-6 py-4 whitespace-nowrap text-sm">
                                                 <button
                                                     onClick={() => openEditModal(company)}
-                                                    className="p-1.5 text-gray-600 hover:text-orange-600 hover:bg-orange-50 rounded"
+                                                    className="p-1.5 text-gray-600 hover:text-primary-600 hover:bg-primary-50 rounded"
                                                     title="編集"
                                                 >
                                                     <Edit className="h-4 w-4" />
@@ -204,7 +204,7 @@ const PartnerCompanyManagementPage: React.FC = () => {
                                         type="text"
                                         value={formData.name || ''}
                                         onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                                     />
                                 </div>
 
@@ -215,7 +215,7 @@ const PartnerCompanyManagementPage: React.FC = () => {
                                             type="text"
                                             value={formData.postal_code || ''}
                                             onChange={(e) => setFormData({ ...formData, postal_code: e.target.value })}
-                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                                         />
                                     </div>
                                     <div>
@@ -224,7 +224,7 @@ const PartnerCompanyManagementPage: React.FC = () => {
                                             type="tel"
                                             value={formData.phone || ''}
                                             onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                                         />
                                     </div>
                                 </div>
@@ -235,7 +235,7 @@ const PartnerCompanyManagementPage: React.FC = () => {
                                         type="text"
                                         value={formData.address || ''}
                                         onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                                     />
                                 </div>
 
@@ -245,7 +245,7 @@ const PartnerCompanyManagementPage: React.FC = () => {
                                         type="email"
                                         value={formData.email || ''}
                                         onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                                     />
                                 </div>
 

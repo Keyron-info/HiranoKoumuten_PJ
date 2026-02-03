@@ -74,7 +74,7 @@ const AuditLogPage: React.FC = () => {
             case 'create': return 'text-green-600 bg-green-50';
             case 'update': return 'text-blue-600 bg-blue-50';
             case 'delete': return 'text-red-600 bg-red-50';
-            case 'approve': return 'text-orange-600 bg-orange-50';
+            case 'approve': return 'text-primary-600 bg-primary-50';
             case 'login': return 'text-purple-600 bg-purple-50';
             default: return 'text-gray-600 bg-gray-50';
         }

@@ -427,7 +427,7 @@ const InvoiceCreatePage: React.FC = () => {
                     value="invoice"
                     checked={documentType === 'invoice'}
                     onChange={() => setDocumentType('invoice')}
-                    className="mr-2 text-orange-500 focus:ring-orange-500"
+                    className="mr-2 text-primary-500 focus:ring-primary-500"
                   />
                   <span className="text-sm">請求書</span>
                 </label>
@@ -438,7 +438,7 @@ const InvoiceCreatePage: React.FC = () => {
                     value="delivery_note"
                     checked={documentType === 'delivery_note'}
                     onChange={() => setDocumentType('delivery_note')}
-                    className="mr-2 text-orange-500 focus:ring-orange-500"
+                    className="mr-2 text-primary-500 focus:ring-primary-500"
                   />
                   <span className="text-sm">納品書</span>
                 </label>
@@ -460,7 +460,7 @@ const InvoiceCreatePage: React.FC = () => {
                   value={formData.project_name}
                   onChange={(e) => setFormData({ ...formData, project_name: e.target.value })}
                   placeholder="例: ○○様邸外壁塗装工事"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 text-lg"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 text-lg"
                 />
               </div>
 
@@ -479,7 +479,7 @@ const InvoiceCreatePage: React.FC = () => {
                       setConstructionTypeOther('');
                     }
                   }}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
                 >
                   <option value="">選択してください</option>
                   {constructionTypes.map((type) => (
@@ -503,7 +503,7 @@ const InvoiceCreatePage: React.FC = () => {
                   onChange={(e) => setConstructionTypeOther(e.target.value)}
                   placeholder="その他の工種名を入力"
                   disabled={selectedConstructionType !== null && String(selectedConstructionType) !== 'other'}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
                 />
               </div>
 
@@ -521,7 +521,7 @@ const InvoiceCreatePage: React.FC = () => {
                       value={sitePassword}
                       onChange={(e) => setSitePassword(e.target.value)}
                       placeholder="現場パスワードを入力してください"
-                      className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
+                      className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
                     />
                     <button
                       type="button"
@@ -576,27 +576,27 @@ const InvoiceCreatePage: React.FC = () => {
 
                 {/* 選択された工事現場の詳細表示 */}
                 {selectedSite && (
-                  <div className="mt-3 p-4 bg-orange-50 border border-orange-200 rounded-lg animate-fade-in">
+                  <div className="mt-3 p-4 bg-primary-50 border border-primary-200 rounded-lg animate-fade-in">
                     <div className="flex items-start space-x-2">
-                      <svg className="w-5 h-5 text-orange-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg className="w-5 h-5 text-primary-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>
                       <div className="flex-1">
-                        <p className="text-sm font-medium text-orange-900">
+                        <p className="text-sm font-medium text-primary-900">
                           {selectedSite.name}
                         </p>
                         {selectedSite.location && (
-                          <p className="text-sm text-orange-700 mt-1">
+                          <p className="text-sm text-primary-700 mt-1">
                             📍 {selectedSite.location}
                           </p>
                         )}
                         {selectedSite.supervisor_name && (
-                          <p className="text-sm text-orange-700 mt-1">
+                          <p className="text-sm text-primary-700 mt-1">
                             👤 現場監督: <span className="font-medium">{selectedSite.supervisor_name}</span>
                           </p>
                         )}
                         {selectedSite.supervisor_name && documentType === 'invoice' && (
-                          <p className="text-xs text-orange-600 mt-2">
+                          <p className="text-xs text-primary-600 mt-2">
                             💡 この請求書は {selectedSite.supervisor_name} が最初に承認します
                           </p>
                         )}
@@ -615,7 +615,7 @@ const InvoiceCreatePage: React.FC = () => {
                   <select
                     value={selectedPurchaseOrder || ''}
                     onChange={(e) => setSelectedPurchaseOrder(e.target.value ? Number(e.target.value) : null)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
                   >
                     <option value="">注文書なし（選択しない）</option>
                     {purchaseOrders.map((order) => (
@@ -641,7 +641,7 @@ const InvoiceCreatePage: React.FC = () => {
                   required
                   value={formData.invoice_date}
                   onChange={(e) => setFormData({ ...formData, invoice_date: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
                 />
               </div>
 
@@ -655,7 +655,7 @@ const InvoiceCreatePage: React.FC = () => {
                   required
                   value={formData.payment_due_date}
                   onChange={(e) => setFormData({ ...formData, payment_due_date: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
                 />
               </div>
             </div>
@@ -670,7 +670,7 @@ const InvoiceCreatePage: React.FC = () => {
                 onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                 rows={3}
                 placeholder="特記事項があれば入力してください"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
               />
             </div>
           </div>
@@ -682,7 +682,7 @@ const InvoiceCreatePage: React.FC = () => {
               <button
                 type="button"
                 onClick={handleAddItem}
-                className="px-4 py-2 bg-orange-500 text-white rounded-md hover:bg-orange-600 transition-colors text-sm flex items-center gap-1"
+                className="px-4 py-2 bg-primary-500 text-white rounded-md hover:bg-primary-600 transition-colors text-sm flex items-center gap-1"
               >
                 <span className="text-lg">+</span>
                 明細を追加
@@ -721,7 +721,7 @@ const InvoiceCreatePage: React.FC = () => {
                             onChange={(e) => handleItemChange(index, 'description', e.target.value)}
                             list={`frequent-items-${index}`}
                             required
-                            className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-orange-500"
+                            className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-primary-500"
                           />
                           {/* よく使う項目のデータリスト */}
                           <datalist id={`frequent-items-${index}`}>
@@ -743,7 +743,7 @@ const InvoiceCreatePage: React.FC = () => {
                           value={item.quantity}
                           onChange={(e) => handleItemChange(index, 'quantity', Number(e.target.value))}
                           required
-                          className="w-full px-2 py-1 border border-gray-300 rounded text-sm text-right focus:outline-none focus:ring-1 focus:ring-orange-500"
+                          className="w-full px-2 py-1 border border-gray-300 rounded text-sm text-right focus:outline-none focus:ring-1 focus:ring-primary-500"
                         />
                       </td>
 
@@ -752,7 +752,7 @@ const InvoiceCreatePage: React.FC = () => {
                         <select
                           value={item.unit}
                           onChange={(e) => handleItemChange(index, 'unit', e.target.value)}
-                          className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-orange-500"
+                          className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-primary-500"
                         >
                           {unitOptions.map((unit) => (
                             <option key={unit} value={unit}>
@@ -772,7 +772,7 @@ const InvoiceCreatePage: React.FC = () => {
                           onChange={(e) => handleItemChange(index, 'unit_price', e.target.value === '' ? 0 : Number(e.target.value))}
                           placeholder="単価を入力"
                           required
-                          className="w-full px-2 py-1 border border-gray-300 rounded text-sm text-right focus:outline-none focus:ring-1 focus:ring-orange-500 placeholder-gray-400"
+                          className="w-full px-2 py-1 border border-gray-300 rounded text-sm text-right focus:outline-none focus:ring-1 focus:ring-primary-500 placeholder-gray-400"
                         />
                       </td>
 
@@ -818,7 +818,7 @@ const InvoiceCreatePage: React.FC = () => {
                 </div>
                 <div className="flex justify-between w-64 pt-2 border-t">
                   <span className="text-lg font-bold text-gray-900">合計</span>
-                  <span className="text-lg font-bold text-orange-600">
+                  <span className="text-lg font-bold text-primary-600">
                     ¥{totalAmount.toLocaleString()}
                   </span>
                 </div>
@@ -839,7 +839,7 @@ const InvoiceCreatePage: React.FC = () => {
             <button
               type="submit"
               disabled={loading || sites.length === 0}
-              className="px-6 py-2 bg-orange-500 text-white rounded-md hover:bg-orange-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+              className="px-6 py-2 bg-primary-500 text-white rounded-md hover:bg-primary-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
             >
               {loading ? (
                 <>

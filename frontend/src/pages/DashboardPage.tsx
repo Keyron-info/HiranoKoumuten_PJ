@@ -315,7 +315,7 @@ const DashboardPage: React.FC = () => {
 
         {/* 承認待ちバナー（内部ユーザーのみ） */}
         {user?.user_type === 'internal' && pendingCount > 0 && (
-          <div className="bg-gradient-to-r from-orange-500 to-rose-500 rounded-2xl shadow-md p-6 text-white">
+          <div className="bg-gradient-to-r from-primary-500 to-emerald-500 rounded-2xl shadow-md p-6 text-white">
             <div className="flex items-center justify-between flex-wrap gap-4">
               <div className="flex items-center gap-4">
                 <div className="bg-white/20 p-3 rounded-xl backdrop-blur-sm">

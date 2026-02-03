@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { 
-  CheckCircle, XCircle, Download, MessageSquare, Clock, User, 
-  Building2, Calendar, Edit3, ArrowLeft 
+import {
+  CheckCircle, XCircle, Download, MessageSquare, Clock, User,
+  Building2, Calendar, Edit3, ArrowLeft
 } from 'lucide-react';
 import { invoiceAPI } from '../api/invoices';
 import Layout from '../components/common/Layout';
@@ -73,7 +73,7 @@ const InvoiceDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
-  
+
   const [invoice, setInvoice] = useState<InvoiceDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [showRejectModal, setShowRejectModal] = useState(false);
@@ -96,7 +96,7 @@ const InvoiceDetailPage: React.FC = () => {
       setLoading(true);
       const data = await invoiceAPI.getInvoice(id!);
       setInvoice(data as unknown as InvoiceDetail);
-      
+
       // 修正履歴を取得
       try {
         const correctionData = await invoiceAPI.getCorrections(id!);
@@ -179,21 +179,21 @@ const InvoiceDetailPage: React.FC = () => {
     try {
       // トークンを取得
       const token = localStorage.getItem('access_token');
-      
+
       // ベースURLを構築（環境変数があれば使用、なければデフォルト）
       let apiBaseUrl = process.env.REACT_APP_API_URL || 'http://localhost:8001/api';
       // /api が含まれていない場合は追加
       if (!apiBaseUrl.includes('/api')) {
         apiBaseUrl = apiBaseUrl.replace(/\/$/, '') + '/api';
       }
-      
+
       // PDFをダウンロード
       const response = await fetch(`${apiBaseUrl}/invoices/${id}/download_pdf/`, {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
       });
-      
+
       if (!response.ok) {
         // エラーレスポンスがJSONかHTMLかを判定
         const contentType = response.headers.get('Content-Type') || '';
@@ -204,10 +204,10 @@ const InvoiceDetailPage: React.FC = () => {
           throw new Error(`HTTPエラー: ${response.status}`);
         }
       }
-      
+
       // PDFをBlobとして取得
       const blob = await response.blob();
-      
+
       // ダウンロードリンクを作成
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
@@ -217,7 +217,7 @@ const InvoiceDetailPage: React.FC = () => {
       link.click();
       link.remove();
       window.URL.revokeObjectURL(url);
-      
+
     } catch (error: any) {
       alert(error.message || 'PDFダウンロードに失敗しました');
     }
@@ -248,7 +248,7 @@ const InvoiceDetailPage: React.FC = () => {
       case 'submitted':
         return <CheckCircle size={18} className="text-green-600" />;
       case 'pending_approval':
-        return <Clock size={18} className="text-orange-600" />;
+        return <Clock size={18} className="text-primary-600" />;
       case 'returned':
       case 'rejected':
         return <XCircle size={18} className="text-red-600" />;
@@ -261,7 +261,7 @@ const InvoiceDetailPage: React.FC = () => {
     return (
       <Layout>
         <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500"></div>
         </div>
       </Layout>
     );
@@ -299,33 +299,31 @@ const InvoiceDetailPage: React.FC = () => {
       <div className="max-w-6xl mx-auto px-4 py-8">
         {/* ヘッダー */}
         <div className="mb-6">
-              <button
+          <button
             onClick={() => navigate(-1)}
             className="text-blue-600 hover:text-blue-700 mb-4 flex items-center space-x-1"
-              >
+          >
             <ArrowLeft size={16} />
             <span>戻る</span>
-              </button>
+          </button>
           <div className="flex items-start justify-between">
-              <div>
+            <div>
               <h1 className="text-3xl font-bold text-gray-900 mb-2">{invoice.invoice_number}</h1>
-              <span className={`inline-block px-4 py-2 rounded-lg text-sm font-medium border ${
-                invoice.status === 'pending_approval' ? 'bg-orange-100 text-orange-700 border-orange-200' :
-                invoice.status === 'approved' ? 'bg-green-100 text-green-700 border-green-200' :
-                invoice.status === 'returned' ? 'bg-red-100 text-red-700 border-red-200' :
-                'bg-gray-100 text-gray-700 border-gray-200'
-              }`}>
+              <span className={`inline-block px-4 py-2 rounded-lg text-sm font-medium border ${invoice.status === 'pending_approval' ? 'bg-primary-100 text-primary-700 border-primary-200' :
+                  invoice.status === 'approved' ? 'bg-green-100 text-green-700 border-green-200' :
+                    invoice.status === 'returned' ? 'bg-red-100 text-red-700 border-red-200' :
+                      'bg-gray-100 text-gray-700 border-gray-200'
+                }`}>
                 {invoice.status_display}
               </span>
             </div>
-            <button 
+            <button
               onClick={handleDownloadPdf}
               disabled={!canDownloadPdf}
-              className={`flex items-center space-x-2 px-4 py-2 border rounded-lg transition-colors ${
-                canDownloadPdf 
-                  ? 'bg-white border-gray-300 hover:bg-gray-50' 
+              className={`flex items-center space-x-2 px-4 py-2 border rounded-lg transition-colors ${canDownloadPdf
+                  ? 'bg-white border-gray-300 hover:bg-gray-50'
                   : 'bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed'
-              }`}
+                }`}
               title={canDownloadPdf ? 'PDFをダウンロード' : 'PDFダウンロード権限がありません'}
             >
               <Download size={20} />
@@ -379,7 +377,7 @@ const InvoiceDetailPage: React.FC = () => {
                 </div>
               </div>
             ))}
-      </div>
+          </div>
         )}
 
         {/* メインコンテンツ */}
@@ -421,7 +419,7 @@ const InvoiceDetailPage: React.FC = () => {
                   <p className="text-sm text-gray-500 mb-1">提出日時</p>
                   <p className="font-medium text-gray-900">{formatDateTime(invoice.submitted_at)}</p>
                 </div>
-                </div>
+              </div>
             </div>
 
             {/* 請求明細 */}
@@ -460,7 +458,7 @@ const InvoiceDetailPage: React.FC = () => {
                     </tr>
                     <tr className="border-t border-gray-200">
                       <td colSpan={4} className="py-3 px-2 text-right font-bold text-gray-900 text-lg">合計</td>
-                      <td className="py-3 px-2 text-right font-bold text-orange-600 text-xl">{formatCurrency(invoice.total_amount)}</td>
+                      <td className="py-3 px-2 text-right font-bold text-primary-600 text-xl">{formatCurrency(invoice.total_amount)}</td>
                     </tr>
                   </tfoot>
                 </table>
@@ -477,7 +475,7 @@ const InvoiceDetailPage: React.FC = () => {
                 <textarea
                   value={comment}
                   onChange={(e) => setComment(e.target.value)}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent resize-none"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent resize-none"
                   rows={4}
                   placeholder="承認時のコメントを入力してください（任意）"
                 />
@@ -513,7 +511,7 @@ const InvoiceDetailPage: React.FC = () => {
               // 平野工務店ユーザー & 承認待ち: 承認・差し戻し・却下ボタン
               <div className="bg-white rounded-xl shadow-sm p-6">
                 <h2 className="text-xl font-bold text-gray-900 mb-6">承認アクション</h2>
-              <div className="space-y-3">
+                <div className="space-y-3">
                   <button
                     onClick={handleApprove}
                     disabled={processing}
@@ -523,22 +521,22 @@ const InvoiceDetailPage: React.FC = () => {
                     <span>{processing ? '処理中...' : '承認する'}</span>
                   </button>
                   {/* 差し戻し（赤ペン修正）ボタン */}
-                    <button
+                  <button
                     onClick={() => navigate(`/invoices/${id}/edit-correction`)}
-                    className="w-full bg-gradient-to-r from-orange-500 to-orange-600 text-white py-4 rounded-lg font-bold text-lg hover:from-orange-600 hover:to-orange-700 transition-all shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 flex items-center justify-center space-x-2"
-                    >
+                    className="w-full bg-gradient-to-r from-primary-500 to-primary-600 text-white py-4 rounded-lg font-bold text-lg hover:from-primary-600 hover:to-primary-700 transition-all shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 flex items-center justify-center space-x-2"
+                  >
                     <Edit3 size={24} />
                     <span>差し戻し（修正依頼）</span>
-                    </button>
+                  </button>
                   {/* 却下ボタン */}
-                    <button
+                  <button
                     onClick={() => setShowRejectModal(true)}
                     disabled={processing}
                     className="w-full bg-gradient-to-r from-red-500 to-red-600 text-white py-4 rounded-lg font-bold text-lg hover:from-red-600 hover:to-red-700 transition-all shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 flex items-center justify-center space-x-2 disabled:opacity-50"
-                    >
+                  >
                     <XCircle size={24} />
                     <span>却下</span>
-                    </button>
+                  </button>
                 </div>
               </div>
             ) : null}
@@ -554,13 +552,12 @@ const InvoiceDetailPage: React.FC = () => {
                         <div className="absolute left-4 top-10 bottom-0 w-0.5 bg-gray-200" />
                       )}
                       <div className="flex items-start space-x-3">
-                        <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
-                          history.action === 'approved' || history.action === 'submitted'
+                        <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${history.action === 'approved' || history.action === 'submitted'
                             ? 'bg-green-100 text-green-600'
                             : history.action === 'returned' || history.action === 'rejected'
-                            ? 'bg-red-100 text-red-600'
-                            : 'bg-orange-100 text-orange-600'
-                        }`}>
+                              ? 'bg-red-100 text-red-600'
+                              : 'bg-primary-100 text-primary-600'
+                          }`}>
                           {getStatusIcon(history.action)}
                         </div>
                         <div className="flex-1 pb-4">
@@ -572,7 +569,7 @@ const InvoiceDetailPage: React.FC = () => {
                           )}
                         </div>
                       </div>
-                          </div>
+                    </div>
                   ))
                 ) : (
                   // デフォルト承認フロー表示
@@ -582,13 +579,12 @@ const InvoiceDetailPage: React.FC = () => {
                         <div className="absolute left-4 top-10 bottom-0 w-0.5 bg-gray-200" />
                       )}
                       <div className="flex items-start space-x-3">
-                        <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
-                          step.status === 'completed'
+                        <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${step.status === 'completed'
                             ? 'bg-green-100 text-green-600'
                             : step.status === 'pending'
-                            ? 'bg-orange-100 text-orange-600'
-                            : 'bg-gray-100 text-gray-400'
-                        }`}>
+                              ? 'bg-primary-100 text-primary-600'
+                              : 'bg-gray-100 text-gray-400'
+                          }`}>
                           {step.status === 'completed' ? (
                             <CheckCircle size={18} />
                           ) : step.status === 'pending' ? (
@@ -640,9 +636,9 @@ const InvoiceDetailPage: React.FC = () => {
               >
                 {processing ? '処理中...' : '却下する'}
               </button>
+            </div>
+          </div>
         </div>
-      </div>
-    </div>
       )}
     </Layout>
   );

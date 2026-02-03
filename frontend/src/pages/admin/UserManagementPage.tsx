@@ -168,12 +168,12 @@ const UserManagementPage: React.FC = () => {
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
                 <div className="flex justify-between items-center mb-6">
                     <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-                        <Users className="h-6 w-6 text-orange-600" />
+                        <Users className="h-6 w-6 text-primary-600" />
                         ユーザー管理
                     </h1>
                     <button
                         onClick={() => setShowCreateModal(true)}
-                        className="px-4 py-2 bg-orange-600 text-white font-medium rounded-lg hover:bg-orange-700 transition-colors flex items-center gap-2"
+                        className="px-4 py-2 bg-primary-600 text-white font-medium rounded-lg hover:bg-primary-700 transition-colors flex items-center gap-2"
                     >
                         <Plus className="h-5 w-5" />
                         新規ユーザー
@@ -212,7 +212,7 @@ const UserManagementPage: React.FC = () => {
                             <select
                                 value={filterUserType}
                                 onChange={(e) => setFilterUserType(e.target.value)}
-                                className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                                className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                             >
                                 <option value="">すべて</option>
                                 <option value="internal">社内ユーザー</option>
@@ -230,7 +230,7 @@ const UserManagementPage: React.FC = () => {
                                     value={searchQuery}
                                     onChange={(e) => setSearchQuery(e.target.value)}
                                     placeholder="ユーザー名、氏名、メールアドレス"
-                                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                                 />
                                 <button
                                     type="submit"
@@ -274,8 +274,8 @@ const UserManagementPage: React.FC = () => {
                                             </td>
                                             <td className="px-6 py-4 whitespace-nowrap">
                                                 <span className={`px-2 py-1 text-xs font-medium rounded-full ${user.user_type === 'internal'
-                                                        ? 'bg-blue-100 text-blue-800'
-                                                        : 'bg-green-100 text-green-800'
+                                                    ? 'bg-blue-100 text-blue-800'
+                                                    : 'bg-green-100 text-green-800'
                                                     }`}>
                                                     {user.user_type_display}
                                                 </span>
@@ -287,8 +287,8 @@ const UserManagementPage: React.FC = () => {
                                             </td>
                                             <td className="px-6 py-4 whitespace-nowrap">
                                                 <span className={`px-2 py-1 text-xs font-medium rounded-full ${user.is_active
-                                                        ? 'bg-green-100 text-green-800'
-                                                        : 'bg-red-100 text-red-800'
+                                                    ? 'bg-green-100 text-green-800'
+                                                    : 'bg-red-100 text-red-800'
                                                     }`}>
                                                     {user.is_active ? '有効' : '無効'}
                                                 </span>
@@ -297,7 +297,7 @@ const UserManagementPage: React.FC = () => {
                                                 <div className="flex gap-2">
                                                     <button
                                                         onClick={() => openEditModal(user)}
-                                                        className="p-1.5 text-gray-600 hover:text-orange-600 hover:bg-orange-50 rounded"
+                                                        className="p-1.5 text-gray-600 hover:text-primary-600 hover:bg-primary-50 rounded"
                                                         title="編集"
                                                     >
                                                         <Edit className="h-4 w-4" />
@@ -305,8 +305,8 @@ const UserManagementPage: React.FC = () => {
                                                     <button
                                                         onClick={() => handleToggleActive(user.id)}
                                                         className={`p-1.5 rounded ${user.is_active
-                                                                ? 'text-red-600 hover:bg-red-50'
-                                                                : 'text-green-600 hover:bg-green-50'
+                                                            ? 'text-red-600 hover:bg-red-50'
+                                                            : 'text-green-600 hover:bg-green-50'
                                                             }`}
                                                         title={user.is_active ? '無効化' : '有効化'}
                                                     >
@@ -345,7 +345,7 @@ const UserManagementPage: React.FC = () => {
                                     <select
                                         value={formData.user_type}
                                         onChange={(e) => setFormData({ ...formData, user_type: e.target.value as 'internal' | 'customer' })}
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                                         required
                                     >
                                         <option value="internal">社内ユーザー</option>
@@ -360,7 +360,7 @@ const UserManagementPage: React.FC = () => {
                                             type="text"
                                             value={formData.last_name}
                                             onChange={(e) => setFormData({ ...formData, last_name: e.target.value })}
-                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                                         />
                                     </div>
                                     <div>
@@ -369,7 +369,7 @@ const UserManagementPage: React.FC = () => {
                                             type="text"
                                             value={formData.first_name}
                                             onChange={(e) => setFormData({ ...formData, first_name: e.target.value })}
-                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
                                         />
                                     </div>
                                 </div>

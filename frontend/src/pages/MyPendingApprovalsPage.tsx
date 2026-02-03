@@ -141,7 +141,7 @@ const MyPendingApprovalsPage: React.FC = () => {
     return (
       <Layout>
         <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500"></div>
         </div>
       </Layout>
     );
@@ -158,7 +158,7 @@ const MyPendingApprovalsPage: React.FC = () => {
             <div>
               <h1 className="text-3xl font-bold text-gray-900 mb-2 flex items-center space-x-3">
                 <span>承認待ち</span>
-                <span className="inline-flex items-center justify-center w-10 h-10 bg-orange-500 text-white rounded-full text-lg font-bold">
+                <span className="inline-flex items-center justify-center w-10 h-10 bg-primary-500 text-white rounded-full text-lg font-bold">
                   {pendingApprovals.length}
                 </span>
               </h1>
@@ -178,7 +178,7 @@ const MyPendingApprovalsPage: React.FC = () => {
                   type="checkbox"
                   checked={selectedIds.size > 0 && selectedIds.size === pendingApprovals.length}
                   onChange={toggleSelectAll}
-                  className="w-5 h-5 text-orange-500 rounded border-gray-300 focus:ring-orange-500"
+                  className="w-5 h-5 text-primary-500 rounded border-gray-300 focus:ring-primary-500"
                 />
                 <span className="font-medium text-gray-700">
                   すべて選択 ({selectedIds.size}/{pendingApprovals.length})
@@ -188,7 +188,7 @@ const MyPendingApprovalsPage: React.FC = () => {
             <button
               onClick={handleBulkApprove}
               disabled={selectedIds.size === 0 || isBulkProcessing}
-              className="bg-gradient-to-r from-orange-500 to-orange-600 text-white px-6 py-2.5 rounded-lg font-bold hover:from-orange-600 hover:to-orange-700 transition-all shadow-md disabled:opacity-50 disabled:shadow-none flex items-center space-x-2"
+              className="bg-gradient-to-r from-primary-500 to-primary-600 text-white px-6 py-2.5 rounded-lg font-bold hover:from-primary-600 hover:to-primary-700 transition-all shadow-md disabled:opacity-50 disabled:shadow-none flex items-center space-x-2"
             >
               <CheckCircle size={20} />
               <span>{isBulkProcessing ? '処理中...' : '一括承認する'}</span>
@@ -220,7 +220,7 @@ const MyPendingApprovalsPage: React.FC = () => {
               return (
                 <div
                   key={invoice.id}
-                  className="bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow border-l-4 border-orange-500"
+                  className="bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow border-l-4 border-primary-500"
                 >
                   <div className="p-6 relative">
                     {/* チェックボックス（絶対配置） */}
@@ -229,17 +229,17 @@ const MyPendingApprovalsPage: React.FC = () => {
                         type="checkbox"
                         checked={selectedIds.has(invoice.id)}
                         onChange={() => toggleSelection(invoice.id)}
-                        className="w-5 h-5 text-orange-500 rounded border-gray-300 focus:ring-orange-500 cursor-pointer"
+                        className="w-5 h-5 text-primary-500 rounded border-gray-300 focus:ring-primary-500 cursor-pointer"
                       />
                     </div>
                     {/* ヘッダー (左マージン追加) */}
                     <div className="flex items-start justify-between mb-4 pl-8">
                       <div>
                         <div className="flex items-center space-x-2 mb-1">
-                          <FileText size={20} className="text-orange-600" />
+                          <FileText size={20} className="text-primary-600" />
                           <h3 className="text-lg font-bold text-gray-900">{invoice.invoice_number}</h3>
                         </div>
-                        <span className="inline-block px-3 py-1 bg-orange-100 text-orange-700 rounded-full text-xs font-medium border border-orange-200">
+                        <span className="inline-block px-3 py-1 bg-primary-100 text-primary-700 rounded-full text-xs font-medium border border-primary-200">
                           {invoice.status_display}
                         </span>
                       </div>
@@ -281,7 +281,7 @@ const MyPendingApprovalsPage: React.FC = () => {
                           <DollarSign size={18} className="text-gray-400" />
                           <div className="text-right">
                             <p className="text-sm text-gray-500">請求金額</p>
-                            <p className="text-xl font-bold text-orange-600">{formatCurrency(invoice.total_amount)}</p>
+                            <p className="text-xl font-bold text-primary-600">{formatCurrency(invoice.total_amount)}</p>
                           </div>
                         </div>
                       </div>

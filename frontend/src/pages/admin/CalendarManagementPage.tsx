@@ -219,11 +219,11 @@ const CalendarManagementPage: React.FC = () => {
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {calendars.map(calendar => (
-                  <tr key={calendar.id} className={calendar.is_non_standard_deadline ? 'bg-orange-50' : ''}>
+                  <tr key={calendar.id} className={calendar.is_non_standard_deadline ? 'bg-primary-50' : ''}>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                       {calendar.year}年{calendar.month}月
                       {calendar.is_non_standard_deadline && (
-                        <span className="ml-2 px-2 py-1 bg-orange-500 text-white text-xs rounded-full">
+                        <span className="ml-2 px-2 py-1 bg-primary-500 text-white text-xs rounded-full">
                           締め日変更
                         </span>
                       )}
@@ -299,11 +299,10 @@ const CalendarManagementPage: React.FC = () => {
                       {banner.period_name || '-'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
-                        banner.is_active
-                          ? 'bg-green-100 text-green-800'
-                          : 'bg-gray-100 text-gray-800'
-                      }`}>
+                      <span className={`px-2 py-1 text-xs font-semibold rounded-full ${banner.is_active
+                        ? 'bg-green-100 text-green-800'
+                        : 'bg-gray-100 text-gray-800'
+                        }`}>
                         {banner.is_active ? '表示中' : '非表示'}
                       </span>
                     </td>
@@ -508,11 +507,11 @@ const CalendarManagementPage: React.FC = () => {
                     表示中（アクティブ）
                   </label>
                 </div>
-                
+
                 {/* プレビュー */}
-                <div className="bg-orange-50 border-l-4 border-orange-400 p-4 rounded">
-                  <h3 className="text-sm font-medium text-orange-800 mb-2">プレビュー</h3>
-                  <p className="text-sm text-orange-700">{getPreviewMessage()}</p>
+                <div className="bg-primary-50 border-l-4 border-primary-400 p-4 rounded">
+                  <h3 className="text-sm font-medium text-primary-800 mb-2">プレビュー</h3>
+                  <p className="text-sm text-primary-700">{getPreviewMessage()}</p>
                 </div>
 
                 <div className="flex gap-3 pt-4">

@@ -29,7 +29,7 @@ const Navbar: React.FC = () => {
                 K
               </div>
               <span className="text-xl font-bold text-white tracking-tight group-hover:text-primary-400 transition-colors">
-                KAKIEMON-BIM
+                平野工務店-BIM
               </span>
             </Link>
 

@@ -225,7 +225,7 @@ const RegistrationRequestsPage: React.FC = () => {
                 {/* 会社情報 */}
                 <div className="bg-gray-50 rounded-lg p-4 space-y-3">
                   <h3 className="font-semibold text-gray-900 flex items-center gap-2">
-                    <Building2 className="h-5 w-5 text-orange-600" />
+                    <Building2 className="h-5 w-5 text-primary-600" />
                     会社情報
                   </h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -249,7 +249,7 @@ const RegistrationRequestsPage: React.FC = () => {
                 {/* 担当者情報 */}
                 <div className="bg-gray-50 rounded-lg p-4 space-y-3">
                   <h3 className="font-semibold text-gray-900 flex items-center gap-2">
-                    <User className="h-5 w-5 text-orange-600" />
+                    <User className="h-5 w-5 text-primary-600" />
                     担当者情報
                   </h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -284,7 +284,7 @@ const RegistrationRequestsPage: React.FC = () => {
                 {selectedRequest.notes && (
                   <div className="bg-gray-50 rounded-lg p-4 space-y-3">
                     <h3 className="font-semibold text-gray-900 flex items-center gap-2">
-                      <FileText className="h-5 w-5 text-orange-600" />
+                      <FileText className="h-5 w-5 text-primary-600" />
                       備考
                     </h3>
                     <p className="text-gray-700 whitespace-pre-wrap">{selectedRequest.notes}</p>

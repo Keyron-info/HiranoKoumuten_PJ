@@ -47,7 +47,7 @@ const DeadlineNotificationBanner: React.FC = () => {
   // または生成バナーでも25日以外なら赤くするなど。
   // ここではシンプルに全てオレンジだが、カスタムなら赤にする例
   const isImportant = banner.id > 0; // カスタムバナーは重要扱い
-  const bgColorClass = isImportant ? 'bg-gradient-to-r from-red-500 to-red-600' : 'bg-gradient-to-r from-orange-500 to-orange-600';
+  const bgColorClass = isImportant ? 'bg-gradient-to-r from-red-500 to-red-600' : 'bg-gradient-to-r from-primary-500 to-primary-600';
 
   return (
     <div className={`${bgColorClass} text-white shadow-lg`}>

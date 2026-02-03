@@ -42,7 +42,7 @@ interface InvoiceData {
 const InvoiceEditWithCorrectionPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  
+
   const [invoice, setInvoice] = useState<InvoiceData | null>(null);
   const [loading, setLoading] = useState(true);
   const [previewMode, setPreviewMode] = useState(false);
@@ -70,11 +70,11 @@ const InvoiceEditWithCorrectionPage: React.FC = () => {
   };
 
   const handleCorrection = (
-    field: string, 
+    field: string,
     fieldKey: string,
     fieldType: string,
-    originalValue: string, 
-    newValue: string, 
+    originalValue: string,
+    newValue: string,
     reason: string,
     itemId?: number
   ) => {
@@ -108,7 +108,7 @@ const InvoiceEditWithCorrectionPage: React.FC = () => {
   const confirmSave = async () => {
     try {
       setProcessing(true);
-      
+
       // 各修正を保存
       for (const correction of Object.values(corrections)) {
         await invoiceAPI.addCorrection(id!, {
@@ -123,7 +123,7 @@ const InvoiceEditWithCorrectionPage: React.FC = () => {
 
       // 差し戻し処理
       await invoiceAPI.returnToPartner(id!, '請求書の修正を行いました。修正内容をご確認ください。');
-      
+
       alert('修正を保存して協力会社に通知しました');
       setShowConfirmDialog(false);
       navigate(`/invoices/${id}`);
@@ -148,7 +148,7 @@ const InvoiceEditWithCorrectionPage: React.FC = () => {
     return (
       <Layout>
         <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500"></div>
         </div>
       </Layout>
     );
@@ -174,7 +174,7 @@ const InvoiceEditWithCorrectionPage: React.FC = () => {
       <div className="max-w-6xl mx-auto px-4 py-8">
         {/* ヘッダー */}
         <div className="mb-6">
-          <button 
+          <button
             onClick={() => navigate(-1)}
             className="text-blue-600 hover:text-blue-700 mb-4 flex items-center space-x-1"
           >
@@ -184,7 +184,7 @@ const InvoiceEditWithCorrectionPage: React.FC = () => {
           <div className="flex items-start justify-between">
             <div>
               <div className="flex items-center space-x-3 mb-2">
-                <Edit3 size={32} className="text-orange-600" />
+                <Edit3 size={32} className="text-primary-600" />
                 <h1 className="text-3xl font-bold text-gray-900">差し戻し（修正依頼）</h1>
               </div>
               <p className="text-gray-600">{invoice.invoice_number} - {invoice.customer_company_name}</p>
@@ -201,10 +201,10 @@ const InvoiceEditWithCorrectionPage: React.FC = () => {
 
         {/* 修正件数バナー */}
         {hasCorrections && !previewMode && (
-          <div className="bg-orange-50 border-l-4 border-orange-500 p-4 mb-6 rounded-lg">
+          <div className="bg-primary-50 border-l-4 border-primary-500 p-4 mb-6 rounded-lg">
             <div className="flex items-center space-x-2">
-              <AlertCircle size={20} className="text-orange-600" />
-              <p className="text-orange-900 font-medium">
+              <AlertCircle size={20} className="text-primary-600" />
+              <p className="text-primary-900 font-medium">
                 {Object.keys(corrections).length}件の修正があります
               </p>
             </div>
@@ -297,7 +297,7 @@ const InvoiceEditWithCorrectionPage: React.FC = () => {
               <button
                 onClick={handleSave}
                 disabled={!hasCorrections}
-                className="px-8 py-3 bg-gradient-to-r from-orange-500 to-orange-600 text-white rounded-lg hover:from-orange-600 hover:to-orange-700 transition-all shadow-lg hover:shadow-xl font-bold flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-8 py-3 bg-gradient-to-r from-primary-500 to-primary-600 text-white rounded-lg hover:from-primary-600 hover:to-primary-700 transition-all shadow-lg hover:shadow-xl font-bold flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <Save size={20} />
                 <span>修正を保存して協力会社に通知</span>
@@ -370,7 +370,7 @@ const InvoiceEditWithCorrectionPage: React.FC = () => {
               <button
                 onClick={confirmSave}
                 disabled={processing}
-                className="flex-1 px-4 py-3 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors font-bold disabled:opacity-50"
+                className="flex-1 px-4 py-3 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors font-bold disabled:opacity-50"
               >
                 {processing ? '送信中...' : '通知する'}
               </button>
@@ -390,23 +390,23 @@ interface CorrectionInputProps {
   fieldType: string;
   corrections: Record<string, CorrectionField>;
   onCorrection: (
-    field: string, 
+    field: string,
     fieldKey: string,
     fieldType: string,
-    originalValue: string, 
-    newValue: string, 
+    originalValue: string,
+    newValue: string,
     reason: string,
     itemId?: number
   ) => void;
   itemId?: number;
 }
 
-const CorrectionInput: React.FC<CorrectionInputProps> = ({ 
-  label, 
-  originalValue, 
+const CorrectionInput: React.FC<CorrectionInputProps> = ({
+  label,
+  originalValue,
   fieldKey,
   fieldType,
-  corrections, 
+  corrections,
   onCorrection,
   itemId
 }) => {
@@ -441,14 +441,14 @@ const CorrectionInput: React.FC<CorrectionInputProps> = ({
             {originalValue}
           </div>
         </div>
-        
+
         {isEditing || hasCorrection ? (
           <>
             {/* 矢印 */}
             <div className="flex items-center justify-center">
               <span className="text-2xl text-gray-400">↓</span>
             </div>
-            
+
             {/* 修正値 */}
             <div>
               <p className="text-xs font-medium text-red-600 mb-1 flex items-center space-x-1">
@@ -464,7 +464,7 @@ const CorrectionInput: React.FC<CorrectionInputProps> = ({
                 className="w-full px-4 py-2 border-2 border-red-300 rounded focus:ring-2 focus:ring-red-500 focus:border-transparent text-red-600 font-bold disabled:bg-red-50"
               />
             </div>
-            
+
             {/* 修正理由 */}
             <div>
               <p className="text-xs font-medium text-gray-700 mb-1">修正理由（必須）</p>
@@ -474,10 +474,10 @@ const CorrectionInput: React.FC<CorrectionInputProps> = ({
                 disabled={!!hasCorrection}
                 placeholder="修正理由を入力してください"
                 rows={2}
-                className="w-full px-4 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-orange-500 focus:border-transparent resize-none disabled:bg-gray-50"
+                className="w-full px-4 py-2 border border-gray-300 rounded focus:ring-2 focus:ring-primary-500 focus:border-transparent resize-none disabled:bg-gray-50"
               />
             </div>
-            
+
             {/* ボタン */}
             {!hasCorrection && (
               <div className="flex space-x-2">
@@ -508,7 +508,7 @@ const CorrectionInput: React.FC<CorrectionInputProps> = ({
           /* 修正開始ボタン */
           <button
             onClick={() => setIsEditing(true)}
-            className="w-full px-4 py-2 border-2 border-dashed border-orange-300 text-orange-600 rounded hover:border-orange-500 hover:bg-orange-50 transition-colors text-sm font-medium flex items-center justify-center space-x-2"
+            className="w-full px-4 py-2 border-2 border-dashed border-primary-300 text-primary-600 rounded hover:border-primary-500 hover:bg-primary-50 transition-colors text-sm font-medium flex items-center justify-center space-x-2"
           >
             <Edit3 size={16} />
             <span>この項目を修正する</span>

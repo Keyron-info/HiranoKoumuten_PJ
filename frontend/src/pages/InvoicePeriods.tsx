@@ -137,7 +137,7 @@ const InvoicePeriods: React.FC = () => {
           <h1 className="text-2xl font-bold text-gray-900">月次請求期間管理</h1>
           <button
             onClick={() => setShowNewPeriodForm(true)}
-            className="bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700 transition"
+            className="bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 transition"
           >
             + 新規期間作成
           </button>
@@ -184,8 +184,8 @@ const InvoicePeriods: React.FC = () => {
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span
                       className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${period.is_closed
-                          ? 'bg-red-100 text-red-800'
-                          : 'bg-green-100 text-green-800'
+                        ? 'bg-red-100 text-red-800'
+                        : 'bg-green-100 text-green-800'
                         }`}
                     >
                       {period.status_display}
@@ -248,7 +248,7 @@ const InvoicePeriods: React.FC = () => {
                         type="number"
                         value={newPeriod.year}
                         onChange={(e) => setNewPeriod({ ...newPeriod, year: parseInt(e.target.value) })}
-                        className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-orange-500 focus:border-orange-500 sm:text-sm"
+                        className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
                         required
                       />
                     </div>
@@ -257,7 +257,7 @@ const InvoicePeriods: React.FC = () => {
                       <select
                         value={newPeriod.month}
                         onChange={(e) => setNewPeriod({ ...newPeriod, month: parseInt(e.target.value) })}
-                        className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-orange-500 focus:border-orange-500 sm:text-sm"
+                        className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
                         required
                       >
                         {[...Array(12)].map((_, i) => (
@@ -271,21 +271,21 @@ const InvoicePeriods: React.FC = () => {
                         type="date"
                         value={newPeriod.deadline_date}
                         onChange={(e) => setNewPeriod({ ...newPeriod, deadline_date: e.target.value })}
-                        className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-orange-500 focus:border-orange-500 sm:text-sm"
+                        className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
                         required
                       />
                     </div>
                     <div className="mt-5 sm:mt-6 sm:grid sm:grid-cols-2 sm:gap-3 sm:grid-flow-row-dense">
                       <button
                         type="submit"
-                        className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-orange-600 text-base font-medium text-white hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 sm:col-start-2 sm:text-sm"
+                        className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-primary-600 text-base font-medium text-white hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 sm:col-start-2 sm:text-sm"
                       >
                         作成
                       </button>
                       <button
                         type="button"
                         onClick={() => setShowNewPeriodForm(false)}
-                        className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 sm:mt-0 sm:col-start-1 sm:text-sm"
+                        className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 sm:mt-0 sm:col-start-1 sm:text-sm"
                       >
                         キャンセル
                       </button>
@@ -311,7 +311,7 @@ const InvoicePeriods: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => setShowUnsubmittedModal(false)}
-                    className="w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 sm:text-sm"
+                    className="w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 sm:text-sm"
                   >
                     閉じる
                   </button>

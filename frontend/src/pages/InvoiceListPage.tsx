@@ -14,7 +14,7 @@ const uniqueArray = <T,>(arr: T[]): T[] => {
 const InvoiceListPage: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
-  
+
   const [invoices, setInvoices] = useState<InvoiceListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -23,9 +23,9 @@ const InvoiceListPage: React.FC = () => {
   const [companyFilter, setCompanyFilter] = useState('all');
   const [currentPage, setCurrentPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
-  
+
   const [projects, setProjects] = useState<ConstructionSite[]>([]);
-  
+
   const itemsPerPage = 20;
 
   useEffect(() => {
@@ -42,7 +42,7 @@ const InvoiceListPage: React.FC = () => {
         page: currentPage,
         search: searchQuery || undefined,
       });
-      
+
       setInvoices(response.results || []);
       setTotalCount(response.count || 0);
     } catch (error) {
@@ -98,7 +98,7 @@ const InvoiceListPage: React.FC = () => {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'pending_approval': return 'bg-orange-100 text-orange-700 border-orange-200';
+      case 'pending_approval': return 'bg-primary-100 text-primary-700 border-primary-200';
       case 'approved': return 'bg-green-100 text-green-700 border-green-200';
       case 'paid': return 'bg-blue-100 text-blue-700 border-blue-200';
       case 'rejected': return 'bg-red-100 text-red-700 border-red-200';
@@ -110,10 +110,10 @@ const InvoiceListPage: React.FC = () => {
 
   // フィルタリング（クライアント側）
   const filteredInvoices = invoices.filter((invoice) => {
-    const matchesProject = projectFilter === 'all' || 
+    const matchesProject = projectFilter === 'all' ||
       invoice.construction_site_name_display === projectFilter ||
       invoice.project_name === projectFilter;
-    const matchesCompany = companyFilter === 'all' || 
+    const matchesCompany = companyFilter === 'all' ||
       invoice.customer_company_name === companyFilter;
     return matchesProject && matchesCompany;
   });
@@ -126,22 +126,22 @@ const InvoiceListPage: React.FC = () => {
   return (
     <Layout>
       <div className="max-w-7xl mx-auto px-4 py-8">
-      {/* ヘッダー */}
+        {/* ヘッダー */}
         <div className="mb-8 flex items-center justify-between">
-            <div>
+          <div>
             <h1 className="text-3xl font-bold text-gray-900 mb-2">請求書一覧</h1>
             <p className="text-gray-600">全ての請求書を管理</p>
-            </div>
-              {user?.user_type === 'customer' && (
-                <button
-                  onClick={() => navigate('/invoices/create')}
-              className="flex items-center space-x-2 px-6 py-3 bg-gradient-to-r from-orange-500 to-orange-600 text-white rounded-lg font-medium hover:from-orange-600 hover:to-orange-700 transition-all shadow-lg hover:shadow-xl"
-                >
+          </div>
+          {user?.user_type === 'customer' && (
+            <button
+              onClick={() => navigate('/invoices/create')}
+              className="flex items-center space-x-2 px-6 py-3 bg-gradient-to-r from-primary-500 to-primary-600 text-white rounded-lg font-medium hover:from-primary-600 hover:to-primary-700 transition-all shadow-lg hover:shadow-xl"
+            >
               <Plus size={20} />
               <span>新規作成</span>
-                </button>
-              )}
-            </div>
+            </button>
+          )}
+        </div>
 
         {/* フィルター */}
         <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
@@ -160,11 +160,11 @@ const InvoiceListPage: React.FC = () => {
                   onChange={(e) => setSearchQuery(e.target.value)}
                   onKeyPress={handleKeyPress}
                   placeholder="請求書番号、会社名で検索"
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                 />
                 <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-        </div>
-      </div>
+              </div>
+            </div>
 
             {/* ステータス */}
             <div>
@@ -175,7 +175,7 @@ const InvoiceListPage: React.FC = () => {
                   setStatusFilter(e.target.value);
                   setCurrentPage(1);
                 }}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
               >
                 <option value="all">すべて</option>
                 <option value="draft">下書き</option>
@@ -187,14 +187,14 @@ const InvoiceListPage: React.FC = () => {
                 <option value="rejected">却下</option>
               </select>
             </div>
-            
+
             {/* 工事現場 */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">工事現場</label>
               <select
                 value={projectFilter}
                 onChange={(e) => setProjectFilter(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
               >
                 <option value="all">すべて</option>
                 {projects.map((project) => (
@@ -211,7 +211,7 @@ const InvoiceListPage: React.FC = () => {
               <select
                 value={companyFilter}
                 onChange={(e) => setCompanyFilter(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
               >
                 <option value="all">すべて</option>
                 {uniqueCompanies.map((company) => (
@@ -224,12 +224,12 @@ const InvoiceListPage: React.FC = () => {
           </div>
           <div className="mt-4 flex items-center justify-between text-sm text-gray-600">
             <p>{filteredInvoices.length}件の請求書が見つかりました</p>
-                <button
+            <button
               onClick={clearFilters}
-              className="text-orange-600 hover:text-orange-700 font-medium"
-                >
+              className="text-primary-600 hover:text-primary-700 font-medium"
+            >
               フィルターをクリア
-                </button>
+            </button>
           </div>
         </div>
 
@@ -237,14 +237,14 @@ const InvoiceListPage: React.FC = () => {
         <div className="bg-white rounded-xl shadow-sm overflow-hidden">
           {loading ? (
             <div className="flex items-center justify-center py-12">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500"></div>
-          </div>
-        ) : (
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500"></div>
+            </div>
+          ) : (
             <>
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead className="bg-gray-50 border-b border-gray-200">
-                <tr>
+                    <tr>
                       <th className="text-left py-4 px-6 text-sm font-medium text-gray-600">請求書番号</th>
                       <th className="text-left py-4 px-6 text-sm font-medium text-gray-600">提出日</th>
                       <th className="text-left py-4 px-6 text-sm font-medium text-gray-600">協力会社</th>
@@ -252,29 +252,29 @@ const InvoiceListPage: React.FC = () => {
                       <th className="text-right py-4 px-6 text-sm font-medium text-gray-600">請求金額</th>
                       <th className="text-center py-4 px-6 text-sm font-medium text-gray-600">ステータス</th>
                       <th className="text-center py-4 px-6 text-sm font-medium text-gray-600">アクション</th>
-                </tr>
-              </thead>
+                    </tr>
+                  </thead>
                   <tbody className="divide-y divide-gray-100">
                     {filteredInvoices.length === 0 ? (
                       <tr>
                         <td colSpan={7} className="py-12 text-center text-gray-500">
                           <p className="text-lg mb-2">請求書が見つかりませんでした</p>
                           <p className="text-sm">検索条件を変更してください</p>
-                    </td>
+                        </td>
                       </tr>
                     ) : (
                       filteredInvoices.map((invoice) => (
-                        <tr 
-                          key={invoice.id} 
+                        <tr
+                          key={invoice.id}
                           className="hover:bg-gray-50 transition-colors cursor-pointer"
                           onClick={() => navigate(`/invoices/${invoice.id}`)}
                         >
                           <td className="py-4 px-6">
                             <span className="font-medium text-gray-900">{invoice.invoice_number}</span>
-                    </td>
+                          </td>
                           <td className="py-4 px-6 text-sm text-gray-600">
-                      {formatDate(invoice.invoice_date)}
-                    </td>
+                            {formatDate(invoice.invoice_date)}
+                          </td>
                           <td className="py-4 px-6 text-sm text-gray-900">
                             {invoice.customer_company_name}
                           </td>
@@ -283,30 +283,30 @@ const InvoiceListPage: React.FC = () => {
                           </td>
                           <td className="py-4 px-6 text-sm text-right font-medium text-gray-900">
                             {formatCurrency(invoice.total_amount)}
-                    </td>
+                          </td>
                           <td className="py-4 px-6 text-center">
                             <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium border ${getStatusColor(invoice.status)}`}>
-                        {invoice.status_display}
-                      </span>
-                    </td>
+                              {invoice.status_display}
+                            </span>
+                          </td>
                           <td className="py-4 px-6 text-center">
-                      <button
+                            <button
                               onClick={(e) => {
                                 e.stopPropagation();
                                 navigate(`/invoices/${invoice.id}`);
                               }}
                               className="inline-flex items-center space-x-1 text-blue-600 hover:text-blue-700 font-medium text-sm"
-                      >
+                            >
                               <Eye size={16} />
                               <span>詳細</span>
-                      </button>
-                    </td>
-                  </tr>
+                            </button>
+                          </td>
+                        </tr>
                       ))
                     )}
-              </tbody>
-            </table>
-          </div>
+                  </tbody>
+                </table>
+              </div>
 
               {/* ページネーション */}
               {totalCount > 0 && (
@@ -337,11 +337,10 @@ const InvoiceListPage: React.FC = () => {
                         <button
                           key={page}
                           onClick={() => setCurrentPage(page)}
-                          className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                            page === currentPage
-                              ? 'bg-orange-500 text-white'
+                          className={`px-4 py-2 rounded-lg font-medium transition-colors ${page === currentPage
+                              ? 'bg-primary-500 text-white'
                               : 'border border-gray-300 hover:bg-gray-50'
-                          }`}
+                            }`}
                         >
                           {page}
                         </button>
@@ -358,9 +357,9 @@ const InvoiceListPage: React.FC = () => {
                 </div>
               )}
             </>
-        )}
+          )}
+        </div>
       </div>
-    </div>
     </Layout>
   );
 };

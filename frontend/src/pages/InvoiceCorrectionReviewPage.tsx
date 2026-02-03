@@ -51,7 +51,7 @@ const InvoiceCorrectionReviewPage: React.FC = () => {
     try {
       setLoading(true);
       const data = await invoiceAPI.getPartnerView(id!);
-      
+
       // corrections が API から返ってこない場合、別途取得
       if (!data.corrections || data.corrections.length === 0) {
         try {
@@ -61,7 +61,7 @@ const InvoiceCorrectionReviewPage: React.FC = () => {
           data.corrections = [];
         }
       }
-      
+
       setInvoice(data);
     } catch (error) {
       console.error('Failed to fetch invoice:', error);
@@ -72,7 +72,7 @@ const InvoiceCorrectionReviewPage: React.FC = () => {
 
   const handleApprove = async () => {
     if (!id) return;
-    
+
     try {
       setProcessing(true);
       await invoiceAPI.approveCorrections(id);
@@ -92,7 +92,7 @@ const InvoiceCorrectionReviewPage: React.FC = () => {
       alert('問い合わせ内容を入力してください');
       return;
     }
-    
+
     try {
       setProcessing(true);
       await invoiceAPI.addComment(id!, inquiryMessage, 'correction', false);
@@ -121,7 +121,7 @@ const InvoiceCorrectionReviewPage: React.FC = () => {
     return (
       <Layout>
         <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500"></div>
         </div>
       </Layout>
     );
@@ -133,9 +133,9 @@ const InvoiceCorrectionReviewPage: React.FC = () => {
         <div className="max-w-4xl mx-auto px-4 py-8">
           <div className="text-center py-12">
             <p className="text-gray-500">請求書が見つかりません</p>
-            <button 
+            <button
               onClick={() => navigate('/invoices')}
-              className="mt-4 text-orange-600 hover:text-orange-700"
+              className="mt-4 text-primary-600 hover:text-primary-700"
             >
               請求書一覧に戻る
             </button>
@@ -152,7 +152,7 @@ const InvoiceCorrectionReviewPage: React.FC = () => {
       <div className="max-w-4xl mx-auto px-4 py-8">
         {/* 戻るボタン */}
         <div className="mb-6">
-          <button 
+          <button
             onClick={() => navigate(-1)}
             className="text-blue-600 hover:text-blue-700 mb-4 flex items-center space-x-1"
           >
@@ -160,25 +160,25 @@ const InvoiceCorrectionReviewPage: React.FC = () => {
             <span>戻る</span>
           </button>
           <div className="flex items-center space-x-3 mb-2">
-            <Edit3 size={32} className="text-orange-600" />
+            <Edit3 size={32} className="text-primary-600" />
             <h1 className="text-3xl font-bold text-gray-900">請求書の修正確認</h1>
           </div>
           <p className="text-gray-600">{invoice.invoice_number} - {invoice.customer_company_name}</p>
         </div>
 
         {/* 通知バナー */}
-        <div className="bg-orange-50 border-l-4 border-orange-500 p-6 mb-8 rounded-lg">
+        <div className="bg-primary-50 border-l-4 border-primary-500 p-6 mb-8 rounded-lg">
           <div className="flex items-start space-x-3">
-            <AlertCircle size={24} className="text-orange-600 flex-shrink-0 mt-1" />
+            <AlertCircle size={24} className="text-primary-600 flex-shrink-0 mt-1" />
             <div>
-              <h3 className="font-bold text-orange-900 text-lg mb-2">
+              <h3 className="font-bold text-primary-900 text-lg mb-2">
                 平野工務店より請求書の修正依頼が入りました
               </h3>
-              <p className="text-orange-800">
+              <p className="text-primary-800">
                 内容をご確認いただき、問題なければ「承認」をお願いいたします。
                 承認後、請求書は再度平野工務店の承認フローに進みます。
               </p>
-              <p className="text-orange-700 text-sm mt-2">
+              <p className="text-primary-700 text-sm mt-2">
                 ※ 修正内容に異議がある場合は「問い合わせ」からご連絡ください。
               </p>
             </div>
@@ -191,7 +191,7 @@ const InvoiceCorrectionReviewPage: React.FC = () => {
             <Edit3 size={24} className="text-red-600" />
             <span>修正内容</span>
           </h2>
-          
+
           {corrections.length === 0 ? (
             <p className="text-gray-500 text-center py-8">修正内容がありません</p>
           ) : (
@@ -209,12 +209,12 @@ const InvoiceCorrectionReviewPage: React.FC = () => {
                         <p className="text-gray-500 line-through text-lg">{correction.original_value}</p>
                       </div>
                     </div>
-                    
+
                     {/* 矢印 */}
                     <div className="flex justify-center">
                       <div className="text-3xl text-red-600 font-bold">↓</div>
                     </div>
-                    
+
                     {/* 修正後 */}
                     <div>
                       <p className="text-sm font-medium text-red-600 mb-2 flex items-center space-x-1">
@@ -228,7 +228,7 @@ const InvoiceCorrectionReviewPage: React.FC = () => {
                         </div>
                       </div>
                     </div>
-                    
+
                     {/* 修正理由 */}
                     <div className="bg-white p-4 rounded border border-red-200">
                       <p className="text-sm font-medium text-gray-700 mb-2">修正理由</p>
@@ -279,7 +279,7 @@ const InvoiceCorrectionReviewPage: React.FC = () => {
             </button>
             <button
               onClick={() => setShowInquiryDialog(true)}
-              className="w-full bg-gradient-to-r from-orange-500 to-orange-600 text-white py-4 rounded-lg font-bold text-lg hover:from-orange-600 hover:to-orange-700 transition-all shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 flex items-center justify-center space-x-2"
+              className="w-full bg-gradient-to-r from-primary-500 to-primary-600 text-white py-4 rounded-lg font-bold text-lg hover:from-primary-600 hover:to-primary-700 transition-all shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 flex items-center justify-center space-x-2"
             >
               <MessageSquare size={24} />
               <span>修正内容について問い合わせる</span>
@@ -331,13 +331,13 @@ const InvoiceCorrectionReviewPage: React.FC = () => {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full p-6">
             <div className="flex items-center space-x-3 mb-4">
-              <MessageSquare size={24} className="text-orange-600" />
+              <MessageSquare size={24} className="text-primary-600" />
               <h3 className="text-xl font-bold text-gray-900">修正内容について問い合わせ</h3>
             </div>
             <p className="text-gray-600 mb-4">
               修正内容についてご不明な点があればお知らせください。担当者より折り返しご連絡いたします。
             </p>
-            
+
             {/* 修正サマリー */}
             <div className="bg-gray-50 p-4 rounded-lg mb-4">
               <h4 className="font-medium text-gray-900 mb-2">修正内容サマリー</h4>
@@ -349,11 +349,11 @@ const InvoiceCorrectionReviewPage: React.FC = () => {
                 ))}
               </ul>
             </div>
-            
+
             <textarea
               value={inquiryMessage}
               onChange={(e) => setInquiryMessage(e.target.value)}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent resize-none"
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent resize-none"
               rows={5}
               placeholder={`問い合わせ内容を入力してください\n\n例：\n・請求金額が減額された理由をもう少し詳しく教えてください\n・工事期間の変更について確認させてください`}
             />
@@ -368,7 +368,7 @@ const InvoiceCorrectionReviewPage: React.FC = () => {
               <button
                 onClick={handleInquiry}
                 disabled={processing}
-                className="flex-1 px-4 py-3 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors font-bold disabled:opacity-50"
+                className="flex-1 px-4 py-3 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors font-bold disabled:opacity-50"
               >
                 {processing ? '送信中...' : '送信する'}
               </button>

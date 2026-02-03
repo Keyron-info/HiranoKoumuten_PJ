@@ -22,6 +22,8 @@ const SiteManagementPage: React.FC = () => {
         location: '',
         site_password: '',
         supervisor: '', // 🆕 Supervisor ID
+        special_access_password: '', // 🆕
+        special_access_expiry: '',   // 🆕
         is_active: true,
     });
 
@@ -68,6 +70,8 @@ const SiteManagementPage: React.FC = () => {
                 location: site.location,
                 site_password: site.site_password || '',
                 supervisor: site.supervisor ? String(site.supervisor) : '', // 🆕 Set ID
+                special_access_password: site.special_access_password || '',
+                special_access_expiry: site.special_access_expiry || '',
                 is_active: site.is_active,
             });
         } else {
@@ -77,6 +81,8 @@ const SiteManagementPage: React.FC = () => {
                 location: '',
                 site_password: '',
                 supervisor: '',
+                special_access_password: '',
+                special_access_expiry: '',
                 is_active: true,
             });
         }
@@ -126,7 +132,7 @@ const SiteManagementPage: React.FC = () => {
                     <h1 className="text-2xl font-bold text-gray-900">工事現場管理</h1>
                     <button
                         onClick={() => handleOpenModal()}
-                        className="bg-orange-500 text-white px-4 py-2 rounded-lg hover:bg-orange-600 transition"
+                        className="bg-primary-500 text-white px-4 py-2 rounded-lg hover:bg-primary-600 transition"
                     >
                         + 新規現場登録
                     </button>
@@ -195,7 +201,7 @@ const SiteManagementPage: React.FC = () => {
                                             required
                                             value={formData.name}
                                             onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                                            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-orange-500 focus:border-orange-500 sm:text-sm"
+                                            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
                                         />
                                     </div>
                                     <div>
@@ -203,7 +209,7 @@ const SiteManagementPage: React.FC = () => {
                                         <textarea
                                             value={formData.location}
                                             onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-                                            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-orange-500 focus:border-orange-500 sm:text-sm"
+                                            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
                                         />
                                     </div>
 
@@ -213,7 +219,7 @@ const SiteManagementPage: React.FC = () => {
                                         <select
                                             value={formData.supervisor}
                                             onChange={(e) => setFormData({ ...formData, supervisor: e.target.value })}
-                                            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-orange-500 focus:border-orange-500 sm:text-sm"
+                                            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
                                         >
                                             <option value="">選択してください</option>
                                             {supervisors.map(user => (
@@ -233,17 +239,42 @@ const SiteManagementPage: React.FC = () => {
                                                 value={formData.site_password}
                                                 onChange={(e) => setFormData({ ...formData, site_password: e.target.value })}
                                                 placeholder="パスワードを入力"
-                                                className="flex-1 min-w-0 block w-full px-3 py-2 rounded-none rounded-l-md border border-gray-300 focus:ring-orange-500 focus:border-orange-500 sm:text-sm"
+                                                className="flex-1 min-w-0 block w-full px-3 py-2 rounded-none rounded-l-md border border-gray-300 focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
                                             />
                                             <button
                                                 type="button"
                                                 onClick={generatePassword}
-                                                className="-ml-px relative inline-flex items-center space-x-2 px-4 py-2 border border-gray-300 text-sm font-medium rounded-r-md text-gray-700 bg-gray-50 hover:bg-gray-100 focus:outline-none focus:ring-1 focus:ring-orange-500 focus:border-orange-500"
+                                                className="-ml-px relative inline-flex items-center space-x-2 px-4 py-2 border border-gray-300 text-sm font-medium rounded-r-md text-gray-700 bg-gray-50 hover:bg-gray-100 focus:outline-none focus:ring-1 focus:ring-primary-500 focus:border-primary-500"
                                             >
                                                 自動生成
                                             </button>
                                         </div>
-                                        <p className="mt-1 text-xs text-gray-500">協力会社に共有するパスワードです。</p>
+                                    </div>
+
+                                    {/* 🆕 特例パスワード設定 */}
+                                    <div className="bg-yellow-50 p-3 rounded-md border border-yellow-200">
+                                        <h4 className="text-sm font-medium text-yellow-800 mb-2">特例請求設定</h4>
+                                        <div className="space-y-3">
+                                            <div>
+                                                <label className="block text-xs font-medium text-yellow-700">特例用パスワード</label>
+                                                <input
+                                                    type="text"
+                                                    value={formData.special_access_password}
+                                                    onChange={(e) => setFormData({ ...formData, special_access_password: e.target.value })}
+                                                    placeholder="締め日後の請求用"
+                                                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-yellow-500 focus:border-yellow-500 sm:text-sm"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-xs font-medium text-yellow-700">特例有効期限</label>
+                                                <input
+                                                    type="date"
+                                                    value={formData.special_access_expiry}
+                                                    onChange={(e) => setFormData({ ...formData, special_access_expiry: e.target.value })}
+                                                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-yellow-500 focus:border-yellow-500 sm:text-sm"
+                                                />
+                                            </div>
+                                        </div>
                                     </div>
 
                                     <div className="flex items-center">
@@ -252,7 +283,7 @@ const SiteManagementPage: React.FC = () => {
                                             type="checkbox"
                                             checked={formData.is_active}
                                             onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
-                                            className="h-4 w-4 text-orange-600 focus:ring-orange-500 border-gray-300 rounded"
+                                            className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
                                         />
                                         <label htmlFor="is_active" className="ml-2 block text-sm text-gray-900">
                                             有効（一覧に表示）
@@ -264,14 +295,14 @@ const SiteManagementPage: React.FC = () => {
                                 <button
                                     type="button"
                                     onClick={handleSubmit}
-                                    className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-orange-600 text-base font-medium text-white hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 sm:col-start-2 sm:text-sm"
+                                    className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-primary-600 text-base font-medium text-white hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 sm:col-start-2 sm:text-sm"
                                 >
                                     保存
                                 </button>
                                 <button
                                     type="button"
                                     onClick={() => setShowModal(false)}
-                                    className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 sm:mt-0 sm:col-start-1 sm:text-sm"
+                                    className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 sm:mt-0 sm:col-start-1 sm:text-sm"
                                 >
                                     キャンセル
                                 </button>

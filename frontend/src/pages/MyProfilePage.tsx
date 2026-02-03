@@ -165,7 +165,7 @@ const MyProfilePage: React.FC = () => {
                         {!showPasswordForm && (
                             <button
                                 onClick={() => setShowPasswordForm(true)}
-                                className="px-4 py-2 bg-orange-600 text-white text-sm font-medium rounded-lg hover:bg-orange-700 transition-colors"
+                                className="px-4 py-2 bg-primary-600 text-white text-sm font-medium rounded-lg hover:bg-primary-700 transition-colors"
                             >
                                 パスワードを変更
                             </button>
@@ -193,7 +193,7 @@ const MyProfilePage: React.FC = () => {
                                             type={showPasswords.current ? 'text' : 'password'}
                                             value={passwordData.current_password}
                                             onChange={(e) => setPasswordData({ ...passwordData, current_password: e.target.value })}
-                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                                             required
                                         />
                                         <button
@@ -215,7 +215,7 @@ const MyProfilePage: React.FC = () => {
                                             type={showPasswords.new ? 'text' : 'password'}
                                             value={passwordData.new_password}
                                             onChange={(e) => setPasswordData({ ...passwordData, new_password: e.target.value })}
-                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                                             required
                                             minLength={8}
                                         />
@@ -239,7 +239,7 @@ const MyProfilePage: React.FC = () => {
                                             type={showPasswords.confirm ? 'text' : 'password'}
                                             value={passwordData.new_password_confirm}
                                             onChange={(e) => setPasswordData({ ...passwordData, new_password_confirm: e.target.value })}
-                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                                             required
                                         />
                                         <button
@@ -256,7 +256,7 @@ const MyProfilePage: React.FC = () => {
                                     <button
                                         type="submit"
                                         disabled={isSubmitting}
-                                        className="px-4 py-2 bg-orange-600 text-white font-medium rounded-lg hover:bg-orange-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                        className="px-4 py-2 bg-primary-600 text-white font-medium rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                                     >
                                         {isSubmitting ? '変更中...' : 'パスワードを変更'}
                                     </button>

@@ -731,7 +731,7 @@ class InvoiceViewSet(viewsets.ModelViewSet):
                             month=month
                         ).first()
                         
-                        if period and period.is_closed and not request.user.is_super_admin:
+                        if period and period.is_closed and not request.user.is_super_admin and not is_bypassed:
                             return Response(
                                 {
                                     'error': f'{period.period_name}は既に締め切られています',

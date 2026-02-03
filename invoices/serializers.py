@@ -384,13 +384,16 @@ class InvoiceCreateSerializer(serializers.ModelSerializer):
     items = InvoiceItemSerializer(many=True)
     # 🆕 現場パスワード（フォームから受け取る用、DB保存なし）
     site_password = serializers.CharField(write_only=True, required=False, allow_blank=True)
+    # 🆕 特例パスワード（期限バイパス用）
+    special_password = serializers.CharField(write_only=True, required=False, allow_blank=True)
     
     class Meta:
         model = Invoice
         fields = [
             'construction_site', 'project_name', 'invoice_date',
             'payment_due_date', 'notes', 'items',
-            'site_password', # 🆕
+            'site_password', 
+            'special_password', # 🆕 特例パスワード
             # Phase 3追加フィールド
             'document_type', 'construction_type', 'construction_type_other',
             'purchase_order',
@@ -466,7 +469,18 @@ class InvoiceCreateSerializer(serializers.ModelSerializer):
         # 今日が締め日より後なら、請求月を翌月に設定させるか、ブロックするか。
         # ユーザー要件：「例外設定以外の時は変更できないように」 -> 今日が遅れていたらブロックでOK
         
-        if today > deadline_date:
+        # 🆕 特例パスワードによるバイパスチェック
+        special_password = attrs.get('special_password')
+        is_bypassed = False
+        construction_site_obj = attrs.get('construction_site')
+        
+        if construction_site_obj and special_password:
+            # 特例パスワードが一致し、期限内であればバイパス
+            if construction_site_obj.special_access_password == special_password:
+                if not construction_site_obj.special_access_expiry or today <= construction_site_obj.special_access_expiry:
+                    is_bypassed = True
+        
+        if today > deadline_date and not is_bypassed:
             # ただし、請求日が「翌月」になっているなら許可する運用もあり得る
             # ここではシンプルに「締め日過ぎたら今月分の作成は不可」とする
             # もし「翌月分として作成」を許容するなら、invoice_dateをチェックすべき
@@ -477,9 +491,7 @@ class InvoiceCreateSerializer(serializers.ModelSerializer):
             # 請求日が締め日より後（来月扱い）ならOK
             
             if invoice_date <= deadline_date: # 締め日以前の日付で、締め日過ぎてから出そうとしている -> 完全に遅延
-                raise serializers.ValidationError(f"今月の締め日（{deadline_date.strftime('%m/%d')}）を過ぎているため、今月分の請求書は作成できません。")
-                
-                raise serializers.ValidationError(f"今月の締め日（{deadline_date.strftime('%m/%d')}）を過ぎているため、今月分の請求書は作成できません。")
+                raise serializers.ValidationError(f"今月の締め日（{deadline_date.strftime('%m/%d')}）を過ぎているため、今月分の請求書は作成できません。特例パスワードをお持ちの場合は入力してください。")
                 
         return attrs
 
@@ -491,6 +503,7 @@ class InvoiceCreateSerializer(serializers.ModelSerializer):
         """
         items_data = validated_data.pop('items', [])
         site_password = validated_data.pop('site_password', None) # 不要なフィールドを除外
+        special_password = validated_data.pop('special_password', None) # 不要なフィールドを除外
         
         # Invoice作成
         invoice = Invoice.objects.create(**validated_data)

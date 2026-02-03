@@ -677,9 +677,26 @@ class InvoiceViewSet(viewsets.ModelViewSet):
         """請求書作成（期間チェック付き）"""
         
         # 1.2 月次締め処理のチェック（毎月25日締め、翌月1日以降は前月分制限）
+        # 特例パスワードの取得
+        special_password = request.data.get('special_password')
+
         if request.user.user_type == 'customer':
             invoice_date = request.data.get('invoice_date')
-            if invoice_date:
+            construction_site_id = request.data.get('construction_site')
+            
+            # 特例パスワードバイパスのチェック
+            is_bypassed = False
+            if construction_site_id and special_password:
+                try:
+                    site_for_auth = ConstructionSite.objects.get(id=construction_site_id)
+                    if site_for_auth.special_access_password and special_password == site_for_auth.special_access_password:
+                        # 期限チェック
+                        if not site_for_auth.special_access_expiry or timezone.now().date() <= site_for_auth.special_access_expiry:
+                            is_bypassed = True
+                except ConstructionSite.DoesNotExist:
+                    pass
+
+            if invoice_date and not is_bypassed:
                 try:
                     date_obj = datetime.strptime(invoice_date, '%Y-%m-%d').date()
                     year, month = date_obj.year, date_obj.month
@@ -694,7 +711,8 @@ class InvoiceViewSet(viewsets.ModelViewSet):
                                 return Response(
                                     {
                                         'error': f'{year}年{month}月分の請求書は作成できません',
-                                        'detail': '月が変わると前月分の請求書は作成できなくなります。管理者にお問い合わせください。'
+                                        'detail': '月が変わると前月分の請求書は作成できなくなります。特例パスワードをお持ちの場合は入力してください。',
+                                        'code': 'past_month_restriction'
                                     },
                                     status=status.HTTP_400_BAD_REQUEST
                                 )
@@ -717,7 +735,8 @@ class InvoiceViewSet(viewsets.ModelViewSet):
                             return Response(
                                 {
                                     'error': f'{period.period_name}は既に締め切られています',
-                                    'detail': '請求書の作成はできません。経理部門にお問い合わせください。'
+                                    'detail': '請求書の作成はできません。特例パスワードをお持ちの場合は入力してください。',
+                                    'code': 'period_closed' 
                                 },
                                 status=status.HTTP_400_BAD_REQUEST
                             )

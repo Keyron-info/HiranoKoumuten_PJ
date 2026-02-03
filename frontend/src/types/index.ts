@@ -56,6 +56,8 @@ export interface ConstructionSite {
   supervisor: string | null;
   supervisor_name: string | null;
   site_password?: string;
+  special_access_password?: string; // 🆕
+  special_access_expiry?: string;   // 🆕
   is_active: boolean;
   created_at: string;
 }
@@ -205,6 +207,7 @@ export interface InvoiceCreateForm {
   payment_due_date: string;
   notes: string;
   items: InvoiceItem[];
+  special_password?: string; // 🆕
 }
 
 // ダッシュボード統計型（社内ユーザー）
@@ -496,6 +499,7 @@ export interface InvoiceCreateFormExtended extends InvoiceCreateForm {
   construction_type: number | null;
   construction_type_other: string;
   purchase_order: number | null;
+  special_password?: string; // 🆕
 }
 
 // 金額照合結果の色

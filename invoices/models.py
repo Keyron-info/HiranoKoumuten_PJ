@@ -312,9 +312,9 @@ class User(AbstractUser):
         ('managing_director', '常務取締役'),
         ('senior_managing_director', '専務取締役'),
         ('president', '代表取締役社長'),
-        ('accountant', '経理担当'),
+        ('accountant', '総務部 経理担当'),
         ('director', '取締役'),
-        ('manager', '部長'),
+        # 部長は削除
         ('supervisor', '課長'),
         ('staff', '一般社員'),
         ('admin', 'システム管理者'),
@@ -471,6 +471,22 @@ class ConstructionSite(models.Model):
         null=True,
         verbose_name="現場パスワード",
         help_text="協力会社が請求書を作成する際に入力するパスワード"
+    )
+
+    # 🆕 特例請求用パスワード（期限切れ後も作成可能にする）
+    special_access_password = models.CharField(
+        max_length=50,
+        blank=True,
+        null=True,
+        verbose_name="特例請求用パスワード",
+        help_text="締め日過ぎても請求書を作成できるようにするためのパスワード"
+    )
+    
+    special_access_expiry = models.DateField(
+        null=True, 
+        blank=True,
+        verbose_name="特例有効期限",
+        help_text="この日付までは特例パスワードが有効"
     )
     
     # 🆕 工種

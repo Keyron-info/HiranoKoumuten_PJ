@@ -1727,11 +1727,39 @@ class MonthlyInvoicePeriod(models.Model):
         return True, None
 
     def close_period(self, user):
-        """期間を締める"""
+        """期間を締める - 提出済み請求書を一斉に承認待ちへ"""
         self.is_closed = True
         self.closed_by = user
         self.closed_at = timezone.now()
         self.save()
+
+        # Batch Approval Logic: "submitted" -> "pending_approval"
+        # Invoice IS defined before MonthlyInvoicePeriod in this file, so we can use it directly.
+        
+        # Find all submitted invoices for this period's company
+        invoices = Invoice.objects.filter(
+            receiving_company=self.company,
+            status='submitted'
+        )
+        
+        processed_count = 0
+        for invoice in invoices:
+            if invoice.construction_site and invoice.construction_site.supervisor:
+                invoice.status = 'pending_approval'
+                invoice.current_approver = invoice.construction_site.supervisor
+                invoice.save()
+                
+                # History log
+                ApprovalHistory.objects.create(
+                    invoice=invoice,
+                    user=user, # The user who closed the period
+                    action='submitted', # Reuse submitted or use a new one. Let's use 'submitted' to imply it's now properly submitted to flow.
+                    comment='締め処理により承認フローが開始されました'
+                )
+                processed_count += 1
+                
+        return processed_count
+
 
     def reopen_period(self):
         """期間を再開する"""

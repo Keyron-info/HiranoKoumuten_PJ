@@ -941,14 +941,7 @@ class InvoiceViewSet(viewsets.ModelViewSet):
 
         # 承認ルートを設定
         invoice.approval_route = approval_route
-        
-        # 現在の承認ステップと承認者を設定
         invoice.current_approval_step = first_step
-        invoice.current_approver = invoice.construction_site.supervisor
-        
-        # ステータスを「承認待ち」に変更
-        invoice.status = 'pending_approval'
-        invoice.save()
         
         # 提出履歴を記録
         ApprovalHistory.objects.create(
@@ -957,15 +950,22 @@ class InvoiceViewSet(viewsets.ModelViewSet):
             action='submitted',
             comment='請求書を提出しました'
         )
-        
-        # 通知メール送信（コンソール出力）
-        self._send_notification_email(
-            recipient=invoice.current_approver,
-            subject=f'【請求書承認依頼】{invoice.invoice_number}',
-            message=f'''
+
+        # ステータスと通知の分岐
+        if invoice.is_created_with_special_access:
+            # 特例: 即座に承認待ちへ
+            invoice.status = 'pending_approval'
+            invoice.current_approver = invoice.construction_site.supervisor
+            invoice.save()
+            
+            # 通知メール送信（即時）
+            self._send_notification_email(
+                recipient=invoice.current_approver,
+                subject=f'【特例・請求書承認依頼】{invoice.invoice_number}',
+                message=f'''
 {invoice.current_approver.get_full_name()} 様
 
-請求書の承認依頼が届いています。
+特例パスワードを使用して作成された請求書の承認依頼が届いています。
 
 請求書番号: {invoice.invoice_number}
 協力会社: {invoice.customer_company.name}
@@ -973,16 +973,18 @@ class InvoiceViewSet(viewsets.ModelViewSet):
 金額: ¥{invoice.total_amount:,}
 
 システムにログインして確認してください。
-            '''.strip()
-        )
+'''.strip()
+            )
+            message = '請求書を提出しました。承認をお待ちください（特例承認）。'
+        else:
+            # 通常: 提出済み（一括承認待ち）ステータスへ
+            invoice.status = 'submitted'
+            invoice.current_approver = None # まだ誰の承認待ちでもない
+            invoice.save()
+            message = '請求書を提出しました。締日まで一時保管されます。'
         
         return Response({
-            'message': '請求書を提出しました。承認をお待ちください。',
-            'invoice': InvoiceSerializer(invoice).data
-        })
-    
-        return Response({
-            'message': '請求書を提出しました。承認をお待ちください。',
+            'message': message,
             'invoice': InvoiceSerializer(invoice).data
         })
     

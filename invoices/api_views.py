@@ -768,7 +768,7 @@ class InvoiceViewSet(viewsets.ModelViewSet):
             if is_bypassed:
                 serializer.validated_data['is_created_with_special_access'] = True
                 
-            invoice = serializer.save()
+            invoice = serializer.save(created_by=request.user)
             
             # アクセスログ記録
             AccessLog.log(

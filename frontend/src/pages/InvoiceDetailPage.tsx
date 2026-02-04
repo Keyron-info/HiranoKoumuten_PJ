@@ -538,7 +538,7 @@ const InvoiceDetailPage: React.FC = () => {
                   </div>
                 </div>
               </div>
-            ) : isInternalUser && invoice.status === 'pending_approval' && (user?.id === invoice.current_approver || user?.position === 'accountant' || user?.user_type === 'admin') ? (
+            ) : isInternalUser && invoice.status === 'pending_approval' && (Number(user?.id) === invoice.current_approver || user?.position === 'accountant' || user?.user_type === 'admin') ? (
               // 平野工務店ユーザー & 承認待ち & (現在の承認者 OR 経理 OR 管理者): 承認・差し戻し・却下ボタン
               <div className="bg-white rounded-xl shadow-sm p-6">
                 <h2 className="text-xl font-bold text-gray-900 mb-6">承認アクション</h2>

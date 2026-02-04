@@ -767,8 +767,21 @@ class InvoiceViewSet(viewsets.ModelViewSet):
             # 特例フラグを設定して保存
             if is_bypassed:
                 serializer.validated_data['is_created_with_special_access'] = True
+            
+            # 保存時の追加パラメータを準備
+            save_kwargs = {'created_by': request.user}
+            
+            # 協力会社ユーザーの場合、会社情報を自動設定
+            if request.user.user_type == 'customer':
+                save_kwargs['customer_company'] = request.user.customer_company
                 
-            invoice = serializer.save(created_by=request.user)
+                # 受取企業（自社）を設定
+                # Note: 複数の自社がある場合はロジック要検討だが、基本は1つ
+                receiving_company = Company.objects.first()
+                if receiving_company:
+                    save_kwargs['receiving_company'] = receiving_company
+                
+            invoice = serializer.save(**save_kwargs)
             
             # アクセスログ記録
             AccessLog.log(

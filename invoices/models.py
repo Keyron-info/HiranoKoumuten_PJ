@@ -786,6 +786,13 @@ class Invoice(models.Model):
         verbose_name="書類タイプ"
     )
     
+    # 🆕 特例パスワードによる作成フラグ（提出制限バイパス用）
+    is_created_with_special_access = models.BooleanField(
+        default=False,
+        verbose_name="特例作成",
+        help_text="特例パスワードを使用して作成されたかどうか"
+    )
+    
     # 関連会社
     customer_company = models.ForeignKey(
         CustomerCompany,

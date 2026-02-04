@@ -763,6 +763,11 @@ class InvoiceViewSet(viewsets.ModelViewSet):
             # 既存の作成処理を実行
             serializer = self.get_serializer(data=request.data)
             serializer.is_valid(raise_exception=True)
+            
+            # 特例フラグを設定して保存
+            if is_bypassed:
+                serializer.validated_data['is_created_with_special_access'] = True
+                
             invoice = serializer.save()
             
             # アクセスログ記録
@@ -866,14 +871,15 @@ class InvoiceViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        # 提出期間チェック (毎月15日以降)
-        # 提出期間チェック (毎月15日以降) -> 一旦無効化（「作成できない」との報告のため、警告のみまたはスルー）
-        # today = timezone.now().date()
-        # if today.day < 15 and not request.user.is_super_admin:
-        #      return Response(
-        #         {'error': '請求書の提出は毎月15日以降から可能です'},
-        #         status=status.HTTP_400_BAD_REQUEST
-        #     )
+        # 提出期間チェック (毎月15日-25日)
+        # 特例パスワードで作成された請求書は制限をバイパス
+        if not invoice.is_created_with_special_access:
+            today = timezone.now().date()
+            if (today.day < 15 or today.day > 25) and not request.user.is_super_admin:
+                 return Response(
+                    {'error': '請求書の提出は毎月15日から25日の間のみ可能です'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
 
         # 現場監督の確認
         if not invoice.construction_site.supervisor:

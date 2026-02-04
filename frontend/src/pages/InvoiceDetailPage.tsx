@@ -171,6 +171,23 @@ const InvoiceDetailPage: React.FC = () => {
     }
   };
 
+  const handleSubmit = async () => {
+    if (!id) return;
+    if (!window.confirm('請求書を提出します。よろしいですか？')) {
+      return;
+    }
+    try {
+      setProcessing(true);
+      await invoiceAPI.submitInvoice(id);
+      alert('請求書を提出しました');
+      fetchInvoice();
+    } catch (error: any) {
+      alert(error.response?.data?.error || '提出に失敗しました');
+    } finally {
+      setProcessing(false);
+    }
+  };
+
   const handleDownloadPdf = async () => {
     if (!canDownloadPdf) {
       alert('PDFダウンロード権限がありません。経理部門にお問い合わせください。');
@@ -310,9 +327,9 @@ const InvoiceDetailPage: React.FC = () => {
             <div>
               <h1 className="text-3xl font-bold text-gray-900 mb-2">{invoice.invoice_number}</h1>
               <span className={`inline-block px-4 py-2 rounded-lg text-sm font-medium border ${invoice.status === 'pending_approval' ? 'bg-primary-100 text-primary-700 border-primary-200' :
-                  invoice.status === 'approved' ? 'bg-green-100 text-green-700 border-green-200' :
-                    invoice.status === 'returned' ? 'bg-red-100 text-red-700 border-red-200' :
-                      'bg-gray-100 text-gray-700 border-gray-200'
+                invoice.status === 'approved' ? 'bg-green-100 text-green-700 border-green-200' :
+                  invoice.status === 'returned' ? 'bg-red-100 text-red-700 border-red-200' :
+                    'bg-gray-100 text-gray-700 border-gray-200'
                 }`}>
                 {invoice.status_display}
               </span>
@@ -321,8 +338,8 @@ const InvoiceDetailPage: React.FC = () => {
               onClick={handleDownloadPdf}
               disabled={!canDownloadPdf}
               className={`flex items-center space-x-2 px-4 py-2 border rounded-lg transition-colors ${canDownloadPdf
-                  ? 'bg-white border-gray-300 hover:bg-gray-50'
-                  : 'bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed'
+                ? 'bg-white border-gray-300 hover:bg-gray-50'
+                : 'bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed'
                 }`}
               title={canDownloadPdf ? 'PDFをダウンロード' : 'PDFダウンロード権限がありません'}
             >
@@ -486,7 +503,20 @@ const InvoiceDetailPage: React.FC = () => {
           {/* サイドバー */}
           <div className="space-y-6">
             {/* アクションボタン */}
-            {isPartnerUser && isReturned ? (
+            {isPartnerUser && invoice.status === 'draft' ? (
+              // 協力会社ユーザー & 下書き状態: 提出ボタン
+              <div className="bg-white rounded-xl shadow-sm p-6">
+                <h2 className="text-xl font-bold text-gray-900 mb-6">アクション</h2>
+                <button
+                  onClick={handleSubmit}
+                  disabled={processing}
+                  className="w-full bg-gradient-to-r from-blue-500 to-blue-600 text-white py-4 rounded-lg font-bold text-lg hover:from-blue-600 hover:to-blue-700 transition-all shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 flex items-center justify-center space-x-2 disabled:opacity-50"
+                >
+                  <CheckCircle size={24} />
+                  <span>{processing ? '処理中...' : '提出する'}</span>
+                </button>
+              </div>
+            ) : isPartnerUser && isReturned ? (
               // 協力会社ユーザー & 差し戻し状態: 承認ボタンのみ
               <div className="bg-white rounded-xl shadow-sm p-6">
                 <h2 className="text-xl font-bold text-gray-900 mb-6">アクション</h2>
@@ -553,10 +583,10 @@ const InvoiceDetailPage: React.FC = () => {
                       )}
                       <div className="flex items-start space-x-3">
                         <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${history.action === 'approved' || history.action === 'submitted'
-                            ? 'bg-green-100 text-green-600'
-                            : history.action === 'returned' || history.action === 'rejected'
-                              ? 'bg-red-100 text-red-600'
-                              : 'bg-primary-100 text-primary-600'
+                          ? 'bg-green-100 text-green-600'
+                          : history.action === 'returned' || history.action === 'rejected'
+                            ? 'bg-red-100 text-red-600'
+                            : 'bg-primary-100 text-primary-600'
                           }`}>
                           {getStatusIcon(history.action)}
                         </div>
@@ -580,10 +610,10 @@ const InvoiceDetailPage: React.FC = () => {
                       )}
                       <div className="flex items-start space-x-3">
                         <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${step.status === 'completed'
-                            ? 'bg-green-100 text-green-600'
-                            : step.status === 'pending'
-                              ? 'bg-primary-100 text-primary-600'
-                              : 'bg-gray-100 text-gray-400'
+                          ? 'bg-green-100 text-green-600'
+                          : step.status === 'pending'
+                            ? 'bg-primary-100 text-primary-600'
+                            : 'bg-gray-100 text-gray-400'
                           }`}>
                           {step.status === 'completed' ? (
                             <CheckCircle size={18} />

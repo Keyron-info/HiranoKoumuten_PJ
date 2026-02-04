@@ -910,17 +910,18 @@ class InvoiceViewSet(viewsets.ModelViewSet):
             (5, '経理確認', 'accountant'),
         ]
         
-        # 既存または新規ルートの確保
-        route_name = f"Strict Approval Flow ({invoice.receiving_company.name})"
-        approval_route, _ = ApprovalRoute.objects.get_or_create(
+        # 承認ルートの作成
+        # 注: 以前は会社共通のルートを使い回していましたが、現場監督が異なるため
+        # 請求書ごとに個別のルートを作成するように変更しました（上書き防止）
+        route_name = f"Approval Flow for {invoice.invoice_number}"
+        approval_route = ApprovalRoute.objects.create(
             company=invoice.receiving_company,
             name=route_name,
-            defaults={'description': '現場監督→常務→専務→社長→経理', 'is_default': True}
+            description=f'請求書 {invoice.invoice_number} 専用の承認ルート',
+            is_default=False
         )
         
-        # ステップの再構築 (既存ステップをクリアして再作成)
-        approval_route.steps.all().delete()
-        
+        # ステップの作成
         first_step = None
         for order, name, position in step_definitions:
             user_to_assign = None

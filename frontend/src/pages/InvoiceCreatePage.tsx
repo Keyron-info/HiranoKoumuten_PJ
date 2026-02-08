@@ -297,7 +297,6 @@ const InvoiceCreatePage: React.FC = () => {
         construction_type: selectedConstructionType,
         construction_type_other: constructionTypeOther,
         purchase_order: selectedPurchaseOrder,
-        special_password: formData.special_password, // 🆕
       };
       const invoice = await invoiceAPI.createInvoice(submitData as any);
 
@@ -383,27 +382,7 @@ const InvoiceCreatePage: React.FC = () => {
             </div>
           )}
 
-          {/* 🆕 特例パスワード入力 (エラー発生時などに表示) */}
-          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-            <details className="group">
-              <summary className="flex items-center gap-2 font-medium text-yellow-900 cursor-pointer">
-                <span className="text-xl">🔑</span>
-                特例パスワードをお持ちの方はこちら
-                <span className="ml-auto text-sm text-yellow-700 group-open:rotate-180 transition-transform">▼</span>
-              </summary>
-              <div className="mt-4 pl-8">
-                <p className="text-sm text-yellow-800 mb-2">
-                  締め日を過ぎている場合や、特例での請求書作成が必要な場合は、会社から発行されたパスワードを入力してください。
-                </p>
-                <input
-                  type="password"
-                  placeholder="特例パスワード"
-                  className="w-full md:w-1/2 px-3 py-2 border border-yellow-300 rounded-md focus:outline-none focus:ring-2 focus:ring-yellow-500"
-                  onChange={(e) => setFormData(prev => ({ ...prev, special_password: e.target.value }))}
-                />
-              </div>
-            </details>
-          </div>
+
 
           {/* 基本情報カード */}
           <div className="bg-white p-6 rounded-lg shadow">

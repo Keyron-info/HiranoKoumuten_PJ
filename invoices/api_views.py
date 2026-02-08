@@ -870,6 +870,50 @@ class InvoiceViewSet(viewsets.ModelViewSet):
         return response
     
     @action(detail=True, methods=['post'])
+    def verify_special_password(self, request, pk=None):
+        """
+        特例パスワードの検証
+        - 提出前に現場の特例パスワードを検証
+        - 有効期限もチェック
+        """
+        invoice = self.get_object()
+        password = request.data.get('special_password')
+        
+        if not password:
+            return Response(
+                {'valid': False, 'error': 'パスワードが入力されていません'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        site = invoice.construction_site
+        if not site:
+            return Response(
+                {'valid': False, 'error': '工事現場が設定されていません'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        if not site.special_access_password:
+            return Response(
+                {'valid': False, 'error': 'この現場には特例パスワードが設定されていません'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        if password != site.special_access_password:
+            return Response(
+                {'valid': False, 'error': 'パスワードが正しくありません'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # 有効期限チェック
+        if site.special_access_expiry and timezone.now().date() > site.special_access_expiry:
+            return Response(
+                {'valid': False, 'error': '特例パスワードの有効期限が切れています'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        return Response({'valid': True, 'message': '認証成功'})
+    
+    @action(detail=True, methods=['post'])
     def submit(self, request, pk=None):
         """
         請求書を提出
@@ -907,26 +951,43 @@ class InvoiceViewSet(viewsets.ModelViewSet):
             )
         
         # 提出期間チェック (毎月15日-25日)
-        # 特例パスワードで作成された請求書は制限をバイパス
-        if not invoice.is_created_with_special_access:
-            today = timezone.now().date()
-            if (today.day < 15 or today.day > 25) and not request.user.is_super_admin:
-                 return Response(
-                    {
-                        'error': '請求書の提出は毎月15日から25日の間のみ可能です',
-                        'detail': f'現在は{today.month}月{today.day}日です。特例パスワードで作成された請求書は期間外でも提出できます。',
-                        'current_date': str(today),
-                        'special_access_used': invoice.is_created_with_special_access
-                    },
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-
-        # 現場監督の確認
-        if not invoice.construction_site.supervisor:
-            return Response(
-                {'error': 'この工事現場には現場監督が設定されていません。システム管理者にお問い合わせください。'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+        # 特例パスワードが提供された場合は検証してバイパス
+        special_password = request.data.get('special_password')
+        today = timezone.now().date()
+        period_valid = (15 <= today.day <= 25)
+        
+        if not period_valid and not request.user.is_super_admin:
+            # 特例パスワードがある場合はバリデーション
+            if special_password:
+                site = invoice.construction_site
+                if not site.special_access_password:
+                    return Response({
+                        'error': 'この現場には特例パスワードが設定されていません',
+                        'code': 'no_special_password'
+                    }, status=status.HTTP_400_BAD_REQUEST)
+                
+                if special_password != site.special_access_password:
+                    return Response({
+                        'error': '特例パスワードが正しくありません',
+                        'code': 'invalid_special_password'
+                    }, status=status.HTTP_400_BAD_REQUEST)
+                
+                # 有効期限チェック
+                if site.special_access_expiry and timezone.now().date() > site.special_access_expiry:
+                    return Response({
+                        'error': '特例パスワードの有効期限が切れています',
+                        'code': 'special_password_expired'
+                    }, status=status.HTTP_400_BAD_REQUEST)
+                
+                # 特例パスワード認証成功 → 期間チェックをバイパス
+            else:
+                # 特例パスワードがない場合はエラー
+                return Response({
+                    'error': '請求書の提出は毎月15日から25日の間のみ可能です',
+                    'detail': f'現在は{today.month}月{today.day}日です。期間外に提出するには特例パスワードが必要です。',
+                    'code': 'outside_submission_period',
+                    'requires_special_password': True
+                }, status=status.HTTP_400_BAD_REQUEST)
         
         # 厳格な承認フローの構築 (Supervisor -> Managing Director -> Senior Managing Director -> President -> Accountant)
         step_definitions = [

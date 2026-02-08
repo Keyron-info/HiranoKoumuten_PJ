@@ -174,16 +174,44 @@ const InvoiceDetailPage: React.FC = () => {
 
   const handleSubmit = async () => {
     if (!id) return;
-    if (!window.confirm('請求書を提出します。よろしいですか？')) {
-      return;
-    }
+
     try {
       setProcessing(true);
+
+      // まず特例パスワードなしで試す
       await invoiceAPI.submitInvoice(id);
       alert('請求書を提出しました');
       fetchInvoice();
     } catch (error: any) {
-      alert(error.response?.data?.error || '提出に失敗しました');
+      const errorData = error.response?.data;
+
+
+      // 期間外エラー、かつ特例パスワードが必要な場合
+      if (errorData?.code === 'outside_submission_period' && errorData?.requires_special_password) {
+        // 特例パスワード入力ダイアログを表示
+        const password = prompt(
+          `提出期間外です（現在：${errorData.detail || '期間外'}）\n\n` +
+          '特例パスワードを入力してください：'
+        );
+
+        if (!password) {
+          setProcessing(false);
+          return;
+        }
+
+        try {
+          // パスワード付きで再提出
+          await invoiceAPI.submitInvoice(id, password);
+          alert('請求書を提出しました（特例承認）');
+          fetchInvoice();
+        } catch (retryError: any) {
+          const retryErrorData = retryError.response?.data;
+          alert(retryErrorData?.error || '提出に失敗しました');
+        }
+      } else {
+        // その他のエラー
+        alert(errorData?.error || '提出に失敗しました');
+      }
     } finally {
       setProcessing(false);
     }

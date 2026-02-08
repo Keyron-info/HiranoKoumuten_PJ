@@ -76,10 +76,21 @@ export const invoiceAPI = {
     await apiClient.delete(`/invoices/${id}/`);
   },
 
-  // 請求書提出
-  submitInvoice: async (id: string): Promise<{ message: string; invoice: Invoice }> => {
+
+  // 特例パスワードの検証
+  verifySpecialPassword: async (id: string, password: string): Promise<{ valid: boolean; error?: string; message?: string }> => {
+    const response = await apiClient.post<{ valid: boolean; error?: string; message?: string }>(
+      `/invoices/${id}/verify_special_password/`,
+      { special_password: password }
+    );
+    return response.data;
+  },
+
+  // 請求書提出（特例パスワード対応）
+  submitInvoice: async (id: string, specialPassword?: string): Promise<{ message: string; invoice: Invoice }> => {
     const response = await apiClient.post<{ message: string; invoice: Invoice }>(
-      `/invoices/${id}/submit/`
+      `/invoices/${id}/submit/`,
+      specialPassword ? { special_password: specialPassword } : {}
     );
     return response.data;
   },

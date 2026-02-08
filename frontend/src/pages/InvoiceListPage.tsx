@@ -26,13 +26,18 @@ const InvoiceListPage: React.FC = () => {
 
   const [projects, setProjects] = useState<ConstructionSite[]>([]);
 
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [minAmount, setMinAmount] = useState('');
+  const [maxAmount, setMaxAmount] = useState('');
+
   const itemsPerPage = 20;
 
   useEffect(() => {
     fetchInvoices();
     fetchFilters();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentPage, statusFilter]);
+  }, [currentPage, statusFilter, dateFrom, dateTo, minAmount, maxAmount]);
 
   const fetchInvoices = async () => {
     try {
@@ -41,6 +46,10 @@ const InvoiceListPage: React.FC = () => {
         status: statusFilter === 'all' ? undefined : statusFilter,
         page: currentPage,
         search: searchQuery || undefined,
+        date_from: dateFrom || undefined,
+        date_to: dateTo || undefined,
+        min_amount: minAmount ? parseInt(minAmount) : undefined,
+        max_amount: maxAmount ? parseInt(maxAmount) : undefined,
       });
 
       setInvoices(response.results || []);
@@ -80,6 +89,10 @@ const InvoiceListPage: React.FC = () => {
     setStatusFilter('all');
     setProjectFilter('all');
     setCompanyFilter('all');
+    setDateFrom('');
+    setDateTo('');
+    setMinAmount('');
+    setMaxAmount('');
     setCurrentPage(1);
   };
 
@@ -149,79 +162,137 @@ const InvoiceListPage: React.FC = () => {
             <Filter size={20} className="text-gray-600" />
             <h3 className="font-bold text-gray-900">フィルター・検索</h3>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {/* 検索 */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">検索</label>
-              <div className="relative">
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  onKeyPress={handleKeyPress}
-                  placeholder="請求書番号、会社名で検索"
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                />
-                <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              {/* 検索 */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">検索</label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onKeyPress={handleKeyPress}
+                    placeholder="請求書番号、会社名で検索"
+                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                  />
+                  <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                </div>
+              </div>
+
+              {/* ステータス */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">ステータス</label>
+                <select
+                  value={statusFilter}
+                  onChange={(e) => {
+                    setStatusFilter(e.target.value);
+                    setCurrentPage(1);
+                  }}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                >
+                  <option value="all">すべて</option>
+                  <option value="draft">下書き</option>
+                  <option value="submitted">提出済み</option>
+                  <option value="pending_approval">承認待ち</option>
+                  <option value="approved">承認済み</option>
+                  <option value="paid">支払済み</option>
+                  <option value="returned">差し戻し</option>
+                  <option value="rejected">却下</option>
+                </select>
+              </div>
+
+              {/* 工事現場 */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">工事現場</label>
+                <select
+                  value={projectFilter}
+                  onChange={(e) => setProjectFilter(e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                >
+                  <option value="all">すべて</option>
+                  {projects.map((project) => (
+                    <option key={project.id} value={project.name}>
+                      {project.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* 協力会社 */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">協力会社</label>
+                <select
+                  value={companyFilter}
+                  onChange={(e) => setCompanyFilter(e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                >
+                  <option value="all">すべて</option>
+                  {uniqueCompanies.map((company) => (
+                    <option key={company} value={company}>
+                      {company}
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
 
-            {/* ステータス */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">ステータス</label>
-              <select
-                value={statusFilter}
-                onChange={(e) => {
-                  setStatusFilter(e.target.value);
-                  setCurrentPage(1);
-                }}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-              >
-                <option value="all">すべて</option>
-                <option value="draft">下書き</option>
-                <option value="submitted">提出済み</option>
-                <option value="pending_approval">承認待ち</option>
-                <option value="approved">承認済み</option>
-                <option value="paid">支払済み</option>
-                <option value="returned">差し戻し</option>
-                <option value="rejected">却下</option>
-              </select>
-            </div>
+            {/* 詳細検索 (日付・金額) */}
+            <div className="pt-4 border-t border-gray-100">
+              <p className="text-sm font-medium text-gray-700 mb-2">詳細検索（電子帳簿保存法対応）</p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* 日服範囲 */}
+                <div className="flex items-center space-x-2">
+                  <div className="flex-1">
+                    <input
+                      type="date"
+                      value={dateFrom}
+                      onChange={(e) => setDateFrom(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                      placeholder="開始日"
+                    />
+                  </div>
+                  <span className="text-gray-400">〜</span>
+                  <div className="flex-1">
+                    <input
+                      type="date"
+                      value={dateTo}
+                      onChange={(e) => setDateTo(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                      placeholder="終了日"
+                    />
+                  </div>
+                </div>
 
-            {/* 工事現場 */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">工事現場</label>
-              <select
-                value={projectFilter}
-                onChange={(e) => setProjectFilter(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-              >
-                <option value="all">すべて</option>
-                {projects.map((project) => (
-                  <option key={project.id} value={project.name}>
-                    {project.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* 協力会社 */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">協力会社</label>
-              <select
-                value={companyFilter}
-                onChange={(e) => setCompanyFilter(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-              >
-                <option value="all">すべて</option>
-                {uniqueCompanies.map((company) => (
-                  <option key={company} value={company}>
-                    {company}
-                  </option>
-                ))}
-              </select>
+                {/* 金額範囲 */}
+                <div className="flex items-center space-x-2">
+                  <div className="flex-1 relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">¥</span>
+                    <input
+                      type="number"
+                      value={minAmount}
+                      onChange={(e) => setMinAmount(e.target.value)}
+                      className="w-full pl-8 pr-3 py-2 border border-gray-300 rounded-lg text-sm"
+                      placeholder="最小金額"
+                    />
+                  </div>
+                  <span className="text-gray-400">〜</span>
+                  <div className="flex-1 relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">¥</span>
+                    <input
+                      type="number"
+                      value={maxAmount}
+                      onChange={(e) => setMaxAmount(e.target.value)}
+                      className="w-full pl-8 pr-3 py-2 border border-gray-300 rounded-lg text-sm"
+                      placeholder="最大金額"
+                    />
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
+
           <div className="mt-4 flex items-center justify-between text-sm text-gray-600">
             <p>{filteredInvoices.length}件の請求書が見つかりました</p>
             <button
@@ -338,8 +409,8 @@ const InvoiceListPage: React.FC = () => {
                           key={page}
                           onClick={() => setCurrentPage(page)}
                           className={`px-4 py-2 rounded-lg font-medium transition-colors ${page === currentPage
-                              ? 'bg-primary-500 text-white'
-                              : 'border border-gray-300 hover:bg-gray-50'
+                            ? 'bg-primary-500 text-white'
+                            : 'border border-gray-300 hover:bg-gray-50'
                             }`}
                         >
                           {page}

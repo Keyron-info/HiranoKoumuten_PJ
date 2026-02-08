@@ -670,7 +670,29 @@ class InvoiceViewSet(viewsets.ModelViewSet):
                 Q(project_name__icontains=search) |
                 Q(construction_site_name__icontains=search)
             )
+
+        # ==========================================
+        # 電子帳簿保存法対応検索フィルター
+        # ==========================================
         
+        # 1. 取引年月日範囲検索
+        date_from = self.request.query_params.get('date_from')
+        if date_from:
+            qs = qs.filter(invoice_date__gte=date_from)
+            
+        date_to = self.request.query_params.get('date_to')
+        if date_to:
+            qs = qs.filter(invoice_date__lte=date_to)
+            
+        # 2. 取引金額範囲検索
+        min_amount = self.request.query_params.get('min_amount')
+        if min_amount and min_amount.isdigit():
+            qs = qs.filter(total_amount__gte=int(min_amount))
+            
+        max_amount = self.request.query_params.get('max_amount')
+        if max_amount and max_amount.isdigit():
+            qs = qs.filter(total_amount__lte=int(max_amount))
+    
         return qs.order_by('-created_at')
     
     def create(self, request, *args, **kwargs):

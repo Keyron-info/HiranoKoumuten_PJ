@@ -239,8 +239,8 @@ class Command(BaseCommand):
         for user_data in users_data:
             email = user_data['email']
             
-            # ユーザー名を生成（メールアドレスの@前の部分）
-            username = email.split('@')[0]
+            # ユーザー名を生成（メールアドレスをそのまま使用してユニーク性を保証）
+            username = email
             
             # 既存ユーザーをチェック
             user = User.objects.filter(email=email).first()

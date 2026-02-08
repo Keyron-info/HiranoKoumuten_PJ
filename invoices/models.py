@@ -384,8 +384,8 @@ class User(AbstractUser):
     
     objects = UserManager()
     
-    USERNAME_FIELD = 'username'
-    REQUIRED_FIELDS = ['email']
+    USERNAME_FIELD = 'email'
+    REQUIRED_FIELDS = ['username']
     
     class Meta:
         verbose_name = "ユーザー"

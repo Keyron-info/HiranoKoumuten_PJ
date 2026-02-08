@@ -2593,7 +2593,8 @@ class MonthlyInvoicePeriodViewSet(viewsets.ModelViewSet):
     def current(self, request):
         """当月の請求期間取得"""
         now = timezone.now()
-        period = self.get_queryset().filter(
+        # 会社フィルタリングを削除し、全ての請求期間から検索
+        period = MonthlyInvoicePeriod.objects.filter(
             year=now.year,
             month=now.month
         ).first()

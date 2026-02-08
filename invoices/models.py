@@ -327,6 +327,13 @@ class User(AbstractUser):
         verbose_name="ユーザー種別"
     )
     
+    # メールアドレス（USERNAME_FIELDとして使用するためuniqueにオーバーライド）
+    email = models.EmailField(
+        unique=True,
+        verbose_name="メールアドレス",
+        help_text="ログインIDとして使用されます"
+    )
+    
     # 社内ユーザー用フィールド
     company = models.ForeignKey(
         Company, 

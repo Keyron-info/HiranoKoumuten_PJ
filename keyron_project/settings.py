@@ -245,6 +245,23 @@ CORS_ALLOW_ALL_ORIGINS = os.environ.get('CORS_ALLOW_ALL_ORIGINS', 'False') == 'T
 
 CORS_ALLOW_CREDENTIALS = True
 
+# ====================
+# CSRF設定
+# ====================
+CSRF_TRUSTED_ORIGINS = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "https://chwnptmkcn.ap-southeast-2.awsapprunner.com",  # App Runner backend
+]
+
+# 環境変数から追加のOriginを読み込む
+if frontend_url:
+    CSRF_TRUSTED_ORIGINS.append(frontend_url.rstrip('/'))
+
+env_csrf_origins = os.environ.get('CSRF_TRUSTED_ORIGINS')
+if env_csrf_origins:
+    CSRF_TRUSTED_ORIGINS.extend([origin.strip() for origin in env_csrf_origins.split(',') if origin.strip()])
+
 # 許可するヘッダー
 CORS_ALLOW_HEADERS = [
     'accept',

@@ -912,7 +912,12 @@ class InvoiceViewSet(viewsets.ModelViewSet):
             today = timezone.now().date()
             if (today.day < 15 or today.day > 25) and not request.user.is_super_admin:
                  return Response(
-                    {'error': '請求書の提出は毎月15日から25日の間のみ可能です'},
+                    {
+                        'error': '請求書の提出は毎月15日から25日の間のみ可能です',
+                        'detail': f'現在は{today.month}月{today.day}日です。特例パスワードで作成された請求書は期間外でも提出できます。',
+                        'current_date': str(today),
+                        'special_access_used': invoice.is_created_with_special_access
+                    },
                     status=status.HTTP_400_BAD_REQUEST
                 )
 

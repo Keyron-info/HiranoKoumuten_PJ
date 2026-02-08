@@ -55,7 +55,7 @@ class Command(BaseCommand):
         self.stdout.write('\n' + '='*60)
         
         # 重複チェック（再確認）
-        duplicatesafter = User.objects.values('username').annotate(
+        duplicates_after = User.objects.values('username').annotate(
             count=Count('username')
         ).filter(count__gt=1)
         

@@ -37,7 +37,7 @@ class Command(BaseCommand):
         partner_user = User.objects.filter(email='partner@test.com').first()
         if not partner_user:
             partner_user = User.objects.create_user(
-                username='partner_test',
+                username='partner@test.com',  # emailをusernameにする
                 email='partner@test.com',
                 password='test1234',
                 last_name='テスト',
@@ -67,7 +67,7 @@ class Command(BaseCommand):
                 'total_budget': 10000000,
                 'is_active': True,
                 'special_access_password': 'test123',
-                'special_access_password_expiry': datetime.date.today() + datetime.timedelta(days=30)
+                'special_access_expiry': datetime.date.today() + datetime.timedelta(days=30)
             }
         )
         site.supervisor = supervisor

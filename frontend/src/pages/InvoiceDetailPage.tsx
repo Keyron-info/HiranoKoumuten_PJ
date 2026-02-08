@@ -538,8 +538,36 @@ const InvoiceDetailPage: React.FC = () => {
                   </div>
                 </div>
               </div>
-            ) : isInternalUser && invoice.status === 'pending_approval' && (Number(user?.id) === invoice.current_approver || user?.position === 'accountant' || user?.user_type === 'admin') ? (
-              // 平野工務店ユーザー & 承認待ち & (現在の承認者 OR 経理 OR 管理者): 承認・差し戻し・却下ボタン
+            ) : isInternalUser && invoice.status === 'pending_approval' && (() => {
+              // 重複承認チェック
+              const alreadyApproved = invoice.approval_histories?.some(
+                h => h.user_name === user?.last_name + ' ' + user?.first_name && h.action === 'approved'
+              );
+
+              if (alreadyApproved) {
+                return false; // 既に承認済み
+              }
+
+              // 現在の承認者かチェック
+              const isCurrentApprover = Number(user?.id) === invoice.current_approver;
+
+              // 経理の場合：最終ステップ（step_order=5）のみ承認可能
+              // ※ current_approval_step.step_orderはバックエンドから返される想定
+              // 　現状のデータ構造にない場合、承認履歴の数で判断
+              if (user?.position === 'accountant') {
+                // 承認履歴から判断：現場監督・常務・専務・社長の4名承認済みなら経理ステップ
+                const approvalCount = invoice.approval_histories?.filter(h => h.action === 'approved').length || 0;
+                return approvalCount >= 4; // 4名承認済み = 経理ステップ
+              }
+
+              // 管理者は常に承認可能（システム管理用）
+              if (user?.user_type === 'admin') {
+                return true;
+              }
+
+              return isCurrentApprover;
+            })() ? (
+              // 平野工務店ユーザー & 承認待ち & 承認権限あり: 承認・差し戻し・却下ボタン
               <div className="bg-white rounded-xl shadow-sm p-6">
                 <h2 className="text-xl font-bold text-gray-900 mb-6">承認アクション</h2>
                 <div className="space-y-3">
@@ -569,6 +597,42 @@ const InvoiceDetailPage: React.FC = () => {
                     <span>却下</span>
                   </button>
                 </div>
+              </div>
+            ) : isInternalUser && invoice.status === 'pending_approval' ? (
+              // 承認待ちだが承認権限がない場合：メッセージ表示
+              <div className="bg-white rounded-xl shadow-sm p-6">
+                <h2 className="text-xl font-bold text-gray-900 mb-4">承認状態</h2>
+                {(() => {
+                  const alreadyApproved = invoice.approval_histories?.some(
+                    h => h.user_name === user?.last_name + ' ' + user?.first_name && h.action === 'approved'
+                  );
+
+                  if (alreadyApproved) {
+                    return (
+                      <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                        <p className="text-sm text-green-800">✓ この請求書は既に承認済みです</p>
+                      </div>
+                    );
+                  }
+
+                  if (user?.position === 'accountant') {
+                    const approvalCount = invoice.approval_histories?.filter(h => h.action === 'approved').length || 0;
+                    if (approvalCount < 4) {
+                      return (
+                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                          <p className="text-sm text-blue-800">経理承認は全ての役職者承認後に実施してください</p>
+                          <p className="text-xs text-blue-600 mt-1">現在：{approvalCount}/4名承認済み</p>
+                        </div>
+                      );
+                    }
+                  }
+
+                  return (
+                    <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                      <p className="text-sm text-gray-700">現在の承認待ち：他の担当者</p>
+                    </div>
+                  );
+                })()}
               </div>
             ) : null}
 

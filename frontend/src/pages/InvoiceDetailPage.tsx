@@ -81,6 +81,9 @@ const InvoiceDetailPage: React.FC = () => {
   const [rejectReason, setRejectReason] = useState('');
   const [comment, setComment] = useState('');
   const [processing, setProcessing] = useState(false);
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [specialPassword, setSpecialPassword] = useState('');
+  const [passwordError, setPasswordError] = useState('');
   const [corrections, setCorrections] = useState<Correction[]>([]);
   const [canDownloadPdf, setCanDownloadPdf] = useState(false);
 
@@ -185,29 +188,13 @@ const InvoiceDetailPage: React.FC = () => {
     } catch (error: any) {
       const errorData = error.response?.data;
 
-
       // 期間外エラー、かつ特例パスワードが必要な場合
       if (errorData?.code === 'outside_submission_period' && errorData?.requires_special_password) {
-        // 特例パスワード入力ダイアログを表示
-        const password = prompt(
-          `提出期間外です（現在：${errorData.detail || '期間外'}）\n\n` +
-          '特例パスワードを入力してください：'
-        );
-
-        if (!password) {
-          setProcessing(false);
-          return;
-        }
-
-        try {
-          // パスワード付きで再提出
-          await invoiceAPI.submitInvoice(id, password);
-          alert('請求書を提出しました（特例承認）');
-          fetchInvoice();
-        } catch (retryError: any) {
-          const retryErrorData = retryError.response?.data;
-          alert(retryErrorData?.error || '提出に失敗しました');
-        }
+        // モーダルを表示
+        setShowPasswordModal(true);
+        setPasswordError('');
+        setSpecialPassword('');
+        return; // processingはモーダルで管理
       } else {
         // その他のエラー
         alert(errorData?.error || '提出に失敗しました');
@@ -215,6 +202,36 @@ const InvoiceDetailPage: React.FC = () => {
     } finally {
       setProcessing(false);
     }
+  };
+
+  const handlePasswordSubmit = async () => {
+    if (!id || !specialPassword) {
+      setPasswordError('パスワードを入力してください');
+      return;
+    }
+
+    try {
+      setProcessing(true);
+      setPasswordError('');
+
+      // パスワード付きで再提出
+      await invoiceAPI.submitInvoice(id, specialPassword);
+      setShowPasswordModal(false);
+      alert('請求書を提出しました（特例承認）');
+      fetchInvoice();
+    } catch (error: any) {
+      const errorData = error.response?.data;
+      setPasswordError(errorData?.error || '提出に失敗しました');
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  const handlePasswordCancel = () => {
+    setShowPasswordModal(false);
+    setSpecialPassword('');
+    setPasswordError('');
+    setProcessing(false);
   };
 
   const handleDownloadPdf = async () => {
@@ -343,6 +360,48 @@ const InvoiceDetailPage: React.FC = () => {
 
   return (
     <Layout>
+      {/* 特例パスワードモーダル */}
+      {showPasswordModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+            <h3 className="text-lg font-semibold mb-4">特例パスワード入力</h3>
+            <p className="text-sm text-gray-600 mb-4">
+              現在は提出期間外です（2月15日～25日のみ提出可能）。
+              <br />
+              期間外に提出するには特例パスワードが必要です。
+            </p>
+            <input
+              type="password"
+              value={specialPassword}
+              onChange={(e) => setSpecialPassword(e.target.value)}
+              onKeyPress={(e) => e.key === 'Enter' && handlePasswordSubmit()}
+              placeholder="特例パスワードを入力"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 mb-2"
+              autoFocus
+            />
+            {passwordError && (
+              <p className="text-sm text-red-600 mb-4">{passwordError}</p>
+            )}
+            <div className="flex space-x-3">
+              <button
+                onClick={handlePasswordCancel}
+                disabled={processing}
+                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+              >
+                キャンセル
+              </button>
+              <button
+                onClick={handlePasswordSubmit}
+                disabled={processing || !specialPassword}
+                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+              >
+                {processing ? '処理中...' : '提出する'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="max-w-6xl mx-auto px-4 py-8">
         {/* ヘッダー */}
         <div className="mb-6">

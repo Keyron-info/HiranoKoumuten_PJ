@@ -32,5 +32,31 @@ venv/bin/python manage.py setup_approval_route || true
 echo "Setting up test data..."
 venv/bin/python manage.py setup_approval_test || true
 
+echo "Creating current month invoice period..."
+venv/bin/python manage.py shell -c "
+from invoices.models import MonthlyInvoicePeriod, Company
+from django.utils import timezone
+from datetime import datetime
+
+company = Company.objects.first()
+if company:
+    now = timezone.now()
+    period, created = MonthlyInvoicePeriod.objects.get_or_create(
+        company=company,
+        year=now.year,
+        month=now.month,
+        defaults={
+            'deadline_date': datetime(now.year, now.month, 25, 23, 59, 59),
+            'is_closed': False
+        }
+    )
+    if created:
+        print(f'✅ 請求期間を作成: {period.period_name}')
+    else:
+        print(f'⚠️  請求期間は既存: {period.period_name}')
+else:
+    print('❌ 会社が見つかりません')
+" || true
+
 echo "Starting Gunicorn server..."
 exec venv/bin/gunicorn --bind 0.0.0.0:8000 keyron_project.wsgi:application

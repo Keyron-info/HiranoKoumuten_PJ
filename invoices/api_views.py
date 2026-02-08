@@ -1036,13 +1036,45 @@ class InvoiceViewSet(viewsets.ModelViewSet):
                 errors.append({'id': invoice.id, 'invoice_number': invoice.invoice_number, 'error': '承認待ちではありません'})
                 continue
             
+            # 重複承認チェック
+            already_approved = ApprovalHistory.objects.filter(
+                invoice=invoice,
+                user=user,
+                action='approved'
+            ).exists()
+            
+            if already_approved:
+                errors.append({'id': invoice.id, 'invoice_number': invoice.invoice_number, 'error': '既に承認済みです'})
+                continue
+            
+            # 現在のステップを確認
+            current_step = invoice.current_approval_step
+            if not current_step:
+                errors.append({'id': invoice.id, 'invoice_number': invoice.invoice_number, 'error': '承認ステップが設定されていません'})
+                continue
+            
             # 権限チェック
             can_approve = False
-            if invoice.current_approver == user:
-                can_approve = True
+            
+            # 経理の場合：最終ステップ（step_order=5）のみ承認可能
             if user.position == 'accountant':
+                if current_step.step_order ==5:
+                    can_approve = True
+                else:
+                    errors.append({'id': invoice.id, 'invoice_number': invoice.invoice_number, 'error': '経理の承認は全ての役職者承認後に実施してください'})
+                    continue
+            # 現場監督の場合：現場の担当監督のみ承認可
+            elif current_step.approver_position == 'site_supervisor':
+                if invoice.construction_site and invoice.construction_site.supervisor == user:
+                    can_approve = True
+            # 指定ユーザーが設定されている場合
+            elif current_step.approver_user:
+                if current_step.approver_user == user:
+                    can_approve = True
+            # 役職が一致する場合
+            elif user.position == current_step.approver_position:
                 can_approve = True
-                
+            
             if not can_approve:
                 errors.append({'id': invoice.id, 'invoice_number': invoice.invoice_number, 'error': '承認権限がありません'})
                 continue
@@ -1138,15 +1170,50 @@ class InvoiceViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
+        
+        # 重複承認チェック
+        already_approved = ApprovalHistory.objects.filter(
+            invoice=invoice,
+            user=user,
+            action='approved'
+        ).exists()
+        
+        if already_approved:
+            return Response(
+                {'error': 'この請求書は既に承認済みです'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # 現在のステップを確認
+        current_step = invoice.current_approval_step
+        if not current_step:
+            return Response(
+                {'error': '承認ステップが設定されていません'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
         # 承認権限チェック
         can_approve = False
         
-        # 現在の承認者である
-        if invoice.current_approver == user:
-            can_approve = True
-        
-        # 経理は全ステップで承認可能
+        # 経理の場合：最終ステップ（step_order=5）のみ承認可能
         if user.position == 'accountant':
+            if current_step.step_order == 5:
+                can_approve = True
+            else:
+                return Response(
+                    {'error': '経理の承認は全ての役職者承認後に実施してください'},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+        # 現場監督の場合：現場の担当監督のみ承認可
+        elif current_step.approver_position == 'site_supervisor':
+            if invoice.construction_site and invoice.construction_site.supervisor == user:
+                can_approve = True
+        # 指定ユーザーが設定されている場合
+        elif current_step.approver_user:
+            if current_step.approver_user == user:
+                can_approve = True
+        # 役職が一致する場合
+        elif user.position == current_step.approver_position:
             can_approve = True
         
         if not can_approve:
@@ -1259,7 +1326,6 @@ class InvoiceViewSet(viewsets.ModelViewSet):
         """
         請求書却下
         - 現在の承認ステップの担当者のみ実行可能
-        - 経理は全ステップで実行可能
         """
         invoice = self.get_object()
         user = request.user
@@ -1271,16 +1337,8 @@ class InvoiceViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        # 却下権限チェック
-        can_reject = False
-        
-        if invoice.current_approver == user:
-            can_reject = True
-        
-        if user.position == 'accountant':
-            can_reject = True
-        
-        if not can_reject:
+        # 却下権限チェック（現在の承認者のみ）
+        if invoice.current_approver != user:
             return Response(
                 {'error': 'この請求書を却下する権限がありません'},
                 status=status.HTTP_403_FORBIDDEN
@@ -1327,7 +1385,6 @@ class InvoiceViewSet(viewsets.ModelViewSet):
         """
         請求書差し戻し
         - 現在の承認ステップの担当者のみ実行可能
-        - 経理は全ステップで実行可能
         """
         invoice = self.get_object()
         user = request.user
@@ -1339,16 +1396,8 @@ class InvoiceViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        # 差し戻し権限チェック
-        can_return = False
-        
-        if invoice.current_approver == user:
-            can_return = True
-        
-        if user.position == 'accountant':
-            can_return = True
-        
-        if not can_return:
+        # 差し戻し権限チェック（現在の承認者のみ）
+        if invoice.current_approver != user:
             return Response(
                 {'error': 'この請求書を差し戻す権限がありません'},
                 status=status.HTTP_403_FORBIDDEN

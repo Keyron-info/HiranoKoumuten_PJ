@@ -16,21 +16,34 @@ from datetime import timedelta
 class ConstructionType(models.Model):
     """工種マスタ - 15種類の工種を事前定義"""
     CONSTRUCTION_TYPES = [
-        ('exterior_wall', '外壁'),
-        ('interior', '内装'),
-        ('electrical', '電気'),
-        ('plumbing', '給排水'),
-        ('air_conditioning', '空調'),
-        ('foundation', '基礎'),
-        ('structural', '躯体'),
-        ('roofing', '屋根'),
-        ('waterproofing', '防水'),
-        ('painting', '塗装'),
-        ('flooring', '床'),
-        ('carpentry', '大工'),
-        ('landscaping', '外構'),
-        ('demolition', '解体'),
-        ('temporary', '仮設'),
+        ('selection', '工種選択用'),
+        ('heavy_equipment_temporary', '重機仮設工事'),
+        ('earthwork', '土工事'),
+        ('pile', '杭工事'),
+        ('reinforcement', '鉄筋工事'),
+        ('concrete', 'コンクリート工事'),
+        ('formwork', '型枠工事'),
+        ('steel_frame', '鉄骨工事'),
+        ('waterproofing', '防水工事'),
+        ('stone_tile', '石タイル工事'),
+        ('alc', 'ALC工事'),
+        ('roof_tile', '屋根瓦工事'),
+        ('plastering', '左官工事'),
+        ('metal', '金属工事'),
+        ('metal_fittings', '金属製建具工事'),
+        ('wood_fittings', '木製建具工事'),
+        ('glass', '硝子工事'),
+        ('painting', '塗装工事'),
+        ('carpentry', '木工事'),
+        ('light_steel', '軽鉄工事'),
+        ('piping', '役管工事'),
+        ('interior', '内装工事'),
+        ('exterior', '外装工事'),
+        ('fixtures', '什器工事'),
+        ('furniture', '家具工事'),
+        ('heating_equipment', '暖房設備工事'),
+        ('unit', 'ユニット工事'),
+        ('miscellaneous', '雑工事'),
     ]
     
     code = models.CharField(max_length=30, unique=True, verbose_name="工種コード")
@@ -1644,6 +1657,21 @@ class MonthlyInvoicePeriod(models.Model):
         '繰越金額', max_digits=15, decimal_places=0, default=0
     )
     carryover_reason = models.TextField('繰越理由', blank=True)
+    
+    # 🆕 特例パスワード（締切後の提出用）
+    special_access_password = models.CharField(
+        '特例パスワード',
+        max_length=100,
+        blank=True,
+        help_text='締切を過ぎた後に請求書を提出する際の特例パスワード'
+    )
+    special_access_expiry = models.DateField(
+        '特例有効期限',
+        null=True,
+        blank=True,
+        help_text='このパスワードが有効な期限'
+    )
+    
     previous_period = models.ForeignKey(
         'self',
         on_delete=models.SET_NULL,

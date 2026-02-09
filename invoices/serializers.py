@@ -301,7 +301,8 @@ class MonthlyInvoicePeriodSerializer(serializers.ModelSerializer):
             'deadline_date', 'is_closed', 'closed_by', 'closed_by_name',
             'closed_at', 'notes', 'period_name', 'is_past_deadline',
             'total_invoices', 'submitted_invoices', 'pending_invoices',
-            'created_at'
+            'created_at',
+            'special_access_password', 'special_access_expiry',  # 🆕 特例パスワード
         ]
         read_only_fields = ['company', 'closed_by', 'closed_at', 'created_at']
     

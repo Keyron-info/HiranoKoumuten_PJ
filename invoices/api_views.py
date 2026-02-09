@@ -1119,8 +1119,34 @@ class InvoiceViewSet(viewsets.ModelViewSet):
             # 現在のステップを確認
             current_step = invoice.current_approval_step
             if not current_step:
-                errors.append({'id': invoice.id, 'invoice_number': invoice.invoice_number, 'error': '承認ステップが設定されていません'})
-                continue
+                # 自動復元を試みる（approveメソッドと同じロジック）
+                if invoice.current_approver and invoice.approval_route:
+                    # 現場監督の場合は特別処理
+                    if invoice.construction_site and invoice.current_approver == invoice.construction_site.supervisor:
+                        current_step = invoice.approval_route.steps.filter(
+                            approver_position='site_supervisor'
+                        ).first()
+                    else:
+                        # 役職からステップを検索
+                        current_step = invoice.approval_route.steps.filter(
+                            approver_position=invoice.current_approver.position
+                        ).first()
+                    
+                    if current_step:
+                        # ステップを設定して保存
+                        invoice.current_approval_step = current_step
+                        invoice.save()
+                
+                # それでも見つからない場合はエラー
+                if not current_step:
+                    errors.append({
+                        'id': invoice.id,
+                        'invoice_number': invoice.invoice_number,
+                        'error': '承認ステップが設定されていません',
+                        'detail': f'承認ルート: {invoice.approval_route_id or "未設定"}, 現在の承認者: {invoice.current_approver.username if invoice.current_approver else "未設定"}'
+                    })
+                    continue
+
             
             # 権限チェック
             can_approve = False

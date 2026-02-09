@@ -16,18 +16,18 @@ from datetime import timedelta
 class ConstructionType(models.Model):
     """工種マスタ - 15種類の工種を事前定義"""
     CONSTRUCTION_TYPES = [
-        ('selection', '工種選択用'),
-        ('heavy_equipment_temporary', '重機仮設工事'),
+    CONSTRUCTION_TYPES = [
+        ('direct_temporary', '直接仮設工事'),
         ('earthwork', '土工事'),
         ('pile', '杭工事'),
         ('reinforcement', '鉄筋工事'),
         ('concrete', 'コンクリート工事'),
         ('formwork', '型枠工事'),
-        ('steel_frame', '鉄骨工事'),
+        ('steel_structure', '鉄骨工事'),
         ('waterproofing', '防水工事'),
         ('stone_tile', '石タイル工事'),
         ('alc', 'ALC工事'),
-        ('roof_tile', '屋根瓦工事'),
+        ('roofing', '屋根樋工事'),
         ('plastering', '左官工事'),
         ('metal', '金属工事'),
         ('metal_fittings', '金属製建具工事'),
@@ -36,14 +36,24 @@ class ConstructionType(models.Model):
         ('painting', '塗装工事'),
         ('carpentry', '木工事'),
         ('light_steel', '軽鉄工事'),
-        ('piping', '役管工事'),
+        ('insulation', '被覆工事'),
         ('interior', '内装工事'),
         ('exterior', '外装工事'),
         ('fixtures', '什器工事'),
         ('furniture', '家具工事'),
-        ('heating_equipment', '暖房設備工事'),
+        ('heating', '暖房器具工事'),
         ('unit', 'ユニット工事'),
         ('miscellaneous', '雑工事'),
+        ('electrical', '電気設備工事'),
+        ('plumbing', '給排水衛生設備工事'),
+        ('hvac', '空調換気設備工事'),
+        ('elevator', 'EV工事'),
+        ('mechanical', '機械設備工事'),
+        ('other_equipment', 'その他設備工事'),
+        ('landscaping', '外構工事'),
+        ('demolition', '解体工事'),
+        ('other', 'その他工事'),
+    ]
     ]
     
     code = models.CharField(max_length=30, unique=True, verbose_name="工種コード")

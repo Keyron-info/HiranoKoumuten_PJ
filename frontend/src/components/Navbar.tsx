@@ -25,11 +25,13 @@ const Navbar: React.FC = () => {
         <div className="flex justify-between h-16">
           <div className="flex">
             <Link to="/dashboard" className="flex-shrink-0 flex items-center gap-3 group">
-              <div className="w-9 h-9 bg-gradient-to-br from-primary-500 to-primary-600 text-white rounded-xl flex items-center justify-center font-bold text-lg shadow-lg shadow-primary-900/20 group-hover:scale-105 transition-transform duration-200">
-                K
-              </div>
+              <img
+                src="https://storage.googleapis.com/studio-design-asset-files/projects/1YWj39BMOm/s-414x160_webp_f7ee48b5-bc92-4c52-a722-7675bf6ee644.png"
+                alt="平野工務店BIM"
+                className="h-10 w-auto group-hover:scale-105 transition-transform duration-200"
+              />
               <span className="text-xl font-bold text-white tracking-tight group-hover:text-primary-400 transition-colors">
-                平野工務店-BIM
+                平野工務店BIM
               </span>
             </Link>
 

@@ -25,7 +25,7 @@ class Command(BaseCommand):
         users_data = [
             # 決裁（役員）
             {
-                'last_name': '南', 
+                'last_name': '堺', 
                 'first_name': '仁一郎',
                 'last_name_kana': 'サカイ',
                 'first_name_kana': 'ジンイチロウ',
@@ -51,7 +51,7 @@ class Command(BaseCommand):
                 'first_name': '美代子',
                 'last_name_kana': 'ホンジョウ',
                 'first_name_kana': 'ミヨコ',
-                'email': 'honjou@hota-sakeimori.jp',
+                'email': 'honjou@hota-kakiemon.jp',
                 'position': 'managing_director',  # 常務取締役（本城）
                 'role': '経理',
                 'note': '全評価期間・印刷'
@@ -68,9 +68,9 @@ class Command(BaseCommand):
             },
             {
                 'last_name': '郁瀬',
-                'first_name': '',
+                'first_name': '夏也',
                 'last_name_kana': 'イクセ',
-                'first_name_kana': '',
+                'first_name_kana': 'ナツヤ',
                 'email': 'ikuse@hira-ko.jp',
                 'position': 'accountant',
                 'role': '経理',
@@ -199,8 +199,8 @@ class Command(BaseCommand):
                 'note': '現場監督'
             },
             {
-                'last_name': '鈴木',
-                'first_name': '健吾',
+                'last_name': '染谷',
+                'first_name': '宏人',
                 'last_name_kana': 'ソメヤ',
                 'first_name_kana': 'ヒロト',
                 'email': 'someya@hira-ko.jp',
@@ -224,7 +224,7 @@ class Command(BaseCommand):
                 'last_name': '都',
                 'first_name': '亭吾',
                 'last_name_kana': 'ミヤコ',
-                'first_name_kana': 'テイゴ',
+                'first_name_kana': 'サトゴ',
                 'email': 'miyako@hira-ko.jp',
                 'position': 'staff',
                 'role': '営業',

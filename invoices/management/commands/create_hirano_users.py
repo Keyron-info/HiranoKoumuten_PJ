@@ -51,7 +51,7 @@ class Command(BaseCommand):
                 'first_name': '美代子',
                 'last_name_kana': 'ホンジョウ',
                 'first_name_kana': 'ミヨコ',
-                'email': 'honjou@hota-kakiemon.jp',
+                'email': 'honjo@oita-kakiemon.jp',
                 'position': 'managing_director',  # 常務取締役（本城）
                 'role': '経理',
                 'note': '全評価期間・印刷'

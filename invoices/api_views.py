@@ -1256,10 +1256,32 @@ class InvoiceViewSet(viewsets.ModelViewSet):
         # 現在のステップを確認
         current_step = invoice.current_approval_step
         if not current_step:
-            return Response(
-                {'error': '承認ステップが設定されていません'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+            # 後方互換性：current_approval_stepが未設定の場合、current_approverから推測
+            if invoice.current_approver:
+                # 承認ルートがあれば、承認者の役職からステップを見つける
+                if invoice.approval_route:
+                    # 現場監督の場合は特別処理
+                    if invoice.construction_site and invoice.current_approver == invoice.construction_site.supervisor:
+                        current_step = invoice.approval_route.steps.filter(
+                            approver_position='site_supervisor'
+                        ).first()
+                    else:
+                        # 役職からステップを検索
+                        current_step = invoice.approval_route.steps.filter(
+                            approver_position=invoice.current_approver.position
+                        ).first()
+                    
+                    if current_step:
+                        # ステップを設定して保存
+                        invoice.current_approval_step = current_step
+                        invoice.save()
+            
+            # それでも見つからない場合はエラー
+            if not current_step:
+                return Response(
+                    {'error': '承認ステップが設定されていません'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
         
         # 承認権限チェック
         can_approve = False

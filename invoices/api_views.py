@@ -1040,10 +1040,12 @@ class InvoiceViewSet(viewsets.ModelViewSet):
         )
 
         # ステータスと通知の分岐
-        if invoice.is_created_with_special_access:
+        # 特例パスワード使用時または期間外提出時は即座に承認フローを開始
+        if special_password or invoice.is_created_with_special_access:
             # 特例: 即座に承認待ちへ
             invoice.status = 'pending_approval'
             invoice.current_approver = invoice.construction_site.supervisor
+            invoice.current_approval_step = first_step
             invoice.save()
             
             # 通知メール送信（即時）
@@ -1068,6 +1070,7 @@ class InvoiceViewSet(viewsets.ModelViewSet):
             # 通常: 提出済み（一括承認待ち）ステータスへ
             invoice.status = 'submitted'
             invoice.current_approver = None # まだ誰の承認待ちでもない
+            invoice.current_approval_step = None
             invoice.save()
             message = '請求書を提出しました。締日まで一時保管されます。'
         

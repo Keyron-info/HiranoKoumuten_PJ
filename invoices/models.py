@@ -16,7 +16,6 @@ from datetime import timedelta
 class ConstructionType(models.Model):
     """工種マスタ - 15種類の工種を事前定義"""
     CONSTRUCTION_TYPES = [
-    CONSTRUCTION_TYPES = [
         ('direct_temporary', '直接仮設工事'),
         ('earthwork', '土工事'),
         ('pile', '杭工事'),
@@ -53,7 +52,6 @@ class ConstructionType(models.Model):
         ('landscaping', '外構工事'),
         ('demolition', '解体工事'),
         ('other', 'その他工事'),
-    ]
     ]
     
     code = models.CharField(max_length=30, unique=True, verbose_name="工種コード")

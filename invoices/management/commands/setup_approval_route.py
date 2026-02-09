@@ -16,7 +16,7 @@ class Command(BaseCommand):
 
         # 承認者を取得
         supervisor = User.objects.filter(position='site_supervisor').first()  # 現場監督（任意）
-        jomu = User.objects.filter(email='honjou@hota-sakeimori.jp').first()  # 常務（本城）
+        jomu = User.objects.filter(email='honjo@oita-kakiemon.jp').first()  # 常務（本城）
         senmu = User.objects.filter(email='sakai@hira-ko.jp').first()  # 専務（堺/南）
         president = User.objects.filter(email='maki@hira-ko.jp').first()  # 社長（眞木）
         accountant = User.objects.filter(position='accountant').first()  # 経理

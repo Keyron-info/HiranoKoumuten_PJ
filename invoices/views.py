@@ -621,7 +621,53 @@ class InvoiceViewSet(viewsets.ModelViewSet):
         #     recipient_list=[recipient.email],
         #     fail_silently=True,
         # )
-
+    @action(detail=False, methods=['get'], permission_classes=[AllowAny], authentication_classes=[])
+    def debug_invoice(self, request):
+        """
+        [デバッグ用] 請求書の承認状態詳細を確認するエンドポイント
+        /api/invoices/debug_invoice/?number=INV-2026-0010
+        """
+        invoice_number = request.query_params.get('number')
+        if not invoice_number:
+            return Response({'error': 'number parameter is required'}, status=400)
+            
+        try:
+            invoice = Invoice.objects.get(invoice_number=invoice_number)
+            
+            # 関連データ取得
+            approver = invoice.current_approver
+            step = invoice.current_approval_step
+            
+            data = {
+                'invoice_number': invoice.invoice_number,
+                'status': invoice.status,
+                'status_display': invoice.get_status_display(),
+                'current_approver': {
+                    'id': approver.id if approver else None,
+                    'username': approver.username if approver else None,
+                    'email': approver.email if approver else None,
+                    'full_name': approver.get_full_name() if approver else None,
+                    'position': approver.position if approver else None,
+                    'is_active': approver.is_active if approver else None,
+                } if approver else None,
+                'current_step': {
+                    'step_name': step.step_name if step else None,
+                    'step_order': step.step_order if step else None,
+                    'approver_position': step.approver_position if step else None,
+                    'approver_user_id': step.approver_user.id if step and step.approver_user else None,
+                    'approver_user_name': step.approver_user.get_full_name() if step and step.approver_user else None,
+                } if step else None,
+                'construction_site': {
+                    'name': invoice.construction_site.name if invoice.construction_site else None,
+                    'supervisor_id': invoice.construction_site.supervisor.id if invoice.construction_site and invoice.construction_site.supervisor else None,
+                    'supervisor_name': invoice.construction_site.supervisor.get_full_name() if invoice.construction_site and invoice.construction_site.supervisor else None,
+                } if invoice.construction_site else None
+            }
+            return Response(data)
+        except Invoice.DoesNotExist:
+            return Response({'error': f'Invoice {invoice_number} not found'}, status=404)
+        except Exception as e:
+            return Response({'error': str(e)}, status=500)
 
 class DashboardViewSet(viewsets.GenericViewSet):
     """ダッシュボードAPI - ユーザー種別対応版"""

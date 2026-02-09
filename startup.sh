@@ -29,6 +29,9 @@ venv/bin/python manage.py create_hirano_users || true
 echo "Setting up approval routes..."
 venv/bin/python manage.py setup_approval_route || true
 
+echo "Fixing invoice approval steps (Safeguard)..."
+venv/bin/python manage.py fix_invoice_approval_steps || true
+
 echo "Setting up test data..."
 venv/bin/python manage.py setup_approval_test || true
 

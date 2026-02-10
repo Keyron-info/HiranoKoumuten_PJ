@@ -643,9 +643,7 @@ const InvoiceDetailPage: React.FC = () => {
               // ※ current_approval_step.step_orderはバックエンドから返される想定
               // 　現状のデータ構造にない場合、承認履歴の数で判断
               if (user?.position === 'accountant') {
-                // 承認履歴から判断：現場監督・常務・専務・社長の4名承認済みなら経理ステップ
-                const approvalCount = invoice.approval_histories?.filter(h => h.action === 'approved').length || 0;
-                return approvalCount >= 4; // 4名承認済み = 経理ステップ
+                return isCurrentApprover;
               }
 
               // 管理者は常に承認可能（システム管理用）
@@ -704,15 +702,11 @@ const InvoiceDetailPage: React.FC = () => {
                   }
 
                   if (user?.position === 'accountant') {
-                    const approvalCount = invoice.approval_histories?.filter(h => h.action === 'approved').length || 0;
-                    if (approvalCount < 4) {
-                      return (
-                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                          <p className="text-sm text-blue-800">経理承認は全ての役職者承認後に実施してください</p>
-                          <p className="text-xs text-blue-600 mt-1">現在：{approvalCount}/4名承認済み</p>
-                        </div>
-                      );
-                    }
+                    return (
+                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                        <p className="text-sm text-blue-800">経理承認は全ての役職者承認後に実施してください</p>
+                      </div>
+                    );
                   }
 
                   return (

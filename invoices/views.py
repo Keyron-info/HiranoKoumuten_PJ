@@ -324,8 +324,8 @@ class InvoiceViewSet(viewsets.ModelViewSet):
         if invoice.current_approver == user:
             can_approve = True
         
-        # 経理は全ステップで承認可能
-        if user.position == 'accountant':
+        # 経理は経理ステップでのみ承認可能
+        if user.position == 'accountant' and invoice.current_approval_step and invoice.current_approval_step.approver_position == 'accountant':
             can_approve = True
         
         if not can_approve:

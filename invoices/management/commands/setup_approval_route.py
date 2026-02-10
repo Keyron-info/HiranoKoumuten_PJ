@@ -18,12 +18,14 @@ class Command(BaseCommand):
         senmu = User.objects.filter(email='sakai@hira-ko.jp').first()  # 専務（堺）
         president = User.objects.filter(email='maki@hira-ko.jp').first()  # 社長（眞木）
         jomu = User.objects.filter(email='honjo@oita-kakiemon.jp').first()  # 常務（本城）
+        bucho = User.objects.filter(email='tanaka@hira-ko.jp').first()  # 部長（田中）
         
-        if not all([senmu, president, jomu]):
+        if not all([senmu, president, jomu, bucho]):
             missing = []
             if not senmu: missing.append('専務 (sakai@hira-ko.jp)')
             if not president: missing.append('社長 (maki@hira-ko.jp)')
             if not jomu: missing.append('常務 (honjo@oita-kakiemon.jp)')
+            if not bucho: missing.append('部長 (tanaka@hira-ko.jp)')
             self.stdout.write(self.style.ERROR(f'❌ 必要なユーザーが見つかりません: {", ".join(missing)}'))
             return
 
@@ -55,7 +57,7 @@ class Command(BaseCommand):
                 'order': 2,
                 'name': '部長承認',
                 'position': 'department_manager',
-                'user': None,  # 部長は役職で検索
+                'user': bucho,  # 田中さん
                 'description': '部門管理者による確認'
             },
             {

@@ -45,6 +45,18 @@ class Command(BaseCommand):
                 'note': '監督・幹部・専（承認のフローにおいてどの段階に承認されるかということ）'
             },
             
+            # 部長
+            {
+                'last_name': '田中',
+                'first_name': '一朗', 
+                'last_name_kana': 'タナカ',
+                'first_name_kana': 'イチロウ',
+                'email': 'tanaka@hira-ko.jp',
+                'position': 'department_manager',  # 部長
+                'role': '部長',
+                'note': '承認フロー（部長承認）'
+            },
+            
             # 経理
             {
                 'last_name': '本城',

@@ -330,12 +330,12 @@ class User(AbstractUser):
     # 🆕 更新: 役職に承認フロー用の役職を追加
     POSITION_CHOICES = [
         ('site_supervisor', '現場監督'),
+        ('department_manager', '部長'),
         ('managing_director', '常務取締役'),
         ('senior_managing_director', '専務取締役'),
         ('president', '代表取締役社長'),
         ('accountant', '総務部 経理担当'),
         ('director', '取締役'),
-        # 部長は削除
         ('supervisor', '課長'),
         ('staff', '一般社員'),
         ('admin', 'システム管理者'),

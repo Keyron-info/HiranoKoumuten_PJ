@@ -14,15 +14,17 @@ class Command(BaseCommand):
             self.stdout.write(self.style.ERROR('❌ 会社が見つかりません。先にcreate_hirano_usersを実行してください。'))
             return
 
-        # 承認者を取得
-        supervisor = User.objects.filter(position='site_supervisor').first()  # 現場監督（任意）
-        jomu = User.objects.filter(email='honjo@oita-kakiemon.jp').first()  # 常務（本城）
-        senmu = User.objects.filter(email='sakai@hira-ko.jp').first()  # 専務（堺/南）
+        # 承認者を取得（特定ユーザー指定が必要なステップ用）
+        senmu = User.objects.filter(email='sakai@hira-ko.jp').first()  # 専務（堺）
         president = User.objects.filter(email='maki@hira-ko.jp').first()  # 社長（眞木）
-        accountant = User.objects.filter(position='accountant').first()  # 経理
+        jomu = User.objects.filter(email='honjo@oita-kakiemon.jp').first()  # 常務（本城）
         
-        if not all([jomu, senmu, president, accountant]):
-            self.stdout.write(self.style.ERROR('❌ 必要な役職のユーザーが見つかりません。'))
+        if not all([senmu, president, jomu]):
+            missing = []
+            if not senmu: missing.append('専務 (sakai@hira-ko.jp)')
+            if not president: missing.append('社長 (maki@hira-ko.jp)')
+            if not jomu: missing.append('常務 (honjo@oita-kakiemon.jp)')
+            self.stdout.write(self.style.ERROR(f'❌ 必要なユーザーが見つかりません: {", ".join(missing)}'))
             return
 
         # 既存の承認ルートを削除（リセット）
@@ -33,14 +35,14 @@ class Command(BaseCommand):
         basic_route = ApprovalRoute.objects.create(
             company=company,
             name='基本承認ルート',
-            description='現場監督 → 常務 → 専務 → 社長 → 経理',
+            description='現場監督 → 部長 → 専務 → 社長 → 常務 → 経理',
             is_default=True,
             is_active=True
         )
         
         self.stdout.write(self.style.SUCCESS(f'✅ 承認ルート作成: {basic_route.name}'))
 
-        # 承認ステップを作成
+        # 承認ステップを作成（新しい順序）
         steps_data = [
             {
                 'order': 1,
@@ -51,16 +53,16 @@ class Command(BaseCommand):
             },
             {
                 'order': 2,
-                'name': '常務承認',
-                'position': 'managing_director',
-                'user': jomu,  # 本城さん
-                'description': '金額の確認'
+                'name': '部長承認',
+                'position': 'department_manager',
+                'user': None,  # 部長は役職で検索
+                'description': '部門管理者による確認'
             },
             {
                 'order': 3,
                 'name': '専務承認',
                 'position': 'senior_managing_director',
-                'user': senmu,  # 南さん（堺）
+                'user': senmu,  # 堺さん
                 'description': '金額の確認'
             },
             {
@@ -72,6 +74,13 @@ class Command(BaseCommand):
             },
             {
                 'order': 5,
+                'name': '常務承認',
+                'position': 'managing_director',
+                'user': jomu,  # 本城さん
+                'description': '常務による確認'
+            },
+            {
+                'order': 6,
                 'name': '経理確認',
                 'position': 'accountant',
                 'user': None,  # 経理担当者は複数いるため指定なし
@@ -101,8 +110,9 @@ class Command(BaseCommand):
         self.stdout.write(self.style.SUCCESS('\n✨ 承認ルート設定完了'))
         self.stdout.write('\n【承認フロー】')
         self.stdout.write(f'  1. 現場監督（各現場の担当者）')
-        self.stdout.write(f'  2. 常務取締役（{jomu.last_name} {jomu.first_name}）')
+        self.stdout.write(f'  2. 部長（部門管理者）')
         self.stdout.write(f'  3. 専務取締役（{senmu.last_name} {senmu.first_name}）')
         self.stdout.write(f'  4. 代表取締役社長（{president.last_name} {president.first_name}）')
-        self.stdout.write(f'  5. 経理担当')
+        self.stdout.write(f'  5. 常務取締役（{jomu.last_name} {jomu.first_name}）')
+        self.stdout.write(f'  6. 経理担当')
         self.stdout.write('\n' + '='*60)

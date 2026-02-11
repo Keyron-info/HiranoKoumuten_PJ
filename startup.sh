@@ -30,6 +30,9 @@ else:
 # venv/bin/python manage.py reset_and_seed_v2
 # venv/bin/python manage.py setup_approval_route
 
+echo "FORCE RESETTING ROUTES..."
+venv/bin/python manage.py force_reset_routes
+
 # 承認ステータスの自動修復（不整合がある場合のみ修正）
 echo "Running approval state repair..."
 venv/bin/python manage.py fix_approval_state || true

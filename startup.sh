@@ -26,22 +26,21 @@ else:
     print(f'Admin user already exists: {email}')
 "
 
-echo "Creating Hirano users..."
-venv/bin/python manage.py create_hirano_users
+echo "Resetting and Seeding Users (Force Cleanup)..."
+venv/bin/python manage.py reset_and_seed_v2
 
 echo "Setting up approval routes..."
 venv/bin/python manage.py setup_approval_route
-
 
 # 承認ステータスの自動修復（不整合がある場合のみ修正）
 echo "Running approval state repair..."
 venv/bin/python manage.py fix_approval_state || true
 
-echo "Fixing invoice approval steps (Safeguard)..."
-venv/bin/python manage.py fix_invoice_approval_steps || true
+# echo "Fixing invoice approval steps (Safeguard)..."
+# venv/bin/python manage.py fix_invoice_approval_steps || true
 
-echo "Setting up test data..."
-venv/bin/python manage.py setup_approval_test || true
+# echo "Setting up test data..."
+# venv/bin/python manage.py setup_approval_test || true
 
 echo "Verifying full approval flow (Log only)..."
 venv/bin/python manage.py verify_full_approval_flow || true

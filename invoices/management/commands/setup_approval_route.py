@@ -20,7 +20,7 @@ class Command(BaseCommand):
         
         route = ApprovalRoute.objects.create(
             company=company, 
-            name='標準承認ルート', 
+            name='標準承認ルート(新)', 
             is_default=True, 
             is_active=True
         )

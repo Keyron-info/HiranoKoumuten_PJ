@@ -1099,10 +1099,28 @@ class Invoice(models.Model):
         # 管理番号の自動生成
         if not self.unique_number:
             year = self.created_at.year if self.created_at else timezone.now().year
-            last_number = Invoice.objects.filter(
-                unique_number__startswith=f'INV-{year}-'
-            ).count()
-            self.unique_number = f'INV-{year}-{str(last_number + 1).zfill(3)}'
+            prefix = f'INV-{year}-'
+            
+            # count()ではなく、最新の番号を取得して+1する方式に変更（欠番対策）
+            last_record = Invoice.objects.filter(
+                unique_number__startswith=prefix
+            ).order_by('-unique_number').first()
+            
+            if last_record and last_record.unique_number:
+                try:
+                    last_number = int(last_record.unique_number.split('-')[-1])
+                    new_number = last_number + 1
+                except (ValueError, IndexError):
+                    new_number = Invoice.objects.filter(unique_number__startswith=prefix).count() + 1
+            else:
+                new_number = 1
+            
+            self.unique_number = f'{prefix}{str(new_number).zfill(3)}'
+            
+            # 安全策: 重複する場合はインクリメントし続ける
+            while Invoice.objects.filter(unique_number=self.unique_number).exists():
+                new_number += 1
+                self.unique_number = f'{prefix}{str(new_number).zfill(3)}'
         
         # construction_site_nameを自動設定
         if self.construction_site and not self.construction_site_name:

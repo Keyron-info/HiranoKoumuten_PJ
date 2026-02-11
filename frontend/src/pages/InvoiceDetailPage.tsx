@@ -68,6 +68,8 @@ interface InvoiceDetail {
   approval_histories?: ApprovalHistoryItem[];
   corrections?: Correction[];
   current_approver?: number;
+  current_approver_name?: string;
+  current_approver_email?: string;
 }
 
 const InvoiceDetailPage: React.FC = () => {

@@ -86,6 +86,9 @@ class Command(BaseCommand):
 
         self.stdout.write(self.style.SUCCESS('   ✅ Test Data Prepared.'))
 
+        # Cleanup previous test data
+        Invoice.objects.filter(project_name='Test Project for Approval Flow').delete()
+        
         # 3. Create & Submit Invoice
         self.stdout.write(self.style.HTTP_INFO('\n3️⃣  Creating & Submitting Invoice...'))
         

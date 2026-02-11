@@ -501,10 +501,38 @@ class InvoiceCreateSerializer(serializers.ModelSerializer):
         カスタム作成メソッド
         - ネストされたitemsの作成
         - 合計金額の計算（Safety Fee適用のため）
+        - 作成者と会社情報の自動設定
         """
         items_data = validated_data.pop('items', [])
         site_password = validated_data.pop('site_password', None) # 不要なフィールドを除外
         special_password = validated_data.pop('special_password', None) # 不要なフィールドを除外
+        
+        # ユーザー情報の取得
+        user = self.context['request'].user
+        validated_data['created_by'] = user
+        
+        # 会社情報の自動設定
+        if user.user_type == 'customer':
+            # 協力会社ユーザーの場合
+            if user.customer_company:
+                validated_data['customer_company'] = user.customer_company
+                
+            # 受取会社（平野工務店）の設定
+            # 現場に関連付けられた会社を使用するか、デフォルトの会社を使用
+            construction_site = validated_data.get('construction_site')
+            if construction_site:
+                validated_data['receiving_company'] = construction_site.company
+            else:
+                # 現場がない場合（ありえないが安全策）、最初の会社を使用
+                validated_data['receiving_company'] = Company.objects.first()
+                
+        elif user.user_type == 'internal':
+            # 社内ユーザーの場合
+            if user.company:
+                validated_data['receiving_company'] = user.company
+            
+            # 社内ユーザーが代理作成する場合はcustomer_companyが入力されているはず
+            # 入力がない場合はNULL（社内経費など）
         
         # Invoice作成
         invoice = Invoice.objects.create(**validated_data)

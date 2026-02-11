@@ -4,12 +4,24 @@ from invoices.models import Invoice, User, ApprovalStep
 class Command(BaseCommand):
     help = 'Debug invoice approval state'
 
+    def add_arguments(self, parser):
+        parser.add_argument('--id', type=int, help='Invoice ID to debug')
+
     def handle(self, *args, **options):
         self.stdout.write("=== DEBUG START ===")
-        # 1. Latest invoice
-        invoice = Invoice.objects.order_by('-created_at').first()
+        
+        invoice_id = options.get('id')
+        if invoice_id:
+            invoice = Invoice.objects.filter(id=invoice_id).first()
+        else:
+            # 1. Latest invoice if no ID is provided
+            invoice = Invoice.objects.order_by('-created_at').first()
+        
         if not invoice:
-            self.stdout.write("No invoice found")
+            if invoice_id:
+                self.stdout.write(f"No invoice found with ID: {invoice_id}")
+            else:
+                self.stdout.write("No invoice found in the database.")
             return
 
         self.stdout.write(f"Invoice: {invoice.invoice_number}")

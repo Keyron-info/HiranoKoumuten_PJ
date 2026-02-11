@@ -640,6 +640,17 @@ const InvoiceDetailPage: React.FC = () => {
               // 現在の承認者かチェック
               const isCurrentApprover = Number(user?.id) === invoice.current_approver;
 
+              // DEBUG: 承認者ID不一致の調査
+              if (user?.email?.includes('tanaka')) {
+                console.log('DEBUG CHECK:', {
+                  userId: user?.id,
+                  userIdType: typeof user?.id,
+                  invoiceApprover: invoice.current_approver,
+                  invoiceApproverType: typeof invoice.current_approver,
+                  isMatch: isCurrentApprover
+                });
+              }
+
               // 経理の場合：最終ステップ（step_order=5）のみ承認可能
               // ※ current_approval_step.step_orderはバックエンドから返される想定
               // 　現状のデータ構造にない場合、承認履歴の数で判断
@@ -718,6 +729,15 @@ const InvoiceDetailPage: React.FC = () => {
                 })()}
               </div>
             ) : null}
+
+            {/* DEBUG INFO (Temporary) */}
+            <div className="bg-gray-800 text-white p-4 rounded-lg text-xs font-mono mb-4">
+              <p>DEBUG INFO:</p>
+              <p>User ID: {user?.id} ({typeof user?.id})</p>
+              <p>Current Approver: {invoice.current_approver} ({typeof invoice.current_approver})</p>
+              <p>Match: {Number(user?.id) === invoice.current_approver ? 'YES' : 'NO'}</p>
+              <p>Status: {invoice.status}</p>
+            </div>
 
             {/* 承認履歴 */}
             <div className="bg-white rounded-xl shadow-sm p-6">

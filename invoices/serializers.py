@@ -603,6 +603,7 @@ class InvoiceSerializer(serializers.ModelSerializer):
     status_display = serializers.CharField(source='get_status_display', read_only=True)
     created_by_name = serializers.CharField(source='created_by.get_full_name', read_only=True)
     current_approver_name = serializers.CharField(source='current_approver.get_full_name', read_only=True, allow_null=True)
+    current_approver_email = serializers.CharField(source='current_approver.email', read_only=True, allow_null=True)
     current_step_name = serializers.CharField(source='current_approval_step.step_name', read_only=True, allow_null=True)
     comments = InvoiceCommentSerializer(many=True, read_only=True)
     approval_histories = ApprovalHistorySerializer(many=True, read_only=True)
@@ -624,7 +625,7 @@ class InvoiceSerializer(serializers.ModelSerializer):
             'notes', 'items',
             'approval_route', 'approval_route_detail',
             'current_approval_step', 'current_step_name',
-            'current_approver', 'current_approver_name',
+            'current_approver', 'current_approver_name', 'current_approver_email',
             'created_by', 'created_by_name',
             'created_at', 'updated_at',
             'comments', 'approval_histories',

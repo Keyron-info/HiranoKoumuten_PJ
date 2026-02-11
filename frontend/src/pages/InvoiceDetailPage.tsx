@@ -732,10 +732,25 @@ const InvoiceDetailPage: React.FC = () => {
 
             {/* DEBUG INFO (Temporary) */}
             <div className="bg-gray-800 text-white p-4 rounded-lg text-xs font-mono mb-4">
-              <p>DEBUG INFO:</p>
-              <p>User ID: {user?.id} ({typeof user?.id})</p>
-              <p>Current Approver: {invoice.current_approver} ({typeof invoice.current_approver})</p>
-              <p>Match: {Number(user?.id) === invoice.current_approver ? 'YES' : 'NO'}</p>
+              <p className="font-bold border-b border-gray-600 mb-2">DEBUG INFO:</p>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-gray-400">Logged-in User (ID: {user?.id})</p>
+                  <p>Name: {user?.last_name} {user?.first_name}</p>
+                  <p>Email: {user?.email}</p>
+                </div>
+                <div>
+                  <p className="text-gray-400">Current Approver (ID: {invoice.current_approver})</p>
+                  <p>Name: {invoice.current_approver_name}</p>
+                  {/* Note: Email is not usually in invoice serializer, relying on name/ID */}
+                </div>
+              </div>
+              <p className="mt-2 pt-2 border-t border-gray-600">
+                Match: {Number(user?.id) === invoice.current_approver ?
+                  <span className="text-green-400 font-bold">YES</span> :
+                  <span className="text-red-400 font-bold">NO</span>
+                }
+              </p>
               <p>Status: {invoice.status}</p>
             </div>
 

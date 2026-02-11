@@ -26,11 +26,9 @@ else:
     print(f'Admin user already exists: {email}')
 "
 
-echo "Resetting and Seeding Users (Force Cleanup)..."
-venv/bin/python manage.py reset_and_seed_v2
-
-echo "Setting up approval routes..."
-venv/bin/python manage.py setup_approval_route
+# User and Approval Route setup are now handled by data migrations (0018, 0019...)
+# venv/bin/python manage.py reset_and_seed_v2
+# venv/bin/python manage.py setup_approval_route
 
 # 承認ステータスの自動修復（不整合がある場合のみ修正）
 echo "Running approval state repair..."

@@ -12,6 +12,8 @@ class Command(BaseCommand):
         if not company:
             self.stdout.write("No company found.")
             return
+        
+        self.stdout.write(f"Company found: {company.name}")
 
         # 1. Reset Routes
         ApprovalRoute.objects.filter(company=company).delete()
@@ -52,10 +54,10 @@ class Command(BaseCommand):
         else:
              self.stdout.write(self.style.WARNING("⚠️ No Department Manager (Bucho) found. Skipping Bucho step."))
 
-        # Step 3: Senmu (Honjo)
-        if senmu:
+        # Step 3: Jomu (Maki) - Requested early
+        if jomu:
             steps_config.append({
-                'name': '専務承認', 'position': 'senior_managing_director', 'user': senmu
+                'name': '常務承認', 'position': 'managing_director', 'user': jomu
             })
         
         # Step 4: Shacho (Sakai)
@@ -64,10 +66,10 @@ class Command(BaseCommand):
                 'name': '社長承認', 'position': 'president', 'user': shacho
             })
 
-        # Step 5: Jomu (Maki)
-        if jomu:
+        # Step 5: Senmu (Honjo) - Requested Last (after President)
+        if senmu:
             steps_config.append({
-                'name': '常務承認', 'position': 'managing_director', 'user': jomu
+                'name': '専務承認', 'position': 'senior_managing_director', 'user': senmu
             })
 
         # Step 6: Keiri (Any)

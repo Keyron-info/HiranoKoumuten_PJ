@@ -31,12 +31,15 @@ class Command(BaseCommand):
         
         # 4. Create Users
         users_config = [
-            # 役員
+            # Executives
             {'name': '堺 仁一郎', 'email': 'sakai@hira-ko.jp', 'role': 'president', 'last': '堺', 'first': '仁一郎'},
             {'name': '眞木 宣之', 'email': 'maki@hira-ko.jp', 'role': 'managing_director', 'last': '眞木', 'first': '宣之'}, # Jomu
             {'name': '本城 美代子', 'email': 'honjo@oita-kakiemon.jp', 'role': 'senior_managing_director', 'last': '本城', 'first': '美代子'}, # Senmu
+
+            # Department Manager
+            {'name': '田中 一朗', 'email': 'tanaka@hira-ko.jp', 'role': 'department_manager', 'last': '田中', 'first': '一朗'},
             
-            # 経理
+            # Accountants経理
             {'name': '竹田 鉄也', 'email': 'takeda@hira-ko.jp', 'role': 'accountant', 'last': '竹田', 'first': '鉄也'},
             {'name': '総務', 'email': 'hiranokoumutensouму@hira-ko.jp', 'role': 'accountant', 'last': '総務', 'first': ''},
             {'name': '佐藤 奏', 'email': 'kana_sato@hira-ko.jp', 'role': 'accountant', 'last': '佐藤', 'first': '奏'},

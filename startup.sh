@@ -8,6 +8,9 @@ venv/bin/python manage.py migrate --noinput
 echo "Fixing duplicate usernames..."
 venv/bin/python manage.py fix_duplicate_usernames || true
 
+echo "Merging duplicate users (ID mismatch fix)..."
+venv/bin/python manage.py fix_duplicate_users || true
+
 echo "Creating initial admin user..."
 venv/bin/python manage.py shell -c "
 from django.contrib.auth import get_user_model

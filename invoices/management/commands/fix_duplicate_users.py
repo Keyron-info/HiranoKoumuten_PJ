@@ -10,40 +10,59 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         self.stdout.write("🔍 重複ユーザーの検査と修復を開始します...")
-        
-        # 1. 名前（漢字）での重複チェック (Last Name Only check for non-Sato)
-        # 佐藤さん以外は名字がユニークなはずなので、名字だけで名寄せする
-        target_last_names = User.objects.exclude(last_name='佐藤').values('last_name') \
-            .annotate(count=Count('id')).filter(count__gt=1)
 
-        for d in target_last_names:
-            last = d['last_name']
-            self.stdout.write(f"\n👥 名字重複検出: {last}")
-            users = User.objects.filter(last_name=last).order_by('id')
-            self._merge_group(users)
+        # 1. 承認フローに関わる主要人物のみをターゲットにする（同姓同名の別人リスク回避）
+        # system_users = [
+        #     (last_name, first_name, email_key),
+        # ]
+        target_users = [
+            ('田中', '一朗', 'tanaka'),
+            ('堺', '仁一郎', 'sakai'),
+            ('眞木', '正之', 'maki'),
+            ('本城', '美代子', 'honjo'),
+            ('竹田', '貴也', 'takeda'),
+            ('赤嶺', '誠司', 'akamine'),
+        ]
 
-        # 2. Emailパターンでのチェック (akamine, tanaka, etc.)
-        # システム生成上のIDと不一致を起こしやすい主要メンバーを明示的にチェック
-        target_emails = ['akamine', 'tanaka', 'sakai', 'maki', 'honjo', 'takeda']
-        for email_key in target_emails:
-            users = User.objects.filter(email__icontains=email_key).order_by('id')
-            if users.count() > 1:
-                self.stdout.write(f"\n📧 Email重複検出({email_key}): {users.count()}件")
-                self._merge_group(users)
+        for last, first, email_key in target_users:
+            self.stdout.write(f"\n🔍 ターゲット検査: {last} {first} ({email_key})")
+            
+            # 条件: 「名字が一致」かつ「(名前が一致) または (メールにキーワードが含まれる)」
+            # これにより、「田中次郎」さんが「田中一朗」として統合されるのを防ぐ
+            
+            candidates = User.objects.filter(
+                Q(last_name=last) & 
+                (Q(first_name=first) | Q(email__icontains=email_key))
+            ).order_by('id')
+
+            if candidates.count() > 1:
+                self.stdout.write(f"   ⚠️ 重複あり: {candidates.count()}件")
+                # 名前が全く違う人が混じっていないか最終チェック
+                valid_candidates = []
+                for u in candidates:
+                    # 名前が空、または指定の名前と一致、またはメールが一致ならOK
+                    # 別の名前が入っている場合は除外（例: Tanaka Jiro）
+                    if (u.first_name and u.first_name != first and email_key not in u.email):
+                        self.stdout.write(f"   🚫 除外（別人判定）: {u.last_name} {u.first_name}")
+                        continue
+                    valid_candidates.append(u)
+                
+                # フィルタ後のリストで再構成
+                if len(valid_candidates) > 1:
+                    # ID順に並んでいるので、最後（最新）を正とする
+                    primary = valid_candidates[-1]
+                    duplicates = valid_candidates[:-1]
+                    
+                    self.stdout.write(f"   ✅ 残すユーザー: ID={primary.id} ({primary.last_name} {primary.first_name})")
+                    for dup in duplicates:
+                        self.stdout.write(f"   ❌ 統合対象: ID={dup.id} ({dup.email})")
+                        self.merge_users(dup, primary)
+            else:
+                self.stdout.write("   ✨ 重複なし")
 
     def _merge_group(self, users):
-        if users.count() < 2:
-            return
-
-        # 生かすユーザーを決定（IDが一番大きいものを正とする）
-        primary_user = users.last() 
-        duplicate_users = users.exclude(id=primary_user.id)
-        
-        self.stdout.write(f"   ✅ 残すユーザー: ID={primary_user.id} ({primary_user.last_name} {primary_user.first_name})")
-        
-        for dup in duplicate_users:
-            self.stdout.write(f"   ❌ 削除/統合対象: ID={dup.id} ({dup.email})")
-            self.merge_users(dup, primary_user)
+        # 廃止: 安全な個別ロジックに移行
+        pass
 
     def merge_users(self, old_user, new_user):
         """old_userのデータをnew_userに付け替えて、old_userを削除"""

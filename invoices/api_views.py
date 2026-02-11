@@ -249,6 +249,11 @@ class UserProfileViewSet(viewsets.GenericViewSet):
                 Q(email__icontains=search)
             )
         
+        # Position filter
+        position = request.query_params.get('position')
+        if position:
+            queryset = queryset.filter(position=position)
+        
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
     

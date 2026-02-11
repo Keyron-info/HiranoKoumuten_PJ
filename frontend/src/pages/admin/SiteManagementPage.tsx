@@ -53,9 +53,12 @@ const SiteManagementPage: React.FC = () => {
     const fetchSupervisors = async () => {
         try {
             // 社内ユーザーかつ現場監督または管理者などを取得
-            // ここでは簡易的に全ての社内ユーザーを取得してフィルタリングするか、API側で対応するか
-            // usersAPI.listAll は管理者権限が必要な可能性が高いが、現場管理者は管理者であることが前提
-            const allUsers = await usersAPI.listAll({ is_active: 'true', user_type: 'internal' });
+            // 現場監督(site_supervisor)でフィルタリング
+            const allUsers = await usersAPI.listAll({
+                is_active: 'true',
+                user_type: 'internal',
+                position: 'site_supervisor'  // 🆕 Filter
+            });
             setSupervisors(allUsers);
         } catch (error) {
             console.error('Failed to fetch supervisors', error);

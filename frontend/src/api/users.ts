@@ -66,6 +66,7 @@ export const usersAPI = {
         user_type?: string;
         is_active?: string;
         search?: string;
+        position?: string;
     }): Promise<UserData[]> => {
         const response = await apiClient.get<UserData[]>('/users/list_all/', { params });
         return response.data;

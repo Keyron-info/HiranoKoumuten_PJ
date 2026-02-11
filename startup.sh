@@ -8,8 +8,8 @@ venv/bin/python manage.py migrate --noinput
 echo "Fixing duplicate usernames..."
 venv/bin/python manage.py fix_duplicate_usernames || true
 
-echo "Merging duplicate users (ID mismatch fix)..."
-venv/bin/python manage.py fix_duplicate_users || true
+echo "Running robust user cleanup and route rebuild..."
+venv/bin/python manage.py clean_rebuild_approvals || true
 
 echo "Creating initial admin user..."
 venv/bin/python manage.py shell -c "

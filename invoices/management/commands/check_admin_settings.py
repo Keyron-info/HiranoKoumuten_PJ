@@ -8,46 +8,35 @@ class Command(BaseCommand):
     help = 'Check admin settings for Department Manager'
 
     def handle(self, *args, **options):
-        self.stdout.write("=== CHECKING ADMIN SETTINGS ===")
+        self.stdout.write("=== 管理設定チェック ===")
         
-        # 1. Check User 'tanaka'
-        tanaka = User.objects.filter(email='tanaka@hira-ko.jp').first()
-        if not tanaka:
-            self.stdout.write(self.style.ERROR("❌ User 'tanaka@hira-ko.jp' NOT FOUND"))
+        # 1. 部長（長嶺）ユーザーを確認
+        bucho = User.objects.filter(email='nagamine@hira-ko.jp').first()
+        if not bucho:
+            self.stdout.write(self.style.ERROR("❌ 部長ユーザー 'nagamine@hira-ko.jp' が見つかりません"))
         else:
-            self.stdout.write(f"✅ User 'tanaka@hira-ko.jp' found. ID: {tanaka.id}")
-            self.stdout.write(f"   - Active: {tanaka.is_active}")
-            self.stdout.write(f"   - Staff: {tanaka.is_staff}")
-            self.stdout.write(f"   - Position: {tanaka.position}")
+            self.stdout.write(f"✅ 部長: {bucho.last_name} {bucho.first_name} (ID:{bucho.id})")
+            self.stdout.write(f"   - Active: {bucho.is_active}")
+            self.stdout.write(f"   - Position: {bucho.position}")
             
-        # 2. Check Approval Step
+        # 2. 承認ステップ確認
         step = ApprovalStep.objects.filter(approver_position='department_manager').first()
         if not step:
-             self.stdout.write(self.style.ERROR("❌ Approval Step for 'department_manager' NOT FOUND"))
+            self.stdout.write(self.style.ERROR("❌ 部長承認ステップが見つかりません"))
         else:
-            self.stdout.write(f"✅ Approval Step 'department_manager' found.")
-            self.stdout.write(f"   - Step Name: {step.step_name}")
+            self.stdout.write(f"✅ 部長承認ステップ: {step.step_name}")
             self.stdout.write(f"   - Approver User: {step.approver_user}")
-            if step.approver_user != tanaka:
-                 self.stdout.write(self.style.WARNING(f"   ⚠️ Approver User mismatch! Expected {tanaka}, got {step.approver_user}"))
+            if bucho and step.approver_user != bucho:
+                self.stdout.write(self.style.WARNING(f"   ⚠️ 承認者が長嶺ではありません！ 現在: {step.approver_user}"))
 
-        # 3. Check Latest Invoice (ID 19 based on screenshot)
-        invoice = Invoice.objects.filter(id=19).first()
-        if not invoice:
-             # Try getting the last one if 19 doesn't exist (in case of ID mismatch)
-             invoice = Invoice.objects.last()
-        
+        # 3. 最新の請求書状態
+        invoice = Invoice.objects.order_by('-updated_at').first()
         if invoice:
-            self.stdout.write(f"=== INVOICE {invoice.id} ({invoice.invoice_number}) STATE ===")
+            self.stdout.write(f"\n=== 最新請求書 (ID:{invoice.id}) ===")
             self.stdout.write(f"   - Status: {invoice.status}")
             self.stdout.write(f"   - Current Step: {invoice.current_approval_step}")
             self.stdout.write(f"   - Current Approver: {invoice.current_approver}")
-            
-            if invoice.current_approver != tanaka:
-                 self.stdout.write(self.style.ERROR(f"   ❌ Current Approver is NOT Tanaka! It is: {invoice.current_approver}"))
-            else:
-                 self.stdout.write(self.style.SUCCESS(f"   ✅ Current Approver IS Tanaka."))
         else:
-             self.stdout.write("⚠️ No invoice found to check.")
+            self.stdout.write("⚠️ 請求書がありません")
 
-        self.stdout.write("=== END CHECK ===")
+        self.stdout.write("=== チェック完了 ===")

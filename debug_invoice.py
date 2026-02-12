@@ -13,19 +13,23 @@ import sys
 
 def debug_invoice():
     parser = argparse.ArgumentParser(description='Debug Invoice State')
-    parser.add_argument('invoice_number', nargs='?', default='INV-2026-0010', help='Invoice Number to debug')
+    parser.add_argument('invoice_number', nargs='?', default=None, help='Invoice Number to debug')
     args = parser.parse_args()
     
-    invoice_number = args.invoice_number
-    
-    print(f"=== Debugging {invoice_number} ===")
-    
-    try:
-        invoice = Invoice.objects.get(invoice_number=invoice_number)
-    except Invoice.DoesNotExist:
-        print(f"❌ Invoice {invoice_number} not found!")
-        return
+    if args.invoice_number:
+        invoice_number = args.invoice_number
+        try:
+            invoice = Invoice.objects.get(invoice_number=invoice_number)
+        except Invoice.DoesNotExist:
+            print(f"❌ Invoice {invoice_number} not found!")
+            return
+    else:
+        invoice = Invoice.objects.order_by('-created_at').first()
+        if not invoice:
+            print("❌ No invoices found!")
+            return
 
+    print(f"=== Debugging {invoice.invoice_number} ===")
     print(f"Status: {invoice.status}")
     print(f"Current Step: {invoice.current_approval_step}")
     
@@ -44,13 +48,13 @@ def debug_invoice():
         print(f"Defined Approver User: {step.approver_user}")
         print(f"Defined Position: {step.approver_position}")
 
-    print("\n--- Check Tanaka (Dept Manager) ---")
-    tanaka = User.objects.filter(email='tanaka@hira-ko.jp').first()
-    if tanaka:
-         print(f"Tanaka User found: {tanaka.get_full_name()} (ID: {tanaka.id})")
-         print(f"Position: {tanaka.position}")
+    print("\n--- Department Manager (Nagamine) ---")
+    bucho = User.objects.filter(email='nagamine@hira-ko.jp').first()
+    if bucho:
+         print(f"Nagamine found: {bucho.get_full_name()} (ID: {bucho.id})")
+         print(f"Position: {bucho.position}")
     else:
-        print("❌ Tanaka user not found in DB!")
+        print("❌ Nagamine user not found in DB!")
 
 if __name__ == '__main__':
     debug_invoice()

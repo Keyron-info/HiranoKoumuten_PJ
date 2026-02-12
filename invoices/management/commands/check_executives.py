@@ -7,27 +7,30 @@ class Command(BaseCommand):
     help = 'Check if executive users required for full approval flow exist'
 
     def handle(self, *args, **options):
-        # List of required emails based on setup_approval_route.py
+        # 承認フローに必要なユーザーのメールアドレス
         required_emails = [
-            'tanaka@hira-ko.jp',        # 部長
-            'sakai@hira-ko.jp',         # 専務
-            'maki@hira-ko.jp',          # 社長
-            'honjo@oita-kakiemon.jp',   # 常務
+            ('nagamine@hira-ko.jp', '部長'),
+            ('maki@hira-ko.jp', '専務'),
+            ('sakai@hira-ko.jp', '社長'),
+            ('honjo@oita-kakiemon.jp', '常務'),
+            ('takeda@hira-ko.jp', '経理'),
         ]
 
-        self.stdout.write("--- Checking Executive Users ---")
+        self.stdout.write("--- 承認フロー必要ユーザー確認 ---")
         all_exist = True
-        for email in required_emails:
+        for email, role in required_emails:
             user = User.objects.filter(email=email).first()
             if user:
-                self.stdout.write(self.style.SUCCESS(f"[OK] Found: {user.get_full_name()} (ID: {user.id}) - {email} - {user.position}"))
+                self.stdout.write(self.style.SUCCESS(
+                    f"[OK] {role}: {user.last_name} {user.first_name} (ID:{user.id}) - {email} - position:{user.position}"
+                ))
             else:
-                self.stdout.write(self.style.ERROR(f"[MISSING] Not found: {email}"))
+                self.stdout.write(self.style.ERROR(f"[MISSING] {role}: {email}"))
                 all_exist = False
         
         self.stdout.write("--------------------------------")
         
         if all_exist:
-             self.stdout.write(self.style.SUCCESS("\nAll required users exist. You can run 'setup_approval_route' to restore the full flow."))
+            self.stdout.write(self.style.SUCCESS("\n✅ 全ての必要ユーザーが存在します。"))
         else:
-             self.stdout.write(self.style.WARNING("\nSome users are missing. You likely need to run 'create_hirano_users' first."))
+            self.stdout.write(self.style.WARNING("\n⚠️ 一部ユーザーが不足しています。'create_hirano_users' を実行してください。"))

@@ -29,17 +29,17 @@ class Command(BaseCommand):
         else:
             self.stdout.write("Current Step: None")
 
-        # 2. 部長（田中）ユーザーを確認
-        tanaka = User.objects.filter(email='tanaka@hira-ko.jp').first()
-        self.stdout.write(f"\n=== Department Manager User (Tanaka) ===")
-        if tanaka:
-            self.stdout.write(f"ID: {tanaka.id}")
-            self.stdout.write(f"Name: {tanaka.last_name} {tanaka.first_name}")
-            self.stdout.write(f"Email: {tanaka.email}")
-            self.stdout.write(f"Position: {tanaka.position}")
-            self.stdout.write(f"Is Active: {tanaka.is_active}")
+        # 2. 部長（長嶺）ユーザーを確認
+        bucho = User.objects.filter(email='nagamine@hira-ko.jp').first()
+        self.stdout.write(f"\n=== Department Manager (Nagamine) ===")
+        if bucho:
+            self.stdout.write(f"ID: {bucho.id}")
+            self.stdout.write(f"Name: {bucho.last_name} {bucho.first_name}")
+            self.stdout.write(f"Email: {bucho.email}")
+            self.stdout.write(f"Position: {bucho.position}")
+            self.stdout.write(f"Is Active: {bucho.is_active}")
         else:
-            self.stdout.write("User 'tanaka@hira-ko.jp' not found.")
+            self.stdout.write("User 'nagamine@hira-ko.jp' not found.")
 
         # 3. 承認ルートの確認
         self.stdout.write(f"\n=== Active Approval Routes ===")
@@ -49,4 +49,3 @@ class Command(BaseCommand):
             for step in route.steps.all().order_by('step_order'):
                 user_str = f"{step.approver_user.last_name}" if step.approver_user else "None"
                 self.stdout.write(f"  Step {step.step_order}: {step.step_name} (Pos: {step.approver_position}, User: {user_str})")
-

@@ -57,7 +57,10 @@ class Command(BaseCommand):
                 invoice.current_approval_step = correct_step
                 
                 # 承認者の設定
-                if correct_step.approver_user:
+                if correct_step.approver_position == 'accountant':
+                    # 経理ステップ: 経理なら誰でも承認可能なのでNone
+                    invoice.current_approver = None
+                elif correct_step.approver_user:
                     invoice.current_approver = correct_step.approver_user
                 else:
                     # ユーザー指定がない場合は役職から検索（最新のアクティブユーザーを優先）

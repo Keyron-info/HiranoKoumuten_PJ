@@ -1022,21 +1022,24 @@ class InvoiceViewSet(viewsets.ModelViewSet):
             # 現場監督は現場に紐付いたユーザーを指定
             if position == 'site_supervisor':
                 user_to_assign = invoice.construction_site.supervisor
+            elif position == 'accountant':
+                # 経理は特定ユーザーに紐付けない（経理なら誰でも承認可能）
+                user_to_assign = None
             else:
-                # 各役職の承認者を検索して紐付ける
+                # その他の役職は具体的なユーザーを検索して紐付ける
                 user_to_assign = User.objects.filter(
                     user_type='internal',
                     company=invoice.receiving_company,
                     position=position,
                     is_active=True
-                ).order_by('-id').first()  # 最新のユーザーを優先
+                ).order_by('-id').first()
             
             step = ApprovalStep.objects.create(
                 route=approval_route,
                 step_order=order,
                 step_name=name,
                 approver_position=position,
-                approver_user=user_to_assign  # 各ステップに具体的なユーザーを紐付け
+                approver_user=user_to_assign
             )
             if order == 1:
                 first_step = step
@@ -1206,7 +1209,10 @@ class InvoiceViewSet(viewsets.ModelViewSet):
                 
                 if next_step:
                     invoice.current_approval_step = next_step
-                    if next_step.approver_user:
+                    if next_step.approver_position == 'accountant':
+                        # 経理ステップ: 誰でも承認可能
+                        invoice.current_approver = None
+                    elif next_step.approver_user:
                         invoice.current_approver = next_step.approver_user
                     else:
                         next_approver = User.objects.filter(
@@ -1220,12 +1226,26 @@ class InvoiceViewSet(viewsets.ModelViewSet):
                     
                     invoice.save()
                     
-                    # 通知
-                    self._send_notification_email(
-                        recipient=invoice.current_approver,
-                        subject=f'【請求書承認依頼】{invoice.invoice_number}',
-                        message=f'一括承認により承認依頼が届いています。'
-                    )
+                    # 通知（経理の場合は全経理に通知）
+                    if next_step.approver_position == 'accountant':
+                        accountants = User.objects.filter(
+                            user_type='internal',
+                            company=invoice.receiving_company,
+                            position='accountant',
+                            is_active=True
+                        )
+                        for acc in accountants:
+                            self._send_notification_email(
+                                recipient=acc,
+                                subject=f'【請求書承認依頼】{invoice.invoice_number}',
+                                message=f'一括承認により経理確認依頼が届いています。'
+                            )
+                    elif invoice.current_approver:
+                        self._send_notification_email(
+                            recipient=invoice.current_approver,
+                            subject=f'【請求書承認依頼】{invoice.invoice_number}',
+                            message=f'一括承認により承認依頼が届いています。'
+                        )
                 else:
                     # 完了
                     invoice.status = 'approved'
@@ -1373,7 +1393,10 @@ class InvoiceViewSet(viewsets.ModelViewSet):
             invoice.current_approval_step = next_step
             
             # 次の承認者を設定
-            if next_step.approver_user:
+            if next_step.approver_position == 'accountant':
+                # 経理ステップ: 経理なら誰でも承認可能なのでcurrent_approverはNone
+                invoice.current_approver = None
+            elif next_step.approver_user:
                 invoice.current_approver = next_step.approver_user
             else:
                 # 役職から承認者を検索（最新のアクティブユーザーを優先）
@@ -1394,11 +1417,38 @@ class InvoiceViewSet(viewsets.ModelViewSet):
             
             invoice.save()
             
-            # 次の承認者に通知
-            self._send_notification_email(
-                recipient=invoice.current_approver,
-                subject=f'【請求書承認依頼】{invoice.invoice_number}',
-                message=f'''
+            # 次の承認者に通知（経理の場合は全経理に通知）
+            if next_step.approver_position == 'accountant':
+                accountants = User.objects.filter(
+                    user_type='internal',
+                    company=invoice.receiving_company,
+                    position='accountant',
+                    is_active=True
+                )
+                for acc in accountants:
+                    self._send_notification_email(
+                        recipient=acc,
+                        subject=f'【請求書承認依頼】{invoice.invoice_number}',
+                        message=f'''
+{acc.get_full_name()} 様
+
+請求書の経理確認依頼が届いています。
+
+請求書番号: {invoice.invoice_number}
+協力会社: {invoice.customer_company.name}
+工事現場: {invoice.construction_site.name}
+金額: ¥{invoice.total_amount:,}
+
+前承認者: {user.get_full_name()} ({user.get_position_display()})
+
+システムにログインして確認してください。
+                        '''.strip()
+                    )
+            elif invoice.current_approver:
+                self._send_notification_email(
+                    recipient=invoice.current_approver,
+                    subject=f'【請求書承認依頼】{invoice.invoice_number}',
+                    message=f'''
 {invoice.current_approver.get_full_name()} 様
 
 請求書の承認依頼が届いています。
@@ -1412,7 +1462,7 @@ class InvoiceViewSet(viewsets.ModelViewSet):
 
 システムにログインして確認してください。
                 '''.strip()
-            )
+                )
             
             message = f'{next_step.step_name}に進みました'
         else:
@@ -2126,6 +2176,19 @@ class InvoiceViewSet(viewsets.ModelViewSet):
             'created_by'
         )
         
+        # 経理ユーザーの場合：経理ステップに到達した全請求書を表示
+        # （current_approver=Noneで経理ステップの請求書）
+        if user.position == 'accountant':
+            accountant_pending = Invoice.objects.filter(
+                status='pending_approval',
+                current_approval_step__approver_position='accountant',
+            ).select_related(
+                'customer_company',
+                'construction_site',
+                'created_by'
+            )
+            pending_invoices = (pending_invoices | accountant_pending).distinct()
+        
         # 役職に基づく承認待ち（ワークフロー対応）
         role_map = {
             'site_supervisor': 'supervisor',
@@ -2161,6 +2224,25 @@ class InvoiceViewSet(viewsets.ModelViewSet):
             'count': pending_invoices.count(),
             'results': serializer.data
         })
+    
+    def _count_my_pending(self, user):
+        """自分の承認待ち件数（経理は全経理ステップをカウント）"""
+        count = Invoice.objects.filter(
+            status='pending_approval',
+            current_approver=user
+        ).count()
+        
+        # 経理ユーザーの場合、current_approver=Noneで経理ステップの請求書もカウント
+        if user.position == 'accountant':
+            accountant_count = Invoice.objects.filter(
+                status='pending_approval',
+                current_approval_step__approver_position='accountant',
+            ).exclude(
+                current_approver=user  # 二重カウント防止
+            ).count()
+            count += accountant_count
+        
+        return count
     
     # ==========================================
     # Phase 6: 一括承認機能
@@ -2293,7 +2375,15 @@ class InvoiceViewSet(viewsets.ModelViewSet):
         )
         
         if not request.user.is_super_admin:
-            invoices = invoices.filter(current_approver=request.user)
+            if request.user.position == 'accountant':
+                # 経理は経理ステップの請求書も却下可能
+                from django.db.models import Q
+                invoices = invoices.filter(
+                    Q(current_approver=request.user) |
+                    Q(current_approval_step__approver_position='accountant')
+                )
+            else:
+                invoices = invoices.filter(current_approver=request.user)
         
         rejected_count = 0
         for invoice in invoices:
@@ -2337,10 +2427,7 @@ class DashboardViewSet(viewsets.GenericViewSet):
                     status='pending_approval'
                 ).count(),
                 
-                'my_pending_approvals': Invoice.objects.filter(
-                    status='pending_approval',
-                    current_approver=user
-                ).count(),
+                'my_pending_approvals': self._count_my_pending(user),
                 
                 'monthly_payment': Invoice.objects.filter(
                     payment_due_date__gte=current_month,

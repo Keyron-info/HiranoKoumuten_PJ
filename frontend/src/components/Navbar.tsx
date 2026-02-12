@@ -27,11 +27,11 @@ const Navbar: React.FC = () => {
             <Link to="/dashboard" className="flex-shrink-0 flex items-center gap-3 group">
               <img
                 src="https://storage.googleapis.com/studio-design-asset-files/projects/1YWj39BMOm/s-863x333_v-fs_webp_f2cc1848-85e6-4e11-a855-9a6eff182a67.png"
-                alt="平野工務店BIM"
+                alt="平野工務店-BIM"
                 className="h-10 w-auto group-hover:scale-105 transition-transform duration-200"
               />
               <span className="text-xl font-bold text-white tracking-tight group-hover:text-primary-400 transition-colors">
-                平野工務店BIM
+                平野工務店-BIM
               </span>
             </Link>
 

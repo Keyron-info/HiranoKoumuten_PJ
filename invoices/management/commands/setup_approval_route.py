@@ -5,7 +5,7 @@ from invoices.models import Company, ApprovalRoute, ApprovalStep
 User = get_user_model()
 
 class Command(BaseCommand):
-    help = 'Setup new 6-step approval route (現場監督 -> 部長 -> 常務 -> 専務 -> 社長 -> 経理)'
+    help = 'Setup new 6-step approval route (現場監督 -> 部長 -> 専務 -> 社長 -> 常務 -> 経理)'
 
     def handle(self, *args, **options):
         company = Company.objects.first()
@@ -26,18 +26,18 @@ class Command(BaseCommand):
         )
 
         # 2. Get Users (正しい役職マッピング)
+        # 長嶺 貴典 = 部長 (department_manager)
+        # 眞木 正之 = 専務取締役 (senior_managing_director)
+        # 堺 仁一郎 = 代表取締役社長 (president)
         # 本城 美代子 = 常務取締役 (managing_director)
-        # 堺 仁一郎 = 専務取締役 (senior_managing_director)
-        # 眞木 正之 = 代表取締役社長 (president)
-        # 田中 一朗 = 部長 (department_manager)
 
-        jomu = User.objects.filter(email='honjo@oita-kakiemon.jp').first()    # 本城 = 常務
-        senmu = User.objects.filter(email='sakai@hira-ko.jp').first()         # 堺 = 専務
-        shacho = User.objects.filter(email='maki@hira-ko.jp').first()         # 眞木 = 社長
-        bucho = User.objects.filter(position='department_manager').first()    # 田中 = 部長
+        bucho = User.objects.filter(email='nagamine@hira-ko.jp').first()       # 長嶺 = 部長
+        senmu = User.objects.filter(email='maki@hira-ko.jp').first()           # 眞木 = 専務
+        shacho = User.objects.filter(email='sakai@hira-ko.jp').first()         # 堺 = 社長
+        jomu = User.objects.filter(email='honjo@oita-kakiemon.jp').first()     # 本城 = 常務
 
         # 3. Define Steps
-        # 正しい承認順序: 現場監督 -> 部長 -> 常務 -> 専務 -> 社長 -> 経理
+        # 承認順序: 現場監督 -> 部長 -> 専務 -> 社長 -> 常務 -> 経理
         steps_config = []
         
         # Step 1: 現場監督
@@ -45,7 +45,7 @@ class Command(BaseCommand):
             'name': '現場監督承認', 'position': 'site_supervisor', 'user': None 
         })
         
-        # Step 2: 部長 (田中)
+        # Step 2: 部長 (長嶺)
         if bucho:
             steps_config.append({
                 'name': '部長承認', 'position': 'department_manager', 'user': bucho
@@ -53,22 +53,22 @@ class Command(BaseCommand):
         else:
              self.stdout.write(self.style.WARNING("⚠️ 部長ユーザーが見つかりません。部長ステップをスキップします。"))
 
-        # Step 3: 常務 (本城)
-        if jomu:
-            steps_config.append({
-                'name': '常務承認', 'position': 'managing_director', 'user': jomu
-            })
-        
-        # Step 4: 専務 (堺)
+        # Step 3: 専務 (眞木)
         if senmu:
             steps_config.append({
                 'name': '専務承認', 'position': 'senior_managing_director', 'user': senmu
             })
 
-        # Step 5: 社長 (眞木)
+        # Step 4: 社長 (堺)
         if shacho:
             steps_config.append({
                 'name': '社長承認', 'position': 'president', 'user': shacho
+            })
+        
+        # Step 5: 常務 (本城)
+        if jomu:
+            steps_config.append({
+                'name': '常務承認', 'position': 'managing_director', 'user': jomu
             })
 
         # Step 6: 経理

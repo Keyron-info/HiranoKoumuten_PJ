@@ -18,10 +18,10 @@ class Command(BaseCommand):
         
         # 2. Force Create/Update Users (正しい役職マッピング)
         users_to_fix = [
-            {'email': 'tanaka@hira-ko.jp', 'role': 'department_manager', 'last': '田中', 'first': '一朗'},
+            {'email': 'nagamine@hira-ko.jp', 'role': 'department_manager', 'last': '長嶺', 'first': '貴典'},
+            {'email': 'maki@hira-ko.jp', 'role': 'senior_managing_director', 'last': '眞木', 'first': '正之'},
+            {'email': 'sakai@hira-ko.jp', 'role': 'president', 'last': '堺', 'first': '仁一郎'},
             {'email': 'honjo@oita-kakiemon.jp', 'role': 'managing_director', 'last': '本城', 'first': '美代子'},
-            {'email': 'sakai@hira-ko.jp', 'role': 'senior_managing_director', 'last': '堺', 'first': '仁一郎'},
-            {'email': 'maki@hira-ko.jp', 'role': 'president', 'last': '眞木', 'first': '正之'},
             {'email': 'takeda@hira-ko.jp', 'role': 'accountant', 'last': '竹田', 'first': '貴也'},
         ]
 
@@ -60,13 +60,13 @@ class Command(BaseCommand):
         )
         self.stdout.write(f"Created Route: {route.name} (ID: {route.id})")
         
-        # Define Steps (正しい順序: 現場監督 -> 部長 -> 常務 -> 専務 -> 社長 -> 経理)
+        # Define Steps (承認順序: 現場監督 -> 部長 -> 専務 -> 社長 -> 常務 -> 経理)
         steps = [
             {'order': 1, 'name': '現場監督承認', 'pos': 'site_supervisor', 'user': None},
             {'order': 2, 'name': '部長承認', 'pos': 'department_manager', 'user': created_users.get('department_manager')},
-            {'order': 3, 'name': '常務承認', 'pos': 'managing_director', 'user': created_users.get('managing_director')},
-            {'order': 4, 'name': '専務承認', 'pos': 'senior_managing_director', 'user': created_users.get('senior_managing_director')},
-            {'order': 5, 'name': '社長承認', 'pos': 'president', 'user': created_users.get('president')},
+            {'order': 3, 'name': '専務承認', 'pos': 'senior_managing_director', 'user': created_users.get('senior_managing_director')},
+            {'order': 4, 'name': '社長承認', 'pos': 'president', 'user': created_users.get('president')},
+            {'order': 5, 'name': '常務承認', 'pos': 'managing_director', 'user': created_users.get('managing_director')},
             {'order': 6, 'name': '経理確認', 'pos': 'accountant', 'user': None},
         ]
 

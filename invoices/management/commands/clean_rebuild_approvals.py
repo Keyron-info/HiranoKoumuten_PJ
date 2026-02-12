@@ -14,10 +14,10 @@ class Command(BaseCommand):
         # ターゲットとなる主要メンバー (名前, メールの一部)
         # ここにあるメンバーについてのみ名寄せを行う
         targets = [
-            {'name': '田中 一朗', 'email_key': 'tanaka', 'role': 'department_manager'},
+            {'name': '長嶺 貴典', 'email_key': 'nagamine', 'role': 'department_manager'},
             {'name': '赤嶺 誠司', 'email_key': 'akamine', 'role': 'site_supervisor'},
-            {'name': '堺 仁一郎', 'email_key': 'sakai', 'role': 'senior_managing_director'},
-            {'name': '眞木 正之', 'email_key': 'maki', 'role': 'president'},
+            {'name': '堺 仁一郎', 'email_key': 'sakai', 'role': 'president'},
+            {'name': '眞木 正之', 'email_key': 'maki', 'role': 'senior_managing_director'},
             {'name': '本城 美代子', 'email_key': 'honjo', 'role': 'managing_director'},
             {'name': '竹田 貴也', 'email_key': 'takeda', 'role': 'accountant'},
         ]

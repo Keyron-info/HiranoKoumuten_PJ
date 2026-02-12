@@ -12,7 +12,7 @@ import sys
 User = get_user_model()
 
 class Command(BaseCommand):
-    help = 'Verify the 6-step approval flow (現場監督 -> 部長 -> 常務 -> 専務 -> 社長 -> 経理)'
+    help = 'Verify the 6-step approval flow (現場監督 -> 部長 -> 専務 -> 社長 -> 常務 -> 経理)'
 
     def handle(self, *args, **options):
         self.stdout.write(self.style.WARNING('🚀 Starting Full Approval Flow Verification...'))
@@ -37,10 +37,10 @@ class Command(BaseCommand):
         # Get Users (正しい役職マッピング)
         try:
             supervisor = User.objects.get(email='akamine@hira-ko.jp')          # 赤嶺 (現場監督)
-            dept_manager = User.objects.get(email='tanaka@hira-ko.jp')         # 田中 (部長)
+            bucho = User.objects.get(email='nagamine@hira-ko.jp')              # 長嶺 (部長)
+            senmu = User.objects.get(email='maki@hira-ko.jp')                  # 眞木 (専務)
+            shacho = User.objects.get(email='sakai@hira-ko.jp')                # 堺 (社長)
             jomu = User.objects.get(email='honjo@oita-kakiemon.jp')            # 本城 (常務)
-            senmu = User.objects.get(email='sakai@hira-ko.jp')                 # 堺 (専務)
-            shacho = User.objects.get(email='maki@hira-ko.jp')                 # 眞木 (社長)
             accountant = User.objects.get(email='takeda@hira-ko.jp')           # 竹田 (経理)
             
             # Create a Partner User for testing
@@ -114,7 +114,7 @@ class Command(BaseCommand):
             amount=100000
         )
 
-        # Submit Invoice (Logic from InvoiceViewSet.submit)
+        # Submit Invoice
         approval_route = ApprovalRoute.objects.filter(
             company=invoice.receiving_company, is_default=True, is_active=True
         ).first()
@@ -134,13 +134,13 @@ class Command(BaseCommand):
         self.verify_state(invoice, 'pending_approval', supervisor, '現場監督 (赤嶺)')
 
 
-        # 4. Approval Steps (正しい順序: 現場監督 -> 部長 -> 常務 -> 専務 -> 社長 -> 経理)
+        # 4. Approval Steps (承認順序: 現場監督 -> 部長 -> 専務 -> 社長 -> 常務 -> 経理)
         approvers_sequence = [
             (supervisor, '現場監督 (赤嶺)', 1),
-            (dept_manager, '部長 (田中)', 2),
-            (jomu, '常務 (本城)', 3),
-            (senmu, '専務 (堺)', 4),
-            (shacho, '社長 (眞木)', 5),
+            (bucho, '部長 (長嶺)', 2),
+            (senmu, '専務 (眞木)', 3),
+            (shacho, '社長 (堺)', 4),
+            (jomu, '常務 (本城)', 5),
             (accountant, '経理 (竹田)', 6)
         ]
 
@@ -157,7 +157,7 @@ class Command(BaseCommand):
             invoice.refresh_from_db()
             
             if step_order < 6:
-                next_approver_tuple = approvers_sequence[step_order]  # index matches next step order
+                next_approver_tuple = approvers_sequence[step_order]
                 next_approver = next_approver_tuple[0]
                 next_role = next_approver_tuple[1]
                 self.verify_state(invoice, 'pending_approval', next_approver, next_role)
@@ -173,9 +173,8 @@ class Command(BaseCommand):
             sys.exit(1)
         
         if invoice.current_approver != expected_approver:
-             # Special case for Accountant if multiple exist
              if expected_approver.position == 'accountant' and invoice.current_approver and invoice.current_approver.position == 'accountant':
-                 pass  # OK
+                 pass
              else:
                 self.stdout.write(self.style.ERROR(f'   ❌ Approver Mismatch at {role_name}! Expected: {expected_approver.get_full_name()}, Got: {invoice.current_approver.get_full_name() if invoice.current_approver else "None"}'))
                 sys.exit(1)
@@ -192,9 +191,6 @@ class Command(BaseCommand):
         self.stdout.write(self.style.SUCCESS(f'   ✅ Verified: Final Status is APPROVED.'))
 
     def approve_invoice(self, invoice, approver):
-        # Simulation of InvoiceViewSet.approve logic
-        
-        # 1. Create History
         ApprovalHistory.objects.create(
             invoice=invoice,
             approval_step=invoice.current_approval_step,
@@ -203,7 +199,6 @@ class Command(BaseCommand):
             comment=f'Approved by {approver.get_full_name()}'
         )
         
-        # 2. Move to next step
         current_step_order = invoice.current_approval_step.step_order
         next_step = invoice.approval_route.steps.filter(
             step_order=current_step_order + 1
@@ -215,7 +210,6 @@ class Command(BaseCommand):
             if next_step.approver_user:
                 invoice.current_approver = next_step.approver_user
             else:
-                # Find by position
                 next_approver = User.objects.filter(
                     user_type='internal',
                     company=invoice.receiving_company,

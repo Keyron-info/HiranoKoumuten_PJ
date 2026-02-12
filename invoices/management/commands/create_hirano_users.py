@@ -30,9 +30,9 @@ class Command(BaseCommand):
                 'last_name_kana': 'サカイ',
                 'first_name_kana': 'ジンイチロウ',
                 'email': 'sakai@hira-ko.jp',
-                'position': 'senior_managing_director',  # 専務取締役（堺）
+                'position': 'president',  # 代表取締役社長（堺）
                 'role': '決裁',
-                'note': '監督・幹部・専（承認のフローにおいてどの段階に承認されるかということ）'
+                'note': '承認フロー④社長承認'
             },
             {
                 'last_name': '眞木',
@@ -40,21 +40,9 @@ class Command(BaseCommand):
                 'last_name_kana': 'マキ',
                 'first_name_kana': 'マサユキ',
                 'email': 'maki@hira-ko.jp',
-                'position': 'president',  # 代表取締役社長（眞木）
+                'position': 'senior_managing_director',  # 専務取締役（眞木）
                 'role': '決裁',
-                'note': '監督・幹部・専（承認のフローにおいてどの段階に承認されるかということ）'
-            },
-            
-            # 部長
-            {
-                'last_name': '田中',
-                'first_name': '一朗', 
-                'last_name_kana': 'タナカ',
-                'first_name_kana': 'イチロウ',
-                'email': 'tanaka@hira-ko.jp',
-                'position': 'department_manager',  # 部長
-                'role': '部長',
-                'note': '承認フロー（部長承認）'
+                'note': '承認フロー③専務承認'
             },
             
             # 経理
@@ -66,7 +54,7 @@ class Command(BaseCommand):
                 'email': 'honjo@oita-kakiemon.jp',
                 'position': 'managing_director',  # 常務取締役（本城）
                 'role': '経理',
-                'note': '全評価期間・印刷'
+                'note': '承認フロー⑤常務承認・全評価期間・印刷'
             },
             {
                 'last_name': '竹田',
@@ -116,9 +104,9 @@ class Command(BaseCommand):
                 'last_name_kana': 'ナガミネ',
                 'first_name_kana': 'タカノリ',
                 'email': 'nagamine@hira-ko.jp',
-                'position': 'site_supervisor',
-                'role': '現場監督',
-                'note': '申請・承認'
+                'position': 'department_manager',  # 部長（長嶺）
+                'role': '部長',
+                'note': '承認フロー②部長承認'
             },
             {
                 'last_name': '稲吉',

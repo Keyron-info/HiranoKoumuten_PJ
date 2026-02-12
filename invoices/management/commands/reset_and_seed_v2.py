@@ -27,12 +27,9 @@ class Command(BaseCommand):
         # 4. Create/Update Users
         users_config = [
             # Executives (正しい役職マッピング)
-            {'name': '堺 仁一郎', 'email': 'sakai@hira-ko.jp', 'role': 'senior_managing_director', 'last': '堺', 'first': '仁一郎'},  # 専務取締役
-            {'name': '眞木 正之', 'email': 'maki@hira-ko.jp', 'role': 'president', 'last': '眞木', 'first': '正之'},  # 代表取締役社長
+            {'name': '堺 仁一郎', 'email': 'sakai@hira-ko.jp', 'role': 'president', 'last': '堺', 'first': '仁一郎'},  # 代表取締役社長
+            {'name': '眞木 正之', 'email': 'maki@hira-ko.jp', 'role': 'senior_managing_director', 'last': '眞木', 'first': '正之'},  # 専務取締役
             {'name': '本城 美代子', 'email': 'honjo@oita-kakiemon.jp', 'role': 'managing_director', 'last': '本城', 'first': '美代子'},  # 常務取締役
-
-            # Department Manager
-            {'name': '田中 一朗', 'email': 'tanaka@hira-ko.jp', 'role': 'department_manager', 'last': '田中', 'first': '一朗'},
             
             # Accountants経理
             {'name': '竹田 鉄也', 'email': 'takeda@hira-ko.jp', 'role': 'accountant', 'last': '竹田', 'first': '鉄也'},
@@ -41,7 +38,7 @@ class Command(BaseCommand):
             
             # 現場監督 (Akamine to Ito)
             {'name': '赤嶺 誠司', 'email': 'akamine@hira-ko.jp', 'role': 'site_supervisor', 'last': '赤嶺', 'first': '誠司'},
-            {'name': '長峯 真美', 'email': 'nagamine@hira-ko.jp', 'role': 'site_supervisor', 'last': '長峯', 'first': '真美'},
+            {'name': '長嶺 貴典', 'email': 'nagamine@hira-ko.jp', 'role': 'department_manager', 'last': '長嶺', 'first': '貴典'},  # 部長
             {'name': '稲吉 智紀', 'email': 'koumu3@hira-ko.jp', 'role': 'site_supervisor', 'last': '稲吉', 'first': '智紀'},
             {'name': '友永 真夫', 'email': 'tomonaga@hira-ko.jp', 'role': 'site_supervisor', 'last': '友永', 'first': '真夫'},
             {'name': '佐土原 圭', 'email': 'sadohara@hira-ko.jp', 'role': 'site_supervisor', 'last': '佐土原', 'first': '圭'},

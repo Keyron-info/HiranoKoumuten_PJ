@@ -78,13 +78,13 @@ class Command(BaseCommand):
                         is_default=False
                     )
                     
-                    # 承認ステップの定義 (現場監督 -> 部長 -> 常務 -> 専務 -> 社長 -> 経理)
+                    # 承認ステップの定義 (現場監督 -> 部長 -> 専務 -> 社長 -> 常務 -> 経理)
                     step_definitions = [
                         (1, '現場監督承認', 'site_supervisor'),
                         (2, '部長承認', 'department_manager'),
-                        (3, '常務承認', 'managing_director'),
-                        (4, '専務承認', 'senior_managing_director'),
-                        (5, '社長承認', 'president'),
+                        (3, '専務承認', 'senior_managing_director'),
+                        (4, '社長承認', 'president'),
+                        (5, '常務承認', 'managing_director'),
                         (6, '経理確認', 'accountant'),
                     ]
                     

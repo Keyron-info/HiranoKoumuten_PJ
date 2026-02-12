@@ -300,7 +300,7 @@ EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 # EMAIL_HOST_PASSWORD = 'your-password'
 
 DEFAULT_FROM_EMAIL = 'noreply@hirano-koumuten.co.jp'
-EMAIL_SUBJECT_PREFIX = '[KEYRON BIM] '
+EMAIL_SUBJECT_PREFIX = '[平野工務店-BIM] '
 
 # フロントエンドURL（ユーザー登録完了メール用）
 FRONTEND_URL = os.environ.get('FRONTEND_URL', 'http://localhost:3000')

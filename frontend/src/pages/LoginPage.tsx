@@ -72,9 +72,9 @@ const LoginPage: React.FC = () => {
       <div className="max-w-md w-full relative z-10">
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-primary-500 to-primary-600 rounded-2xl mb-4 shadow-xl shadow-primary-500/20 transform rotate-3">
-            <span className="text-white text-3xl font-bold tracking-wider">KB</span>
+            <span className="text-white text-2xl font-bold tracking-wider">平野</span>
           </div>
-          <h1 className="text-3xl font-bold text-white mb-2 tracking-tight">KAKIEMON-BIM</h1>
+          <h1 className="text-3xl font-bold text-white mb-2 tracking-tight">平野工務店-BIM</h1>
           <p className="text-slate-400">請求書管理システムへログイン</p>
         </div>
 
@@ -199,7 +199,7 @@ const LoginPage: React.FC = () => {
         <p className="text-center text-xs text-slate-600 mt-8">
           © 2025 平野工務店. All rights reserved.
           <br />
-          System by KAKIEMON-BIM
+          System by 平野工務店-BIM
         </p>
       </div>
     </div>

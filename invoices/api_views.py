@@ -2160,54 +2160,16 @@ class InvoiceViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['get'])
     def my_pending_approvals(self, request):
         """自分の承認待ち一覧（改善版）"""
-        user = request.user
-        
-        # 社内ユーザーのみ
-        if user.user_type != 'internal':
-            return Response([])
-        
-        # 現在の承認者として設定されている請求書
-        pending_invoices = Invoice.objects.filter(
-            current_approver=user,
-            status='pending_approval'
-        ).select_related(
-            'customer_company',
-            'construction_site',
-            'created_by'
-        )
-        
-        # 経理ユーザーの場合：経理ステップに到達した全請求書を表示
-        # （current_approver=Noneで経理ステップの請求書）
-        if user.position == 'accountant':
-            accountant_pending = Invoice.objects.filter(
-                status='pending_approval',
-                current_approval_step__approver_position='accountant',
-            ).select_related(
-                'customer_company',
-                'construction_site',
-                'created_by'
-            )
-            pending_invoices = (pending_invoices | accountant_pending).distinct()
-        
-        # 役職に基づく承認待ち（ワークフロー対応）
-        role_map = {
-            'site_supervisor': 'supervisor',
-            'manager': 'manager',
-            'accountant': 'accounting',
-            'director': 'executive',
-            'president': 'president',
-        }
-        
-        user_role = role_map.get(user.position)
-        if user_role:
-            # InvoiceApprovalStepから自分の承認待ちを取得
-            workflow_invoice_ids = InvoiceApprovalStep.objects.filter(
-                approver_role=user_role,
-                step_status='in_progress'
-            ).values_list('workflow__invoice_id', flat=True)
+        try:
+            user = request.user
             
-            workflow_invoices = Invoice.objects.filter(
-                id__in=workflow_invoice_ids,
+            # 社内ユーザーのみ
+            if user.user_type != 'internal':
+                return Response({'count': 0, 'results': []})
+            
+            # 現在の承認者として設定されている請求書
+            pending_invoices = Invoice.objects.filter(
+                current_approver=user,
                 status='pending_approval'
             ).select_related(
                 'customer_company',
@@ -2215,15 +2177,61 @@ class InvoiceViewSet(viewsets.ModelViewSet):
                 'created_by'
             )
             
-            # 結合
-            pending_invoices = (pending_invoices | workflow_invoices).distinct()
-        
-        serializer = InvoiceListSerializer(pending_invoices, many=True)
-        
-        return Response({
-            'count': pending_invoices.count(),
-            'results': serializer.data
-        })
+            # 経理ユーザーの場合：経理ステップに到達した全請求書を表示
+            # （current_approver=Noneで経理ステップの請求書）
+            if getattr(user, 'position', '') == 'accountant':
+                accountant_pending = Invoice.objects.filter(
+                    status='pending_approval',
+                    current_approval_step__approver_position='accountant',
+                ).select_related(
+                    'customer_company',
+                    'construction_site',
+                    'created_by'
+                )
+                pending_invoices = (pending_invoices | accountant_pending).distinct()
+            
+            # 役職に基づく承認待ち（ワークフロー対応）
+            role_map = {
+                'site_supervisor': 'supervisor',
+                'manager': 'manager',
+                'accountant': 'accounting',
+                'director': 'executive',
+                'president': 'president',
+            }
+            
+            user_role = role_map.get(getattr(user, 'position', ''))
+            if user_role:
+                # InvoiceApprovalStepから自分の承認待ちを取得
+                workflow_invoice_ids = InvoiceApprovalStep.objects.filter(
+                    approver_role=user_role,
+                    step_status='in_progress'
+                ).values_list('workflow__invoice_id', flat=True)
+                
+                workflow_invoices = Invoice.objects.filter(
+                    id__in=workflow_invoice_ids,
+                    status='pending_approval'
+                ).select_related(
+                    'customer_company',
+                    'construction_site',
+                    'created_by'
+                )
+                
+                # 結合
+                pending_invoices = (pending_invoices | workflow_invoices).distinct()
+            
+            serializer = InvoiceListSerializer(pending_invoices, many=True)
+            
+            return Response({
+                'count': pending_invoices.count(),
+                'results': serializer.data
+            })
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            return Response(
+                {'error': f'承認待ち取得エラー: {str(e)}', 'count': 0, 'results': []},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
     
     def _count_my_pending(self, user):
         """自分の承認待ち件数（経理は全経理ステップをカウント）"""
@@ -2408,6 +2416,30 @@ class DashboardViewSet(viewsets.GenericViewSet):
     """ダッシュボードAPI - ユーザー種別対応版"""
     permission_classes = [IsAuthenticated]
     
+    def _count_my_pending(self, user):
+        """自分の承認待ち件数（経理は全経理ステップをカウント）"""
+        try:
+            count = Invoice.objects.filter(
+                status='pending_approval',
+                current_approver=user
+            ).count()
+            
+            # 経理ユーザーの場合、current_approver=Noneで経理ステップの請求書もカウント
+            if getattr(user, 'position', '') == 'accountant':
+                accountant_count = Invoice.objects.filter(
+                    status='pending_approval',
+                    current_approval_step__approver_position='accountant',
+                ).exclude(
+                    current_approver=user  # 二重カウント防止
+                ).count()
+                count += accountant_count
+            
+            return count
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            return 0
+    
     @action(detail=False, methods=['get'])
     def stats(self, request):
         """
@@ -2416,59 +2448,67 @@ class DashboardViewSet(viewsets.GenericViewSet):
         社内ユーザー: 全体統計
         協力会社ユーザー: 自社の統計のみ
         """
-        user = request.user
-        current_month = timezone.now().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-        next_month = (current_month + timedelta(days=32)).replace(day=1)
+        try:
+            user = request.user
+            current_month = timezone.now().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+            next_month = (current_month + timedelta(days=32)).replace(day=1)
 
-        if user.user_type == 'internal':
-            # 社内ユーザー向け統計
-            stats = {
-                'pending_invoices': Invoice.objects.filter(
-                    status='pending_approval'
-                ).count(),
-                
-                'my_pending_approvals': self._count_my_pending(user),
-                
-                'monthly_payment': Invoice.objects.filter(
-                    payment_due_date__gte=current_month,
-                    payment_due_date__lt=next_month,
-                    status__in=['approved', 'paid']
-                ).aggregate(total=Sum('total_amount'))['total'] or 0,
-                
-                'partner_companies': CustomerCompany.objects.filter(
-                    is_active=True
-                ).count(),
-            }
-        else:
-            # 協力会社ユーザー向け統計
-            stats = {
-                'draft_count': Invoice.objects.filter(
-                    customer_company=user.customer_company,
-                    status='draft'
-                ).count(),
-                
-                'submitted_count': Invoice.objects.filter(
-                    customer_company=user.customer_company,
-                    status__in=['submitted', 'pending_approval']
-                ).count(),
-                
-                'returned_count': Invoice.objects.filter(
-                    customer_company=user.customer_company,
-                    status='returned'
-                ).count(),
-                
-                'approved_count': Invoice.objects.filter(
-                    customer_company=user.customer_company,
-                    status='approved'
-                ).count(),
-                
-                'total_amount_pending': Invoice.objects.filter(
-                    customer_company=user.customer_company,
-                    status__in=['submitted', 'pending_approval', 'approved']
-                ).aggregate(total=Sum('total_amount'))['total'] or 0,
-            }
+            if user.user_type == 'internal':
+                # 社内ユーザー向け統計
+                stats = {
+                    'pending_invoices': Invoice.objects.filter(
+                        status='pending_approval'
+                    ).count(),
+                    
+                    'my_pending_approvals': self._count_my_pending(user),
+                    
+                    'monthly_payment': Invoice.objects.filter(
+                        payment_due_date__gte=current_month,
+                        payment_due_date__lt=next_month,
+                        status__in=['approved', 'paid']
+                    ).aggregate(total=Sum('total_amount'))['total'] or 0,
+                    
+                    'partner_companies': CustomerCompany.objects.filter(
+                        is_active=True
+                    ).count(),
+                }
+            else:
+                # 協力会社ユーザー向け統計
+                stats = {
+                    'draft_count': Invoice.objects.filter(
+                        customer_company=user.customer_company,
+                        status='draft'
+                    ).count(),
+                    
+                    'submitted_count': Invoice.objects.filter(
+                        customer_company=user.customer_company,
+                        status__in=['submitted', 'pending_approval']
+                    ).count(),
+                    
+                    'returned_count': Invoice.objects.filter(
+                        customer_company=user.customer_company,
+                        status='returned'
+                    ).count(),
+                    
+                    'approved_count': Invoice.objects.filter(
+                        customer_company=user.customer_company,
+                        status='approved'
+                    ).count(),
+                    
+                    'total_amount_pending': Invoice.objects.filter(
+                        customer_company=user.customer_company,
+                        status__in=['submitted', 'pending_approval', 'approved']
+                    ).aggregate(total=Sum('total_amount'))['total'] or 0,
+                }
 
-        return Response(stats, status=status.HTTP_200_OK)
+            return Response(stats, status=status.HTTP_200_OK)
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            return Response(
+                {'error': f'ダッシュボード統計の取得に失敗しました: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
     
     @action(detail=False, methods=['get'])
     def site_heatmap(self, request):

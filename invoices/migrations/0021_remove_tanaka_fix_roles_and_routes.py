@@ -23,12 +23,13 @@ def fix_roles_and_routes(apps, schema_editor):
 
     print("\n=== Migration 0021: 田中削除・役職修正・承認ルート再構築 ===")
 
-    # ===== 1. 田中一朗を無効化 =====
+    # ===== 1. 田中一朗を無効化（役職もクリアして検索にヒットしないようにする） =====
     tanaka = User.objects.filter(email='tanaka@hira-ko.jp').first()
     if tanaka:
         tanaka.is_active = False
+        tanaka.position = ''
         tanaka.save()
-        print(f"  ✅ 田中一朗 (ID:{tanaka.id}) を無効化しました")
+        print(f"  ✅ 田中一朗 (ID:{tanaka.id}) を無効化・役職クリアしました")
     else:
         print("  ℹ️ 田中一朗は存在しません")
 

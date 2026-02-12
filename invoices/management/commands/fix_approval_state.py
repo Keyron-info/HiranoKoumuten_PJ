@@ -60,11 +60,11 @@ class Command(BaseCommand):
                 if correct_step.approver_user:
                     invoice.current_approver = correct_step.approver_user
                 else:
-                    # ユーザー指定がない場合は役職から検索（既存ロジックの簡易版）
+                    # ユーザー指定がない場合は役職から検索（最新のアクティブユーザーを優先）
                     approver = User.objects.filter(
                         position=correct_step.approver_position,
                         is_active=True
-                    ).first()
+                    ).order_by('-id').first()
                     invoice.current_approver = approver
 
                 invoice.save()

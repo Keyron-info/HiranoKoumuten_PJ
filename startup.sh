@@ -5,6 +5,20 @@
 echo "Running database migrations..."
 venv/bin/python manage.py migrate --noinput
 
+echo "Deactivating old Tanaka user (replaced by Nagamine)..."
+venv/bin/python manage.py shell -c "
+from django.contrib.auth import get_user_model
+User = get_user_model()
+tanaka = User.objects.filter(email='tanaka@hira-ko.jp').first()
+if tanaka:
+    tanaka.is_active = False
+    tanaka.position = ''
+    tanaka.save()
+    print(f'Deactivated Tanaka (ID:{tanaka.id})')
+else:
+    print('Tanaka user not found (already removed)')
+" || true
+
 echo "Fixing duplicate usernames..."
 venv/bin/python manage.py fix_duplicate_usernames || true
 

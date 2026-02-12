@@ -8,6 +8,14 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         self.stdout.write("STARTING FORCE RESET ROUTES...")
         
+        # 0. 旧ユーザー（田中一朗）を無効化
+        tanaka = User.objects.filter(email='tanaka@hira-ko.jp').first()
+        if tanaka:
+            tanaka.is_active = False
+            tanaka.position = ''  # 役職もクリアして検索にヒットしないようにする
+            tanaka.save()
+            self.stdout.write(f"  🗑️ 田中一朗 (ID:{tanaka.id}) を無効化しました")
+        
         # 1. Company Setup (Ensure)
         company, _ = Company.objects.get_or_create(name='平野工務店', defaults={
             'email': 'info@hira-ko.jp', 'phone': '03-0000-0000', 'address': 'Tokyo'

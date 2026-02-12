@@ -1015,20 +1015,28 @@ class InvoiceViewSet(viewsets.ModelViewSet):
             is_default=False
         )
         
-        # ステップの作成
+        # ステップの作成（各ステップに具体的な承認者を紐付ける）
         first_step = None
         for order, name, position in step_definitions:
             user_to_assign = None
             # 現場監督は現場に紐付いたユーザーを指定
             if position == 'site_supervisor':
                 user_to_assign = invoice.construction_site.supervisor
+            else:
+                # 各役職の承認者を検索して紐付ける
+                user_to_assign = User.objects.filter(
+                    user_type='internal',
+                    company=invoice.receiving_company,
+                    position=position,
+                    is_active=True
+                ).order_by('-id').first()  # 最新のユーザーを優先
             
             step = ApprovalStep.objects.create(
                 route=approval_route,
                 step_order=order,
                 step_name=name,
                 approver_position=position,
-                approver_user=user_to_assign # 特定ユーザーがいれば紐付け
+                approver_user=user_to_assign  # 各ステップに具体的なユーザーを紐付け
             )
             if order == 1:
                 first_step = step
@@ -1206,7 +1214,7 @@ class InvoiceViewSet(viewsets.ModelViewSet):
                             company=invoice.receiving_company,
                             position=next_step.approver_position,
                             is_active=True
-                        ).first()
+                        ).order_by('-id').first()
                         if next_approver:
                             invoice.current_approver = next_approver
                     
@@ -1368,13 +1376,13 @@ class InvoiceViewSet(viewsets.ModelViewSet):
             if next_step.approver_user:
                 invoice.current_approver = next_step.approver_user
             else:
-                # 役職から承認者を検索
+                # 役職から承認者を検索（最新のアクティブユーザーを優先）
                 next_approver = User.objects.filter(
                     user_type='internal',
                     company=invoice.receiving_company,
                     position=next_step.approver_position,
                     is_active=True
-                ).first()
+                ).order_by('-id').first()
                 
                 if next_approver:
                     invoice.current_approver = next_approver

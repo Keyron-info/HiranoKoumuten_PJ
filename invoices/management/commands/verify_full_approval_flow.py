@@ -12,7 +12,7 @@ import sys
 User = get_user_model()
 
 class Command(BaseCommand):
-    help = 'Verify the 6-step approval flow (Supervisor -> Dept Manager -> Senior MD -> President -> MD -> Accountant)'
+    help = 'Verify the 6-step approval flow (現場監督 -> 部長 -> 常務 -> 専務 -> 社長 -> 経理)'
 
     def handle(self, *args, **options):
         self.stdout.write(self.style.WARNING('🚀 Starting Full Approval Flow Verification...'))
@@ -34,14 +34,14 @@ class Command(BaseCommand):
         # 2. Prepare Test Data
         self.stdout.write(self.style.HTTP_INFO('\n2️⃣  Preparing Test Data...'))
         
-        # Get Users
+        # Get Users (正しい役職マッピング)
         try:
-            supervisor = User.objects.get(email='akamine@hira-ko.jp') # 赤嶺 (Site Supervisor)
-            dept_manager = User.objects.get(email='tanaka@hira-ko.jp') # 田中 一朗 (Dept Manager)
-            senior_md = User.objects.get(email='sakai@hira-ko.jp') # 堺 (Senior MD)
-            president = User.objects.get(email='maki@hira-ko.jp') # 眞木 (President)
-            md = User.objects.get(email='honjo@oita-kakiemon.jp') # 本城 (MD)
-            accountant = User.objects.get(email='takeda@hira-ko.jp') # 竹田 (Accountant)
+            supervisor = User.objects.get(email='akamine@hira-ko.jp')          # 赤嶺 (現場監督)
+            dept_manager = User.objects.get(email='tanaka@hira-ko.jp')         # 田中 (部長)
+            jomu = User.objects.get(email='honjo@oita-kakiemon.jp')            # 本城 (常務)
+            senmu = User.objects.get(email='sakai@hira-ko.jp')                 # 堺 (専務)
+            shacho = User.objects.get(email='maki@hira-ko.jp')                 # 眞木 (社長)
+            accountant = User.objects.get(email='takeda@hira-ko.jp')           # 竹田 (経理)
             
             # Create a Partner User for testing
             partner_company, _ = CustomerCompany.objects.get_or_create(
@@ -75,7 +75,7 @@ class Command(BaseCommand):
                     'is_active': True
                 }
             )
-            # Ensure supervisor is set correctly (in case it was created differently before)
+            # Ensure supervisor is set correctly
             if site.supervisor != supervisor:
                 site.supervisor = supervisor
                 site.save()
@@ -126,22 +126,22 @@ class Command(BaseCommand):
         first_step = approval_route.steps.filter(step_order=1).first()
         invoice.approval_route = approval_route
         invoice.current_approval_step = first_step
-        invoice.current_approver = invoice.construction_site.supervisor # Should be Akamine
+        invoice.current_approver = invoice.construction_site.supervisor
         invoice.status = 'pending_approval'
         invoice.save()
         
         self.stdout.write(f'   Invoice {invoice.invoice_number} submitted.')
-        self.verify_state(invoice, 'pending_approval', supervisor, 'Site Supervisor')
+        self.verify_state(invoice, 'pending_approval', supervisor, '現場監督 (赤嶺)')
 
 
-        # 4. Approval Steps
+        # 4. Approval Steps (正しい順序: 現場監督 -> 部長 -> 常務 -> 専務 -> 社長 -> 経理)
         approvers_sequence = [
-            (supervisor, 'Site Supervisor (Akamine)', 1),
-            (dept_manager, 'Dept Manager (Tanaka)', 2),
-            (senior_md, 'Senior MD (Sakai)', 3),
-            (president, 'President (Maki)', 4),
-            (md, 'Managing Director (Honjo)', 5),
-            (accountant, 'Accountant (Takeda)', 6)
+            (supervisor, '現場監督 (赤嶺)', 1),
+            (dept_manager, '部長 (田中)', 2),
+            (jomu, '常務 (本城)', 3),
+            (senmu, '専務 (堺)', 4),
+            (shacho, '社長 (眞木)', 5),
+            (accountant, '経理 (竹田)', 6)
         ]
 
         for approver, role_name, step_order in approvers_sequence:
@@ -150,10 +150,6 @@ class Command(BaseCommand):
             # Refresh invoice
             invoice.refresh_from_db()
             
-            # Verify Current Approver (Accountant step is special, approver_user might be None in step definition but logic might handle it)
-            # In setup_approval_route.py, Step 6 (Accountant) has user=None.
-            # In InvoiceViewSet.approve logic, if user=None, it searches by position.
-            
             # Logic to approve
             self.approve_invoice(invoice, approver)
             
@@ -161,7 +157,7 @@ class Command(BaseCommand):
             invoice.refresh_from_db()
             
             if step_order < 6:
-                next_approver_tuple = approvers_sequence[step_order] # index matches next step order (0-indexed list vs 1-indexed step)
+                next_approver_tuple = approvers_sequence[step_order]  # index matches next step order
                 next_approver = next_approver_tuple[0]
                 next_role = next_approver_tuple[1]
                 self.verify_state(invoice, 'pending_approval', next_approver, next_role)
@@ -176,18 +172,10 @@ class Command(BaseCommand):
             self.stdout.write(self.style.ERROR(f'   ❌ Status Mismatch! Expected: {expected_status}, Got: {invoice.status}'))
             sys.exit(1)
         
-        # For accountant step, create logic might assign specific user or any accountant. 
-        # But our setup logic assigns specific users for positions except Accountant.
-        # However, for Step 6, the View logic searches for a user with position='accountant'. Takeda is one.
-        # If invoice.current_approver is Takeda (or any accountant), it's fine.
-        
-        # If expected_approver is Accountant, we might need loose check if there are multiple.
-        # But creates_hirano_users makes Takeda, Ikuse, Cato. Takeda is usually first found.
-        
         if invoice.current_approver != expected_approver:
              # Special case for Accountant if multiple exist
-             if expected_approver.position == 'accountant' and invoice.current_approver.position == 'accountant':
-                 pass # OK
+             if expected_approver.position == 'accountant' and invoice.current_approver and invoice.current_approver.position == 'accountant':
+                 pass  # OK
              else:
                 self.stdout.write(self.style.ERROR(f'   ❌ Approver Mismatch at {role_name}! Expected: {expected_approver.get_full_name()}, Got: {invoice.current_approver.get_full_name() if invoice.current_approver else "None"}'))
                 sys.exit(1)

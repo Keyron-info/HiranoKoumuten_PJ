@@ -25,7 +25,7 @@ const LoginPage: React.FC = () => {
 
     try {
       setLoading(true);
-      await login({ email, password } as any);
+      await login({ email, password });
 
       // ログインを保持する場合の処理
       if (rememberMe) {

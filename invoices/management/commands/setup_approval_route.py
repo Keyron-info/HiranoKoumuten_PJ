@@ -5,7 +5,7 @@ from invoices.models import Company, ApprovalRoute, ApprovalStep
 User = get_user_model()
 
 class Command(BaseCommand):
-    help = 'Setup new 6-step approval route (Genba -> Bucho -> Senmu -> Shacho -> Jomu -> Keiri)'
+    help = 'Setup new 6-step approval route (現場監督 -> 部長 -> 常務 -> 専務 -> 社長 -> 経理)'
 
     def handle(self, *args, **options):
         company = Company.objects.first()
@@ -20,61 +20,60 @@ class Command(BaseCommand):
         
         route = ApprovalRoute.objects.create(
             company=company, 
-            name='標準承認ルート(新)', 
+            name='標準承認ルート', 
             is_default=True, 
             is_active=True
         )
 
-        # 2. Get Users
-        # Mappings based on request:
-        # Senmu = 本城 (Honjo)
-        # Shacho = 堺 (Sakai)
-        # Jomu = 眞木 (Maki)
-        # Bucho = ? (Missing in list, will check for 'department_manager' role)
+        # 2. Get Users (正しい役職マッピング)
+        # 本城 美代子 = 常務取締役 (managing_director)
+        # 堺 仁一郎 = 専務取締役 (senior_managing_director)
+        # 眞木 正之 = 代表取締役社長 (president)
+        # 田中 一朗 = 部長 (department_manager)
 
-        senmu = User.objects.filter(email='honjo@oita-kakiemon.jp').first()
-        shacho = User.objects.filter(email='sakai@hira-ko.jp').first()
-        jomu = User.objects.filter(email='maki@hira-ko.jp').first()
-        bucho = User.objects.filter(position='department_manager').first()
+        jomu = User.objects.filter(email='honjo@oita-kakiemon.jp').first()    # 本城 = 常務
+        senmu = User.objects.filter(email='sakai@hira-ko.jp').first()         # 堺 = 専務
+        shacho = User.objects.filter(email='maki@hira-ko.jp').first()         # 眞木 = 社長
+        bucho = User.objects.filter(position='department_manager').first()    # 田中 = 部長
 
         # 3. Define Steps
-        # Request: 現場監督 -> 部長 -> 専務 -> 社長 -> 常務 -> 経理
+        # 正しい承認順序: 現場監督 -> 部長 -> 常務 -> 専務 -> 社長 -> 経理
         steps_config = []
         
-        # Step 1: Genba
+        # Step 1: 現場監督
         steps_config.append({
             'name': '現場監督承認', 'position': 'site_supervisor', 'user': None 
         })
         
-        # Step 2: Bucho (Skip if not found)
+        # Step 2: 部長 (田中)
         if bucho:
             steps_config.append({
                 'name': '部長承認', 'position': 'department_manager', 'user': bucho
             })
         else:
-             self.stdout.write(self.style.WARNING("⚠️ No Department Manager (Bucho) found. Skipping Bucho step."))
+             self.stdout.write(self.style.WARNING("⚠️ 部長ユーザーが見つかりません。部長ステップをスキップします。"))
 
-        # Step 3: Jomu (Maki) - Requested early
+        # Step 3: 常務 (本城)
         if jomu:
             steps_config.append({
                 'name': '常務承認', 'position': 'managing_director', 'user': jomu
             })
         
-        # Step 4: Shacho (Sakai)
-        if shacho:
-            steps_config.append({
-                'name': '社長承認', 'position': 'president', 'user': shacho
-            })
-
-        # Step 5: Senmu (Honjo) - Requested Last (after President)
+        # Step 4: 専務 (堺)
         if senmu:
             steps_config.append({
                 'name': '専務承認', 'position': 'senior_managing_director', 'user': senmu
             })
 
-        # Step 6: Keiri (Any)
+        # Step 5: 社長 (眞木)
+        if shacho:
+            steps_config.append({
+                'name': '社長承認', 'position': 'president', 'user': shacho
+            })
+
+        # Step 6: 経理
         steps_config.append({
-            'name': '経理承認', 'position': 'accountant', 'user': None
+            'name': '経理確認', 'position': 'accountant', 'user': None
         })
 
         # 4. Create Steps
@@ -87,7 +86,7 @@ class Command(BaseCommand):
                 approver_user=step_data['user'],
                 is_required=True
             )
-            user_name = step_data['user'].get_full_name() if step_data['user'] else "Any/Site-files"
+            user_name = step_data['user'].get_full_name() if step_data['user'] else "(役職指定: 誰でも可)"
             self.stdout.write(f"Step {i}: {step_data['name']} ({user_name})")
 
-        self.stdout.write(self.style.SUCCESS("Approval route setup complete!"))
+        self.stdout.write(self.style.SUCCESS("承認ルートのセットアップが完了しました！"))

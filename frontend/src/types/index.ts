@@ -252,7 +252,7 @@ export interface AuthTokens {
 
 // ログインフォーム型
 export interface LoginForm {
-  username: string;
+  email: string;
   password: string;
 }
 

@@ -350,14 +350,14 @@ const InvoiceDetailPage: React.FC = () => {
     ? `${formatDate(invoice.billing_period_start)} - ${formatDate(invoice.billing_period_end)}`
     : '-';
 
-  // 承認フロー定義（正しい順序：監督 → 部長 → 専務 → 社長 → 常務 → 経理）
+  // 承認フロー定義（正しい順序：現場監督 → 部長 → 常務 → 専務 → 社長 → 経理）
   const approvalSteps = [
     { step: '提出', role: 'partner', status: 'completed' },
-    { step: '現場監督承認', role: 'supervisor', status: 'pending' },
+    { step: '現場監督承認', role: 'site_supervisor', status: 'pending' },
     { step: '部長承認', role: 'department_manager', status: 'waiting' },
+    { step: '常務承認', role: 'managing_director', status: 'waiting' },
     { step: '専務承認', role: 'senior_managing_director', status: 'waiting' },
     { step: '社長承認', role: 'president', status: 'waiting' },
-    { step: '常務承認', role: 'managing_director', status: 'waiting' },
     { step: '経理確認', role: 'accountant', status: 'waiting' },
   ];
 

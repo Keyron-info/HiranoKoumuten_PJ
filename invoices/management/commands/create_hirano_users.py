@@ -309,6 +309,7 @@ class Command(BaseCommand):
         self.stdout.write(f'  代表取締役社長: {User.objects.filter(position="president").count()}人')
         self.stdout.write(f'  専務取締役: {User.objects.filter(position="senior_managing_director").count()}人')
         self.stdout.write(f'  常務取締役: {User.objects.filter(position="managing_director").count()}人')
+        self.stdout.write(f'  部長: {User.objects.filter(position="department_manager").count()}人')
         self.stdout.write(f'  経理担当: {User.objects.filter(position="accountant").count()}人')
         self.stdout.write(f'  現場監督: {User.objects.filter(position="site_supervisor").count()}人')
         self.stdout.write(f'  一般社員: {User.objects.filter(position="staff").count()}人')

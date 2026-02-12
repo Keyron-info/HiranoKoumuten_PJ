@@ -994,13 +994,14 @@ class InvoiceViewSet(viewsets.ModelViewSet):
                     'requires_special_password': True
                 }, status=status.HTTP_400_BAD_REQUEST)
         
-        # 厳格な承認フローの構築 (Supervisor -> Managing Director -> Senior Managing Director -> President -> Accountant)
+        # 厳格な承認フローの構築 (現場監督 -> 部長 -> 常務 -> 専務 -> 社長 -> 経理)
         step_definitions = [
             (1, '現場監督承認', 'site_supervisor'),
-            (2, '常務承認', 'managing_director'),
-            (3, '専務承認', 'senior_managing_director'),
-            (4, '社長承認', 'president'),
-            (5, '経理確認', 'accountant'),
+            (2, '部長承認', 'department_manager'),
+            (3, '常務承認', 'managing_director'),
+            (4, '専務承認', 'senior_managing_director'),
+            (5, '社長承認', 'president'),
+            (6, '経理確認', 'accountant'),
         ]
         
         # 承認ルートの作成
@@ -1156,9 +1157,9 @@ class InvoiceViewSet(viewsets.ModelViewSet):
             # 権限チェック
             can_approve = False
             
-            # 経理の場合：最終ステップ（step_order=5）のみ承認可能
+            # 経理の場合：最終ステップ（経理確認ステップ）のみ承認可能
             if user.position == 'accountant':
-                if current_step.step_order ==5:
+                if current_step.approver_position == 'accountant':
                     can_approve = True
                 else:
                     errors.append({'id': invoice.id, 'invoice_number': invoice.invoice_number, 'error': '経理の承認は全ての役職者承認後に実施してください'})
@@ -1317,9 +1318,9 @@ class InvoiceViewSet(viewsets.ModelViewSet):
         # 承認権限チェック
         can_approve = False
         
-        # 経理の場合：最終ステップ（step_order=5）のみ承認可能
+        # 経理の場合：最終ステップ（経理確認ステップ）のみ承認可能
         if user.position == 'accountant':
-            if current_step.step_order == 5:
+            if current_step.approver_position == 'accountant':
                 can_approve = True
             else:
                 return Response(

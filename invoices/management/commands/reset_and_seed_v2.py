@@ -26,10 +26,10 @@ class Command(BaseCommand):
         
         # 4. Create/Update Users
         users_config = [
-            # Executives
-            {'name': '堺 仁一郎', 'email': 'sakai@hira-ko.jp', 'role': 'president', 'last': '堺', 'first': '仁一郎'},
-            {'name': '眞木 宣之', 'email': 'maki@hira-ko.jp', 'role': 'managing_director', 'last': '眞木', 'first': '宣之'}, # Jomu
-            {'name': '本城 美代子', 'email': 'honjo@oita-kakiemon.jp', 'role': 'senior_managing_director', 'last': '本城', 'first': '美代子'}, # Senmu
+            # Executives (正しい役職マッピング)
+            {'name': '堺 仁一郎', 'email': 'sakai@hira-ko.jp', 'role': 'senior_managing_director', 'last': '堺', 'first': '仁一郎'},  # 専務取締役
+            {'name': '眞木 正之', 'email': 'maki@hira-ko.jp', 'role': 'president', 'last': '眞木', 'first': '正之'},  # 代表取締役社長
+            {'name': '本城 美代子', 'email': 'honjo@oita-kakiemon.jp', 'role': 'managing_director', 'last': '本城', 'first': '美代子'},  # 常務取締役
 
             # Department Manager
             {'name': '田中 一朗', 'email': 'tanaka@hira-ko.jp', 'role': 'department_manager', 'last': '田中', 'first': '一朗'},

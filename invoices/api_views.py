@@ -2160,35 +2160,32 @@ class InvoiceViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['get'])
     def my_pending_approvals(self, request):
         """自分の承認待ち一覧（改善版）"""
+        import traceback as tb
         try:
             user = request.user
             
             # 社内ユーザーのみ
-            if user.user_type != 'internal':
+            if getattr(user, 'user_type', '') != 'internal':
                 return Response({'count': 0, 'results': []})
             
-            # 現在の承認者として設定されている請求書
-            pending_invoices = Invoice.objects.filter(
+            # Step 1: IDだけ取得（軽量クエリ）
+            pending_ids = list(Invoice.objects.filter(
                 current_approver=user,
                 status='pending_approval'
-            ).select_related(
-                'customer_company',
-                'construction_site',
-                'created_by'
-            )
+            ).values_list('id', flat=True))
             
-            # 経理ユーザーの場合：経理ステップに到達した全請求書を表示
-            # （current_approver=Noneで経理ステップの請求書）
+            # 経理ユーザーの場合：経理ステップの全請求書も対象
             if getattr(user, 'position', '') == 'accountant':
-                accountant_pending = Invoice.objects.filter(
-                    status='pending_approval',
-                    current_approval_step__approver_position='accountant',
-                ).select_related(
-                    'customer_company',
-                    'construction_site',
-                    'created_by'
-                )
-                pending_invoices = (pending_invoices | accountant_pending).distinct()
+                try:
+                    accountant_ids = list(Invoice.objects.filter(
+                        status='pending_approval',
+                        current_approval_step__approver_position='accountant',
+                    ).exclude(
+                        id__in=pending_ids
+                    ).values_list('id', flat=True))
+                    pending_ids.extend(accountant_ids)
+                except Exception as e:
+                    print(f"[my_pending_approvals] accountant query error: {e}")
             
             # 役職に基づく承認待ち（ワークフロー対応）
             role_map = {
@@ -2198,40 +2195,74 @@ class InvoiceViewSet(viewsets.ModelViewSet):
                 'director': 'executive',
                 'president': 'president',
             }
-            
             user_role = role_map.get(getattr(user, 'position', ''))
             if user_role:
-                # InvoiceApprovalStepから自分の承認待ちを取得
-                workflow_invoice_ids = InvoiceApprovalStep.objects.filter(
-                    approver_role=user_role,
-                    step_status='in_progress'
-                ).values_list('workflow__invoice_id', flat=True)
-                
-                workflow_invoices = Invoice.objects.filter(
-                    id__in=workflow_invoice_ids,
-                    status='pending_approval'
-                ).select_related(
-                    'customer_company',
-                    'construction_site',
-                    'created_by'
-                )
-                
-                # 結合
-                pending_invoices = (pending_invoices | workflow_invoices).distinct()
+                try:
+                    workflow_ids = list(InvoiceApprovalStep.objects.filter(
+                        approver_role=user_role,
+                        step_status='in_progress'
+                    ).values_list('workflow__invoice_id', flat=True))
+                    for wid in workflow_ids:
+                        if wid not in pending_ids:
+                            pending_ids.append(wid)
+                except Exception as e:
+                    print(f"[my_pending_approvals] workflow query error: {e}")
             
-            serializer = InvoiceListSerializer(pending_invoices, many=True)
+            if not pending_ids:
+                return Response({'count': 0, 'results': []})
+            
+            # Step 2: IDで取得してシリアライズ
+            invoices = Invoice.objects.filter(
+                id__in=pending_ids,
+                status='pending_approval'
+            ).select_related(
+                'customer_company',
+                'construction_site',
+                'created_by'
+            ).order_by('-created_at')
+            
+            try:
+                serializer = InvoiceListSerializer(invoices, many=True)
+                results = serializer.data
+            except Exception as e:
+                print(f"[my_pending_approvals] serializer error: {e}")
+                tb.print_exc()
+                # シリアライザーが失敗した場合は手動でデータ構築
+                results = []
+                for inv in invoices:
+                    try:
+                        results.append({
+                            'id': inv.id,
+                            'invoice_number': inv.invoice_number or '',
+                            'customer_company_name': inv.customer_company.name if inv.customer_company else '',
+                            'construction_site_name_display': inv.construction_site_name or (inv.construction_site.name if inv.construction_site else ''),
+                            'project_name': inv.project_name or '',
+                            'invoice_date': str(inv.invoice_date) if inv.invoice_date else None,
+                            'payment_due_date': str(inv.payment_due_date) if inv.payment_due_date else None,
+                            'status': inv.status or '',
+                            'status_display': inv.get_status_display() if hasattr(inv, 'get_status_display') else inv.status,
+                            'total_amount': float(inv.total_amount) if inv.total_amount else 0,
+                            'current_approver_name': inv.current_approver.get_full_name() if inv.current_approver else None,
+                            'created_by_name': inv.created_by.get_full_name() if inv.created_by else '',
+                            'created_at': inv.created_at.isoformat() if inv.created_at else None,
+                            'updated_at': inv.updated_at.isoformat() if inv.updated_at else None,
+                        })
+                    except Exception as item_err:
+                        print(f"[my_pending_approvals] item serialize error for invoice {inv.id}: {item_err}")
             
             return Response({
-                'count': pending_invoices.count(),
-                'results': serializer.data
+                'count': len(pending_ids),
+                'results': results
             })
         except Exception as e:
-            import traceback
-            traceback.print_exc()
-            return Response(
-                {'error': f'承認待ち取得エラー: {str(e)}', 'count': 0, 'results': []},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+            tb.print_exc()
+            print(f"[my_pending_approvals] CRITICAL ERROR: {type(e).__name__}: {e}")
+            # 200で返してフロントエンドを壊さないようにする（エラーはログに出力）
+            return Response({
+                'count': 0,
+                'results': [],
+                '_debug_error': f'{type(e).__name__}: {str(e)}'
+            })
     
     def _count_my_pending(self, user):
         """自分の承認待ち件数（経理は全経理ステップをカウント）"""

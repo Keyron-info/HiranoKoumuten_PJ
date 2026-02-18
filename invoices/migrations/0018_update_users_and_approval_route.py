@@ -154,5 +154,5 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.RunPython(update_users_and_routes, reverse_func),
+        migrations.RunPython(update_users_and_routes, migrations.RunPython.noop),
     ]

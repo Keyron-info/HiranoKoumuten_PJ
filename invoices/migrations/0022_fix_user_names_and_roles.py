@@ -68,13 +68,13 @@ def fix_names_and_roles(apps, schema_editor):
     sakai    = User.objects.filter(email='sakai@hira-ko.jp', is_active=True).first()       # 社長
     maki     = User.objects.filter(email='maki@hira-ko.jp', is_active=True).first()        # 常務
 
-    # 承認ステップ: 現場監督→部長(長峯)→専務(本城)→社長(堺)→常務(眞木)→経理
+    # 承認ステップ: 現場監督→部長(長峯)→常務(眞木)→社長(堺)→専務(本城)→経理
     steps = [
         (1, '現場監督承認', 'site_supervisor',          None),
         (2, '部長承認',     'department_manager',       nagamine),
-        (3, '専務承認',     'senior_managing_director', honjo),
+        (3, '常務承認',     'managing_director',        maki),
         (4, '社長承認',     'president',                sakai),
-        (5, '常務承認',     'managing_director',        maki),
+        (5, '専務承認',     'senior_managing_director', honjo),
         (6, '経理確認',     'accountant',               None),
     ]
 

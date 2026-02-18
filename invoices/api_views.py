@@ -4273,8 +4273,8 @@ class UserRegistrationRequestViewSet(viewsets.ModelViewSet):
     serializer_class = UserRegistrationRequestSerializer
     
     def get_permissions(self):
-        if self.action == 'create':
-            # 登録申請は誰でも可能
+        if self.action in ['create', 'register']:
+            # 登録申請は誰でも可能（未ログインユーザーも含む）
             return [AllowAny()]
         elif self.action in ['list', 'retrieve']:
             # 一覧・詳細はAdmin/経理のみ

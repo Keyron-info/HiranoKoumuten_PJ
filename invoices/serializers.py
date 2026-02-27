@@ -484,17 +484,18 @@ class InvoiceCreateSerializer(serializers.ModelSerializer):
                     is_bypassed = True
         
         if today > deadline_date and not is_bypassed:
-            # ただし、請求日が「翌月」になっているなら許可する運用もあり得る
-            # ここではシンプルに「締め日過ぎたら今月分の作成は不可」とする
-            # もし「翌月分として作成」を許容するなら、invoice_dateをチェックすべき
-            
             invoice_date = attrs.get('invoice_date', today)
             
-            # 請求日が締め日以前なら（過去日付で出そうとしている）、それはNG
-            # 請求日が締め日より後（来月扱い）ならOK
-            
-            if invoice_date <= deadline_date: # 締め日以前の日付で、締め日過ぎてから出そうとしている -> 完全に遅延
-                raise serializers.ValidationError(f"今月の締め日（{deadline_date.strftime('%m/%d')}）を過ぎているため、今月分の請求書は作成できません。特例パスワードをお持ちの場合は入力してください。")
+            # 請求日が当月内なら許可（25日過ぎても当月分の請求書は作成可能）
+            # ブロックするのは「前月以前の日付で作成しようとしている場合」のみ
+            if invoice_date.month != today.month or invoice_date.year != today.year:
+                # 前月以前の日付 → ブロック
+                if invoice_date < today:
+                    raise serializers.ValidationError(
+                        f"今月の締め日（{deadline_date.strftime('%m/%d')}）を過ぎているため、"
+                        f"{invoice_date.strftime('%Y年%m月')}分の請求書は作成できません。"
+                        f"特例パスワードをお持ちの場合は入力してください。"
+                    )
                 
         return attrs
 

@@ -307,7 +307,30 @@ const InvoiceCreatePage: React.FC = () => {
 
     } catch (error: any) {
       console.error('Failed to create invoice:', error);
-      const errorMessage = error.response?.data?.message || '請求書の作成に失敗しました';
+      // DRFのバリデーションエラーを適切に表示
+      const responseData = error.response?.data;
+      let errorMessage = '請求書の作成に失敗しました';
+      if (responseData) {
+        if (typeof responseData === 'string') {
+          errorMessage = responseData;
+        } else if (Array.isArray(responseData)) {
+          errorMessage = responseData.join('\n');
+        } else if (responseData.non_field_errors) {
+          errorMessage = responseData.non_field_errors.join('\n');
+        } else if (responseData.error) {
+          errorMessage = responseData.error;
+        } else if (responseData.detail) {
+          errorMessage = responseData.detail;
+        } else if (responseData.message) {
+          errorMessage = responseData.message;
+        } else {
+          // フィールド別エラーを結合
+          const fieldErrors = Object.entries(responseData)
+            .map(([key, val]) => `${key}: ${Array.isArray(val) ? val.join(', ') : val}`)
+            .join('\n');
+          if (fieldErrors) errorMessage = fieldErrors;
+        }
+      }
       alert(errorMessage);
     } finally {
       setLoading(false);

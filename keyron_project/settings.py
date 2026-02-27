@@ -11,9 +11,13 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
 import os
+import sys
+import logging
 import dj_database_url
 from pathlib import Path
 from datetime import timedelta
+
+logger = logging.getLogger(__name__)
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -28,7 +32,7 @@ SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-k=7l0(k#%0(^)woy)ktw#
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get('DEBUG', 'True') == 'True'
 
-ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', '*').split(',')
+ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
 
 
 # Application definition
@@ -92,33 +96,26 @@ WSGI_APPLICATION = 'keyron_project.wsgi.application'
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
 # DATABASE_URLが設定されている場合はそちらを使用、なければSQLiteを使用
-import os
-import sys
-import dj_database_url
-
 DATABASE_URL = os.environ.get('DATABASE_URL')
 
 if DATABASE_URL:
-    # デバッグログ：DATABASE_URLの内容確認（パスワードはマスク）
     masked_url = DATABASE_URL.split('@')[-1] if '@' in DATABASE_URL else 'HIDDEN'
-    print(f"[DEBUG] DATABASE_URL detected. Host info: {masked_url}", file=sys.stderr)
+    logger.info(f"DATABASE_URL detected. Host info: {masked_url}")
     
-    # DATABASE_URLから設定をパース
     db_config = dj_database_url.parse(DATABASE_URL, conn_max_age=600)
     
-    # [CRITICAL FIX] データベース名を強制的に 'postgres' に設定
-    # App Runner環境変数や以前の設定で 'keyronnew' になっている可能性があるため
+    # DB名を環境変数から取得（デフォルト: postgres）
+    db_name_override = os.environ.get('DB_NAME_OVERRIDE', 'postgres')
     original_name = db_config.get('NAME')
-    print(f"[DEBUG] Original DB Name from URL: {original_name}", file=sys.stderr)
-    
-    db_config['NAME'] = 'postgres'
-    print(f"[DEBUG] Overridden DB Name: {db_config['NAME']}", file=sys.stderr)
+    if original_name != db_name_override:
+        logger.warning(f"DB Name overridden: {original_name} -> {db_name_override}")
+        db_config['NAME'] = db_name_override
     
     DATABASES = {
         'default': db_config
     }
 else:
-    print("[DEBUG] No DATABASE_URL found. Using SQLite.", file=sys.stderr)
+    logger.info("No DATABASE_URL found. Using SQLite.")
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.sqlite3',
@@ -292,18 +289,20 @@ CORS_ALLOW_METHODS = [
 # ====================
 # メール設定
 # ====================
-# 開発環境: コンソールに出力
-EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+# 環境変数で切り替え（デフォルト: 開発用コンソール出力）
+EMAIL_BACKEND = os.environ.get(
+    'EMAIL_BACKEND',
+    'django.core.mail.backends.console.EmailBackend'
+)
 
-# 本番環境用（SMTPサーバー設定）
-# EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-# EMAIL_HOST = 'smtp.example.com'
-# EMAIL_PORT = 587
-# EMAIL_USE_TLS = True
-# EMAIL_HOST_USER = 'your-email@example.com'
-# EMAIL_HOST_PASSWORD = 'your-password'
+# AWS SES / SMTP 本番設定（環境変数で注入）
+EMAIL_HOST = os.environ.get('EMAIL_HOST', 'email-smtp.ap-northeast-1.amazonaws.com')
+EMAIL_PORT = int(os.environ.get('EMAIL_PORT', '587'))
+EMAIL_USE_TLS = os.environ.get('EMAIL_USE_TLS', 'True') == 'True'
+EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', '')
+EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
 
-DEFAULT_FROM_EMAIL = 'noreply@hirano-koumuten.co.jp'
+DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'noreply@hirano-koumuten.co.jp')
 EMAIL_SUBJECT_PREFIX = '[平野工務店-BIM] '
 
 # フロントエンドURL（ユーザー登録完了メール用）

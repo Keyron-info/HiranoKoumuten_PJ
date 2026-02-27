@@ -7,12 +7,17 @@ const RegisterPage: React.FC = () => {
   const navigate = useNavigate();
   const [formData, setFormData] = useState<RegistrationFormData>({
     company_name: '',
+    company_name_kana: '',
     full_name: '',
     email: '',
     confirm_email: '',
     phone_number: '',
+    fax_number: '',
     postal_code: '',
     address: '',
+    representative_name: '',
+    invoice_registration_number: '',
+    head_office_address: '',
     department: '',
     position: '',
     notes: '',
@@ -183,9 +188,9 @@ const RegisterPage: React.FC = () => {
               </h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {/* 会社名 */}
-                <div className="col-span-1 md:col-span-2">
+                <div className="col-span-1">
                   <FormInput
-                    label="会社名"
+                    label="会社名（業者名）"
                     id="company_name"
                     value={formData.company_name}
                     onChange={handleChange}
@@ -195,10 +200,45 @@ const RegisterPage: React.FC = () => {
                   />
                 </div>
 
-                {/* 氏名 */}
+                {/* 会社名ふりがな */}
+                <div className="col-span-1">
+                  <FormInput
+                    label="会社名（ふりがな）"
+                    id="company_name_kana"
+                    value={formData.company_name_kana}
+                    onChange={handleChange}
+                    placeholder="例: かぶしきがいしゃさんぷるけんせつ"
+                  />
+                </div>
+
+                {/* 代表者名 */}
+                <div className="col-span-1">
+                  <FormInput
+                    label="代表者名"
+                    id="representative_name"
+                    value={formData.representative_name}
+                    onChange={handleChange}
+                    placeholder="例: 平野 一郎"
+                    icon={<User size={18} className="text-slate-500" />}
+                  />
+                </div>
+
+                {/* インボイス番号 */}
+                <div className="col-span-1">
+                  <FormInput
+                    label="インボイス番号"
+                    id="invoice_registration_number"
+                    value={formData.invoice_registration_number}
+                    onChange={handleChange}
+                    placeholder="例: T1234567890123"
+                    icon={<FileText size={18} className="text-slate-500" />}
+                  />
+                </div>
+
+                {/* 担当者名 */}
                 <div className="col-span-1 md:col-span-2">
                   <FormInput
-                    label="氏名"
+                    label="担当者名"
                     id="full_name"
                     value={formData.full_name}
                     onChange={handleChange}
@@ -263,6 +303,19 @@ const RegisterPage: React.FC = () => {
                   />
                 </div>
 
+                {/* FAX番号 */}
+                <div className="col-span-1">
+                  <FormInput
+                    label="FAX番号"
+                    id="fax_number"
+                    type="tel"
+                    value={formData.fax_number}
+                    onChange={handleChange}
+                    placeholder="03-1234-5678"
+                    icon={<Phone size={18} className="text-slate-500" />}
+                  />
+                </div>
+
                 {/* 郵便番号 */}
                 <div className="col-span-1">
                   <FormInput
@@ -276,6 +329,9 @@ const RegisterPage: React.FC = () => {
                   />
                 </div>
 
+                {/* 空白 */}
+                <div className="col-span-1" />
+
                 {/* 住所 */}
                 <div className="col-span-1 md:col-span-2">
                   <label htmlFor="address" className="block text-sm font-medium text-slate-300 mb-1">
@@ -286,7 +342,7 @@ const RegisterPage: React.FC = () => {
                     name="address"
                     value={formData.address}
                     onChange={handleChange}
-                    rows={3}
+                    rows={2}
                     className={`w-full px-4 py-3 bg-slate-800/50 border rounded-lg focus:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all text-white placeholder-slate-600 ${errors.address ? 'border-rose-500/50 ring-rose-500/20' : 'border-slate-700'
                       }`}
                     placeholder="都道府県、市区町村、番地、建物名など"
@@ -294,6 +350,22 @@ const RegisterPage: React.FC = () => {
                   {errors.address && (
                     <p className="mt-1 text-xs text-rose-400">{errors.address}</p>
                   )}
+                </div>
+
+                {/* 本社住所 */}
+                <div className="col-span-1 md:col-span-2">
+                  <label htmlFor="head_office_address" className="block text-sm font-medium text-slate-300 mb-1">
+                    本社住所（上記と異なる場合）
+                  </label>
+                  <textarea
+                    id="head_office_address"
+                    name="head_office_address"
+                    value={formData.head_office_address}
+                    onChange={handleChange}
+                    rows={2}
+                    className="w-full px-4 py-3 bg-slate-800/50 border border-slate-700 rounded-lg focus:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all text-white placeholder-slate-600"
+                    placeholder="本社が事務所と異なる場合にご記入ください"
+                  />
                 </div>
               </div>
             </section>

@@ -4383,15 +4383,20 @@ KEYRON BIM 運営チーム
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        # 顧客会社を作成または取得
+        # 顧客会社を作成または取得（会社名で自動マッチング）
         customer_company, created = CustomerCompany.objects.get_or_create(
             name=registration.company_name,
             defaults={
                 'business_type': 'subcontractor',
+                'name_kana': getattr(registration, 'company_name_kana', '') or '',
+                'representative_name': getattr(registration, 'representative_name', '') or '',
+                'invoice_registration_number': getattr(registration, 'invoice_registration_number', '') or '',
                 'email': registration.email,
                 'phone': registration.phone_number,
+                'fax': getattr(registration, 'fax_number', '') or '',
                 'postal_code': registration.postal_code,
                 'address': registration.address,
+                'head_office_address': getattr(registration, 'head_office_address', '') or '',
             }
         )
         
@@ -4496,6 +4501,149 @@ KEYRON BIM 運営チーム
             pass
         
         return Response({"message": "申請を却下しました"})
+
+
+# ==========================================
+# 支払い表（Payment Report）
+# ==========================================
+
+class PaymentReportViewSet(viewsets.ViewSet):
+    """月次支払い表API"""
+    permission_classes = [IsAuthenticated, IsAccountantOrSuperAdmin]
+    
+    @action(detail=False, methods=['get'])
+    def generate(self, request):
+        """
+        支払い表データを生成
+        
+        Query Params:
+            year: 年 (required)
+            month: 月 (required)
+            site_id: 現場ID (optional, 全現場の場合は省略)
+        """
+        year = request.query_params.get('year')
+        month = request.query_params.get('month')
+        site_id = request.query_params.get('site_id')
+        
+        if not year or not month:
+            return Response(
+                {'error': '年と月を指定してください'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        year = int(year)
+        month = int(month)
+        
+        # 対象請求書を取得（承認済み・支払い準備中・支払い済み）
+        invoices_qs = Invoice.objects.filter(
+            invoice_date__year=year,
+            invoice_date__month=month,
+            status__in=['approved', 'payment_preparing', 'paid']
+        ).select_related('customer_company', 'construction_site')
+        
+        if site_id:
+            invoices_qs = invoices_qs.filter(construction_site_id=site_id)
+        
+        # 現場ごとにグループ化
+        sites_data = {}
+        for inv in invoices_qs:
+            site_name = inv.construction_site.name if inv.construction_site else '現場未指定'
+            site_key = inv.construction_site_id or 0
+            
+            if site_key not in sites_data:
+                sites_data[site_key] = {
+                    'site_id': site_key,
+                    'site_name': site_name,
+                    'companies': {}
+                }
+            
+            company_name = inv.customer_company.name if inv.customer_company else '会社未指定'
+            company_id = inv.customer_company_id or 0
+            
+            if company_id not in sites_data[site_key]['companies']:
+                sites_data[site_key]['companies'][company_id] = {
+                    'company_id': company_id,
+                    'company_name': company_name,
+                    'invoice_amount': 0,
+                    'safety_fee': 0,
+                    'net_amount': 0,
+                    'invoice_count': 0,
+                    'invoice_ids': [],
+                }
+            
+            entry = sites_data[site_key]['companies'][company_id]
+            total = int(inv.total_amount or 0)
+            safety = int(inv.safety_cooperation_fee or 0) if hasattr(inv, 'safety_cooperation_fee') else 0
+            entry['invoice_amount'] += total
+            entry['safety_fee'] += safety
+            entry['net_amount'] += (total - safety)
+            entry['invoice_count'] += 1
+            entry['invoice_ids'].append(inv.id)
+        
+        # レスポンス構築
+        report_data = []
+        grand_total_invoice = 0
+        grand_total_safety = 0
+        grand_total_net = 0
+        
+        for site_key, site_info in sites_data.items():
+            site_total_invoice = 0
+            site_total_safety = 0
+            site_total_net = 0
+            companies_list = []
+            
+            for company_id, comp_data in site_info['companies'].items():
+                site_total_invoice += comp_data['invoice_amount']
+                site_total_safety += comp_data['safety_fee']
+                site_total_net += comp_data['net_amount']
+                companies_list.append(comp_data)
+            
+            grand_total_invoice += site_total_invoice
+            grand_total_safety += site_total_safety
+            grand_total_net += site_total_net
+            
+            report_data.append({
+                'site_id': site_info['site_id'],
+                'site_name': site_info['site_name'],
+                'companies': companies_list,
+                'site_total_invoice': site_total_invoice,
+                'site_total_safety': site_total_safety,
+                'site_total_net': site_total_net,
+            })
+        
+        # 支払日計算（翌月末）
+        import calendar as cal_module
+        if month == 12:
+            pay_year, pay_month = year + 1, 1
+        else:
+            pay_year, pay_month = year, month + 1
+        pay_last_day = cal_module.monthrange(pay_year, pay_month)[1]
+        payment_date = f"{pay_year}-{pay_month:02d}-{pay_last_day:02d}"
+        
+        return Response({
+            'year': year,
+            'month': month,
+            'payment_date': payment_date,
+            'sites': report_data,
+            'grand_total_invoice': grand_total_invoice,
+            'grand_total_safety': grand_total_safety,
+            'grand_total_net': grand_total_net,
+        })
+    
+    @action(detail=False, methods=['get'])
+    def available_months(self, request):
+        """支払い表が利用可能な年月の一覧"""
+        months = Invoice.objects.filter(
+            status__in=['approved', 'payment_preparing', 'paid']
+        ).values('invoice_date__year', 'invoice_date__month').distinct().order_by(
+            '-invoice_date__year', '-invoice_date__month'
+        )
+        
+        result = [
+            {'year': m['invoice_date__year'], 'month': m['invoice_date__month']}
+            for m in months
+        ]
+        return Response(result)
 
 
 # ==========================================

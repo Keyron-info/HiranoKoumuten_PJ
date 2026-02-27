@@ -296,15 +296,33 @@ class CustomerCompany(models.Model):
     ]
     
     name = models.CharField(max_length=100, verbose_name="会社名")
+    name_kana = models.CharField(max_length=200, verbose_name="会社名（ふりがな）", blank=True)
     business_type = models.CharField(
         max_length=20, 
         choices=BUSINESS_TYPE_CHOICES, 
         verbose_name="業種"
     )
+    
+    # 代表者情報
+    representative_name = models.CharField(max_length=100, verbose_name="代表者名", blank=True)
+    
+    # インボイス制度対応
+    invoice_registration_number = models.CharField(
+        max_length=20, verbose_name="インボイス番号",
+        blank=True, help_text="T+13桁の番号（例: T1234567890123）"
+    )
+    
+    # 連絡先（事務所/支店）
     postal_code = models.CharField(max_length=10, verbose_name="郵便番号", blank=True)
     address = models.TextField(verbose_name="住所", blank=True)
     phone = models.CharField(max_length=20, verbose_name="電話番号", blank=True)
+    fax = models.CharField(max_length=20, verbose_name="FAX番号", blank=True)
     email = models.EmailField(verbose_name="代表メールアドレス")
+    
+    # 本社情報（事務所と異なる場合）
+    head_office_postal_code = models.CharField(max_length=10, verbose_name="本社郵便番号", blank=True)
+    head_office_address = models.TextField(verbose_name="本社住所", blank=True)
+    
     tax_number = models.CharField(max_length=20, verbose_name="法人番号", blank=True)
     bank_name = models.CharField(max_length=50, verbose_name="銀行名", blank=True)
     bank_branch = models.CharField(max_length=50, verbose_name="支店名", blank=True)
@@ -2875,11 +2893,21 @@ class UserRegistrationRequest(models.Model):
     
     # 基本情報
     company_name = models.CharField(max_length=200, verbose_name="会社名")
+    company_name_kana = models.CharField(max_length=200, verbose_name="会社名（ふりがな）", blank=True)
     full_name = models.CharField(max_length=100, verbose_name="氏名")
     email = models.EmailField(unique=True, verbose_name="メールアドレス")
     phone_number = models.CharField(max_length=20, verbose_name="電話番号")
+    fax_number = models.CharField(max_length=20, verbose_name="FAX番号", blank=True)
     postal_code = models.CharField(max_length=10, verbose_name="郵便番号")
     address = models.TextField(verbose_name="住所")
+    
+    # 会社詳細情報
+    representative_name = models.CharField(max_length=100, verbose_name="代表者名", blank=True)
+    invoice_registration_number = models.CharField(
+        max_length=20, verbose_name="インボイス番号", blank=True,
+        help_text="T+13桁の番号（例: T1234567890123）"
+    )
+    head_office_address = models.TextField(verbose_name="本社住所", blank=True)
     
     # 任意項目
     department = models.CharField(max_length=100, blank=True, verbose_name="部署")

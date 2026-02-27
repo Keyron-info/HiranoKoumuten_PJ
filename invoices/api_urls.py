@@ -48,6 +48,8 @@ from .api_views import (
     DeadlineNotificationBannerViewSet,
     PasswordResetView,
     PasswordResetConfirmView,
+    # 支払い表
+    PaymentReportViewSet,
 )
 
 router = DefaultRouter()
@@ -92,6 +94,8 @@ router.register(r'user-registration-requests', UserRegistrationRequestViewSet, b
 # タスク3追加
 router.register(r'payment-calendar', PaymentCalendarViewSet, basename='payment-calendar')
 router.register(r'deadline-banner', DeadlineNotificationBannerViewSet, basename='deadline-banner')
+# 支払い表
+router.register(r'payment-report', PaymentReportViewSet, basename='payment-report')
 
 urlpatterns = [
     # JWT認証

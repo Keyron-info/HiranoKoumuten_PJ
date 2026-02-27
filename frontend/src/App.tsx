@@ -25,7 +25,9 @@ import CalendarManagementPage from './pages/admin/CalendarManagementPage';
 import SiteManagementPage from './pages/admin/SiteManagementPage';
 import UserManagementPage from './pages/admin/UserManagementPage';
 import PartnerCompanyManagementPage from './pages/admin/PartnerCompanyManagementPage';
+import ConstructionTypeManagementPage from './pages/admin/ConstructionTypeManagementPage';
 import AuditLogPage from './pages/AuditLogPage';
+import PaymentReportPage from './pages/PaymentReportPage';
 import ThankYouPage from './pages/ThankYouPage'; // 🆕 Import
 
 // ====================
@@ -265,10 +267,26 @@ const AppRoutes: React.FC = () => {
         }
       />
       <Route
+        path="/admin/construction-types"
+        element={
+          <InternalRoute>
+            <ConstructionTypeManagementPage />
+          </InternalRoute>
+        }
+      />
+      <Route
         path="/audit-logs"
         element={
           <InternalRoute>
             <AuditLogPage />
+          </InternalRoute>
+        }
+      />
+      <Route
+        path="/payment-report"
+        element={
+          <InternalRoute>
+            <PaymentReportPage />
           </InternalRoute>
         }
       />

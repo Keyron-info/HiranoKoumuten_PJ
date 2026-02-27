@@ -5,11 +5,16 @@ import apiClient from './client';
 export interface UserRegistrationRequest {
   id: number;
   company_name: string;
+  company_name_kana?: string;
   full_name: string;
   email: string;
   phone_number: string;
+  fax_number?: string;
   postal_code: string;
   address: string;
+  representative_name?: string;
+  invoice_registration_number?: string;
+  head_office_address?: string;
   department?: string;
   position?: string;
   notes?: string;
@@ -25,12 +30,17 @@ export interface UserRegistrationRequest {
 
 export interface RegistrationFormData {
   company_name: string;
+  company_name_kana: string;
   full_name: string;
   email: string;
   confirm_email: string;
   phone_number: string;
+  fax_number: string;
   postal_code: string;
   address: string;
+  representative_name: string;
+  invoice_registration_number: string;
+  head_office_address: string;
   department?: string;
   position?: string;
   notes?: string;
@@ -44,11 +54,16 @@ export const userRegistrationAPI = {
       '/users/register/',
       {
         company_name: data.company_name,
+        company_name_kana: data.company_name_kana || '',
         full_name: data.full_name,
         email: data.email,
         phone_number: data.phone_number,
+        fax_number: data.fax_number || '',
         postal_code: data.postal_code,
         address: data.address,
+        representative_name: data.representative_name || '',
+        invoice_registration_number: data.invoice_registration_number || '',
+        head_office_address: data.head_office_address || '',
         department: data.department || '',
         position: data.position || '',
         notes: data.notes || '',

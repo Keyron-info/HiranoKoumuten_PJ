@@ -143,6 +143,24 @@ const InvoicePeriods: React.FC = () => {
           </button>
         </div>
 
+        {/* 自動締め情報バナー */}
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+          <div className="flex items-start">
+            <div className="flex-shrink-0">
+              <svg className="h-5 w-5 text-blue-400 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+              </svg>
+            </div>
+            <div className="ml-3">
+              <h3 className="text-sm font-medium text-blue-800">自動締め処理について</h3>
+              <p className="mt-1 text-sm text-blue-700">
+                毎月<strong>25日</strong>に当月分の請求期間が自動的に締められます。
+                翌月分の期間も自動で作成されます。特定の月のみ手動で締め日を変更できます。
+              </p>
+            </div>
+          </div>
+        </div>
+
         {/* 期間一覧 */}
         <div className="bg-white shadow overflow-hidden sm:rounded-lg">
           <table className="min-w-full divide-y divide-gray-200">
@@ -190,6 +208,15 @@ const InvoicePeriods: React.FC = () => {
                     >
                       {period.status_display}
                     </span>
+                    {period.is_closed && period.closed_at && (
+                      <div className="text-xs text-gray-400 mt-1">
+                        {period.closed_by_name
+                          ? period.closed_by_name
+                          : '自動処理'
+                        }
+                        {' '}({new Date(period.closed_at).toLocaleDateString('ja-JP')})
+                      </div>
+                    )}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm text-gray-900">

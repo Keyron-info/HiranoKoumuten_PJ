@@ -79,9 +79,19 @@ const Navbar: React.FC = () => {
                 <NavLink to="/admin/partners" label="協力会社" />
               )}
 
+              {/* 工種管理は管理者または経理のみ */}
+              {(user?.user_type === 'admin' || (user?.user_type === 'internal' && (user?.position === 'accountant' || user?.position === 'admin'))) && (
+                <NavLink to="/admin/construction-types" label="工種管理" />
+              )}
+
               {/* 操作ログは管理者または経理のみ */}
               {(user?.user_type === 'admin' || (user?.user_type === 'internal' && (user?.position === 'accountant' || user?.position === 'admin'))) && (
                 <NavLink to="/audit-logs" label="操作ログ" />
+              )}
+
+              {/* 支払い表は管理者または経理のみ */}
+              {(user?.user_type === 'admin' || (user?.user_type === 'internal' && (user?.position === 'accountant' || user?.position === 'admin'))) && (
+                <NavLink to="/payment-report" label="支払い表" />
               )}
             </div>
           </div>

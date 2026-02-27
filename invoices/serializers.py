@@ -72,9 +72,11 @@ class CustomerCompanySerializer(serializers.ModelSerializer):
     class Meta:
         model = CustomerCompany
         fields = [
-            'id', 'name', 'business_type', 'business_type_display',
-            'postal_code', 'address', 'phone', 'email', 'tax_number',
-            'bank_name', 'bank_branch', 'bank_account', 'is_active'
+            'id', 'name', 'name_kana', 'business_type', 'business_type_display',
+            'representative_name', 'invoice_registration_number',
+            'postal_code', 'address', 'phone', 'fax', 'email',
+            'head_office_postal_code', 'head_office_address',
+            'tax_number', 'bank_name', 'bank_branch', 'bank_account', 'is_active'
         ]
 
 
@@ -1256,8 +1258,11 @@ class UserRegistrationRequestSerializer(serializers.ModelSerializer):
     class Meta:
         model = UserRegistrationRequest
         fields = [
-            'id', 'company_name', 'full_name', 'email', 'phone_number',
-            'postal_code', 'address', 'department', 'position', 'notes',
+            'id', 'company_name', 'company_name_kana', 'full_name',
+            'email', 'phone_number', 'fax_number',
+            'postal_code', 'address',
+            'representative_name', 'invoice_registration_number', 'head_office_address',
+            'department', 'position', 'notes',
             'status', 'status_display', 'submitted_at', 'reviewed_at',
             'reviewed_by', 'reviewed_by_name', 'rejection_reason',
             'created_user'

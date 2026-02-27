@@ -457,6 +457,24 @@ export const constructionTypeAPI = {
     const response = await apiClient.post<{ message: string; total: number }>('/construction-types/initialize/');
     return response.data;
   },
+
+  // 工種作成
+  create: async (data: { code: string; name: string; description?: string; display_order?: number }): Promise<ConstructionType> => {
+    const response = await apiClient.post<ConstructionType>('/construction-types/', data);
+    return response.data;
+  },
+
+  // 工種更新
+  update: async (id: number, data: Partial<{ code: string; name: string; description: string; display_order: number; is_active: boolean }>): Promise<ConstructionType> => {
+    const response = await apiClient.patch<ConstructionType>(`/construction-types/${id}/`, data);
+    return response.data;
+  },
+
+  // 工種削除（論理削除: is_active=false）
+  deactivate: async (id: number): Promise<ConstructionType> => {
+    const response = await apiClient.patch<ConstructionType>(`/construction-types/${id}/`, { is_active: false });
+    return response.data;
+  },
 };
 
 // 注文書API

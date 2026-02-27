@@ -19,6 +19,7 @@ const InvoiceCreatePage: React.FC = () => {
   const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>([]);
   const [documentType, setDocumentType] = useState<'invoice' | 'delivery_note'>('invoice');
   const [selectedConstructionType, setSelectedConstructionType] = useState<number | null>(null);
+  const [isOtherType, setIsOtherType] = useState(false);
   const [constructionTypeOther, setConstructionTypeOther] = useState<string>('');
   const [selectedPurchaseOrder, setSelectedPurchaseOrder] = useState<number | null>(null);
 
@@ -294,9 +295,9 @@ const InvoiceCreatePage: React.FC = () => {
         ...formData,
         template: selectedTemplate,
         document_type: documentType,
-        construction_type: selectedConstructionType,
-        construction_type_other: constructionTypeOther,
-        purchase_order: selectedPurchaseOrder,
+        construction_type: selectedConstructionType || null,
+        construction_type_other: constructionTypeOther || '',
+        purchase_order: selectedPurchaseOrder || null,
       };
       const invoice = await invoiceAPI.createInvoice(submitData as any);
 
@@ -450,11 +451,15 @@ const InvoiceCreatePage: React.FC = () => {
                 </label>
                 <select
                   required
-                  value={selectedConstructionType || ''}
+                  value={isOtherType ? 'other' : (selectedConstructionType || '')}
                   onChange={(e) => {
                     const value = e.target.value;
-                    setSelectedConstructionType(value ? Number(value) : null);
-                    if (value !== 'other') {
+                    if (value === 'other') {
+                      setSelectedConstructionType(null);
+                      setIsOtherType(true);
+                    } else {
+                      setSelectedConstructionType(value ? Number(value) : null);
+                      setIsOtherType(false);
                       setConstructionTypeOther('');
                     }
                   }}
@@ -481,7 +486,7 @@ const InvoiceCreatePage: React.FC = () => {
                   value={constructionTypeOther}
                   onChange={(e) => setConstructionTypeOther(e.target.value)}
                   placeholder="その他の工種名を入力"
-                  disabled={selectedConstructionType !== null && String(selectedConstructionType) !== 'other'}
+                  disabled={!isOtherType}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
                 />
               </div>

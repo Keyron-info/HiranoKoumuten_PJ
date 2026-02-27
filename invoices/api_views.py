@@ -707,6 +707,9 @@ class InvoiceViewSet(viewsets.ModelViewSet):
             # 特例パスワードの取得
             special_password = request.data.get('special_password')
     
+            # デフォルト値
+            is_bypassed = False
+    
             if request.user.user_type == 'customer':
                 invoice_date = request.data.get('invoice_date')
                 construction_site_id = request.data.get('construction_site')

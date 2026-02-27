@@ -301,9 +301,9 @@ const InvoiceCreatePage: React.FC = () => {
       };
       const invoice = await invoiceAPI.createInvoice(submitData as any);
 
-      // 成功時の処理
-      navigate('/thank-you');
-      // setShowSuccessModal(true); // 直遷移に変更
+      // 成功時の処理: 下書きとして保存されたので、詳細画面へ遷移して提出を促す
+      alert('請求書を下書きとして保存しました。内容を確認し、提出ボタンを押して完了させてください。');
+      navigate(`/invoices/${invoice.id}`);
 
     } catch (error: any) {
       console.error('Failed to create invoice:', error);

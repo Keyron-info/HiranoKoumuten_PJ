@@ -86,6 +86,7 @@ const InvoiceDetailPage: React.FC = () => {
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [specialPassword, setSpecialPassword] = useState('');
   const [passwordError, setPasswordError] = useState('');
+  const [specialPasswordMessage, setSpecialPasswordMessage] = useState('');
   const [corrections, setCorrections] = useState<Correction[]>([]);
   const [canDownloadPdf, setCanDownloadPdf] = useState(false);
 
@@ -190,9 +191,10 @@ const InvoiceDetailPage: React.FC = () => {
     } catch (error: any) {
       const errorData = error.response?.data;
 
-      // 期間外エラー、かつ特例パスワードが必要な場合
-      if (errorData?.code === 'outside_submission_period' && errorData?.requires_special_password) {
+      // 期間外エラーまたは期間クローズエラー、かつ特例パスワードが必要な場合
+      if ((errorData?.code === 'outside_submission_period' || errorData?.code === 'period_closed') && errorData?.requires_special_password) {
         // モーダルを表示
+        setSpecialPasswordMessage(errorData.detail || '現在は提出期間外です。期間外に提出するには特例パスワードが必要です。');
         setShowPasswordModal(true);
         setPasswordError('');
         setSpecialPassword('');
@@ -368,10 +370,8 @@ const InvoiceDetailPage: React.FC = () => {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
             <h3 className="text-lg font-semibold mb-4">特例パスワード入力</h3>
-            <p className="text-sm text-gray-600 mb-4">
-              現在は提出期間外です（2月15日～25日のみ提出可能）。
-              <br />
-              期間外に提出するには特例パスワードが必要です。
+            <p className="text-sm text-gray-600 mb-4 whitespace-pre-wrap">
+              {specialPasswordMessage}
             </p>
             <input
               type="password"

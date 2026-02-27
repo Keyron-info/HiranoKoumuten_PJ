@@ -409,7 +409,7 @@ class InvoiceCreateSerializer(serializers.ModelSerializer):
         """
         バリデーション
         - 現場パスワードによる現場特定
-        - 締め日チェック（25日締めルール強制）
+        - 締め日チェックは提出時（submit）に行うため、ここでは不要
         """
         # 1. 現場パスワード処理
         site_password = attrs.get('site_password')
@@ -437,65 +437,6 @@ class InvoiceCreateSerializer(serializers.ModelSerializer):
         # 現場必須チェック
         if not attrs.get('construction_site'):
             raise serializers.ValidationError({"construction_site": "工事現場を選択するか、正しい現場パスワードを入力してください。"})
-
-        # ユーザータイプ確認
-        user = self.context['request'].user
-        
-        # 社内ユーザーや経理は期限無視可能（必要に応じて）
-        # if user.user_type == 'internal':
-        #     return attrs
-            
-        # 請求日（invoice_date）または現在日付で判定
-        # ユーザー入力の請求日を基準にするか、提出日（今日）を基準にするか
-        # 一般的には「提出しようとしている日」が締め日を過ぎていたらアウト
-        from django.utils import timezone
-        import datetime
-        from .models import PaymentCalendar
-        
-        today = timezone.now().date()
-        current_year = today.year
-        current_month = today.month
-        
-        # カレンダー取得
-        try:
-            calendar = PaymentCalendar.objects.get(year=current_year, month=current_month)
-            deadline_date = calendar.deadline_date
-        except PaymentCalendar.DoesNotExist:
-            # カレンダーがない場合はデフォルト25日
-            # 注意: 2月など25日が存在しない月は考慮不要（25日は必ずある）
-            deadline_date = datetime.date(current_year, current_month, 25)
-        
-        # 締め日を過ぎているかチェック
-        # ただし「来月の請求書」ならOKなど柔軟性が必要
-        # ここでは「今月の請求として出す場合、今月の締め日を過ぎていたらエラー」とする
-        # 判定ロジック：
-        # 今日が締め日より後なら、請求月を翌月に設定させるか、ブロックするか。
-        # ユーザー要件：「例外設定以外の時は変更できないように」 -> 今日が遅れていたらブロックでOK
-        
-        # 🆕 特例パスワードによるバイパスチェック
-        special_password = attrs.get('special_password')
-        is_bypassed = False
-        construction_site_obj = attrs.get('construction_site')
-        
-        if construction_site_obj and special_password:
-            # 特例パスワードが一致し、期限内であればバイパス
-            if construction_site_obj.special_access_password == special_password:
-                if not construction_site_obj.special_access_expiry or today <= construction_site_obj.special_access_expiry:
-                    is_bypassed = True
-        
-        if today > deadline_date and not is_bypassed:
-            invoice_date = attrs.get('invoice_date', today)
-            
-            # 請求日が当月内なら許可（25日過ぎても当月分の請求書は作成可能）
-            # ブロックするのは「前月以前の日付で作成しようとしている場合」のみ
-            if invoice_date.month != today.month or invoice_date.year != today.year:
-                # 前月以前の日付 → ブロック
-                if invoice_date < today:
-                    raise serializers.ValidationError(
-                        f"今月の締め日（{deadline_date.strftime('%m/%d')}）を過ぎているため、"
-                        f"{invoice_date.strftime('%Y年%m月')}分の請求書は作成できません。"
-                        f"特例パスワードをお持ちの場合は入力してください。"
-                    )
                 
         return attrs
 

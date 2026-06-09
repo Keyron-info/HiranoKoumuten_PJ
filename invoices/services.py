@@ -19,7 +19,7 @@ from django.http import HttpResponse
 
 from .models import (
     Invoice, InvoiceItem, User, CustomerCompany, ConstructionSite,
-    SystemNotification, AccessLog, MonthlyInvoicePeriod, SafetyFee,
+    SystemNotification, AccessLog, AuditLog, MonthlyInvoicePeriod, SafetyFee,
     InvoiceChangeHistory, ApprovalHistory, InvoiceCorrection
 )
 
@@ -219,9 +219,27 @@ class EmailService:
 
 class AuditLogService:
     """監査ログサービス"""
-    
-    @staticmethod
+
+    # AuditLog.ACTION_CHOICES に存在しない action を正規化するマッピング
+    _ACTION_MAP = {
+        'bulk_approve': 'approve',
+        'export': 'other',
+        'download': 'other',
+        'view': 'other',
+        'remand': 'remand',
+        'reject': 'reject',
+    }
+
+    @classmethod
+    def _normalize_action(cls, action: str) -> str:
+        """AuditLog の ACTION_CHOICES に合わせて action を正規化"""
+        valid = {'create', 'update', 'delete', 'login', 'logout',
+                 'approve', 'reject', 'remand', 'cancel', 'other'}
+        return cls._ACTION_MAP.get(action, action if action in valid else 'other')
+
+    @classmethod
     def log(
+        cls,
         user: User,
         action: str,
         resource_type: str,
@@ -230,14 +248,15 @@ class AuditLogService:
         user_agent: str = '',
         details: Dict = None
     ):
-        """監査ログを記録"""
-        return AccessLog.objects.create(
+        """監査ログを AuditLog テーブルに記録（旧実装が AccessLog に書いていたバグを修正）"""
+        return AuditLog.objects.create(
             user=user,
-            action=action,
-            resource_type=resource_type,
-            resource_id=str(resource_id),
+            action=cls._normalize_action(action),
+            target_model=resource_type,
+            target_id=str(resource_id),
+            target_label='',
             ip_address=ip_address,
-            user_agent=user_agent,
+            user_agent=user_agent or '',
             details=details or {}
         )
     
@@ -259,11 +278,12 @@ class AuditLogService:
     def log_invoice_action(cls, request, invoice: Invoice, action: str, details: Dict = None):
         """請求書関連のアクションをログ"""
         client_info = cls.get_client_info(request)
-        return cls.log(
+        return AuditLog.objects.create(
             user=request.user,
-            action=action,
-            resource_type='invoice',
-            resource_id=invoice.id,
+            action=cls._normalize_action(action),
+            target_model='Invoice',
+            target_id=str(invoice.id),
+            target_label=invoice.invoice_number,
             ip_address=client_info['ip_address'],
             user_agent=client_info['user_agent'],
             details={

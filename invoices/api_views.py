@@ -304,7 +304,8 @@ class UserProfileViewSet(viewsets.GenericViewSet):
                 position=data.get('position', ''),
                 phone=data.get('phone', ''),
                 customer_company_id=data.get('customer_company') if user_type == 'customer' else None,
-                company_id=data.get('company') if user_type == 'internal' else None,
+                # company未指定の場合は作成者のcompanyを自動設定（invoice一覧が空になるのを防ぐ）
+                company_id=data.get('company') or (request.user.company_id if user_type == 'internal' else None),
             )
             
             serializer = self.get_serializer(user)
@@ -637,6 +638,9 @@ class InvoiceViewSet(viewsets.ModelViewSet):
         if user.user_type == 'customer':
             qs = qs.filter(customer_company=user.customer_company)
         else:
+            # company が未設定の社内ユーザーは0件を返す（company必須）
+            if user.company is None:
+                return qs.none()
             qs = qs.filter(receiving_company=user.company)
             
         # 閲覧期間制限 (重要: Adminと経理以外は1ヶ月制限)
@@ -4486,11 +4490,17 @@ class PaymentReportViewSet(viewsets.ViewSet):
         month = int(month)
         
         # 対象請求書を取得（承認済み・支払い準備中・支払い済み）
+        # invoice_date が null の場合は issue_date / created_at でフォールバック
         invoices_qs = Invoice.objects.filter(
-            invoice_date__year=year,
-            invoice_date__month=month,
+            Q(invoice_date__year=year, invoice_date__month=month) |
+            Q(invoice_date__isnull=True, issue_date__year=year, issue_date__month=month) |
+            Q(invoice_date__isnull=True, issue_date__isnull=True, created_at__year=year, created_at__month=month),
             status__in=['approved', 'payment_preparing', 'paid']
         ).select_related('customer_company', 'construction_site')
+
+        # receiving_company でフィルタリング（経理ユーザーの所属会社のみ）
+        if request.user.company:
+            invoices_qs = invoices_qs.filter(receiving_company=request.user.company)
         
         if site_id:
             invoices_qs = invoices_qs.filter(construction_site_id=site_id)
@@ -4584,15 +4594,36 @@ class PaymentReportViewSet(viewsets.ViewSet):
     @action(detail=False, methods=['get'])
     def available_months(self, request):
         """支払い表が利用可能な年月の一覧"""
-        months = Invoice.objects.filter(
+        base_qs = Invoice.objects.filter(
             status__in=['approved', 'payment_preparing', 'paid']
-        ).values('invoice_date__year', 'invoice_date__month').distinct().order_by(
-            '-invoice_date__year', '-invoice_date__month'
         )
-        
+        if request.user.company:
+            base_qs = base_qs.filter(receiving_company=request.user.company)
+
+        # invoice_date が設定されている月
+        months_from_invoice = list(
+            base_qs.filter(invoice_date__isnull=False)
+            .values_list('invoice_date__year', 'invoice_date__month')
+            .distinct()
+        )
+        # invoice_date が null の場合は issue_date を使用
+        months_from_issue = list(
+            base_qs.filter(invoice_date__isnull=True, issue_date__isnull=False)
+            .values_list('issue_date__year', 'issue_date__month')
+            .distinct()
+        )
+
+        # 重複排除してソート
+        all_months = sorted(
+            set(months_from_invoice + months_from_issue),
+            key=lambda x: (x[0], x[1]),
+            reverse=True
+        )
+
         result = [
-            {'year': m['invoice_date__year'], 'month': m['invoice_date__month']}
-            for m in months
+            {'year': y, 'month': m}
+            for y, m in all_months
+            if y is not None and m is not None
         ]
         return Response(result)
 

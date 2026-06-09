@@ -290,7 +290,12 @@ class MonthlyInvoicePeriodSerializer(serializers.ModelSerializer):
     closed_by_name = serializers.CharField(source='closed_by.get_full_name', read_only=True, allow_null=True)
     period_name = serializers.CharField(read_only=True)
     is_past_deadline = serializers.BooleanField(read_only=True)
-    
+
+    # フロントが使う start_date / end_date を確実に返す
+    # period_start_date / period_end_date が null の場合は year/month から自動計算
+    start_date = serializers.SerializerMethodField()
+    end_date = serializers.SerializerMethodField()
+
     # 統計情報
     total_invoices = serializers.SerializerMethodField()
     submitted_invoices = serializers.SerializerMethodField()
@@ -300,22 +305,40 @@ class MonthlyInvoicePeriodSerializer(serializers.ModelSerializer):
         model = MonthlyInvoicePeriod
         fields = [
             'id', 'company', 'company_name', 'year', 'month',
+            'start_date', 'end_date',  # フロント用（自動計算フォールバック付き）
             'deadline_date', 'is_closed', 'closed_by', 'closed_by_name',
             'closed_at', 'notes', 'period_name', 'is_past_deadline',
             'total_invoices', 'submitted_invoices', 'pending_invoices',
             'created_at',
-            'special_access_password', 'special_access_expiry',  # 🆕 特例パスワード
+            'special_access_password', 'special_access_expiry',
         ]
         read_only_fields = ['company', 'closed_by', 'closed_at', 'created_at']
-    
+
+    def get_start_date(self, obj):
+        """対象期間開始日（前月26日）: DB値がnullなら自動計算"""
+        from datetime import date
+        if obj.period_start_date:
+            return obj.period_start_date.isoformat()
+        year, month = obj.year, obj.month
+        if month == 1:
+            return date(year - 1, 12, 26).isoformat()
+        return date(year, month - 1, 26).isoformat()
+
+    def get_end_date(self, obj):
+        """対象期間終了日（当月25日）: DB値がnullなら自動計算"""
+        from datetime import date
+        if obj.period_end_date:
+            return obj.period_end_date.isoformat()
+        return date(obj.year, obj.month, 25).isoformat()
+
     def get_total_invoices(self, obj):
         """この期間の総請求書数"""
         return obj.invoices.count()
-    
+
     def get_submitted_invoices(self, obj):
         """提出済み請求書数"""
         return obj.invoices.exclude(status='draft').count()
-    
+
     def get_pending_invoices(self, obj):
         """未提出（下書き）請求書数"""
         return obj.invoices.filter(status='draft').count()

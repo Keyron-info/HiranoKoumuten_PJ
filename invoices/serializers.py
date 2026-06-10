@@ -481,8 +481,12 @@ class InvoiceCreateSerializer(serializers.ModelSerializer):
         # 会社情報の自動設定
         if user.user_type == 'customer':
             # 協力会社ユーザーの場合
-            if user.customer_company:
-                validated_data['customer_company'] = user.customer_company
+            # customer_company が未設定なら ValueError（Viewset 側で事前チェック済みだが二重防衛）
+            if not user.customer_company:
+                raise serializers.ValidationError(
+                    {'error': '協力会社情報が設定されていません。管理者にお問い合わせください。'}
+                )
+            validated_data['customer_company'] = user.customer_company
                 
             # 受取会社（平野工務店）の設定
             # 現場に関連付けられた会社を使用するか、デフォルトの会社を使用

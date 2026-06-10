@@ -735,8 +735,18 @@ class InvoiceViewSet(viewsets.ModelViewSet):
             
             # 協力会社ユーザーの場合、会社情報を自動設定
             if request.user.user_type == 'customer':
+                # customer_company が未設定の場合は明示的なエラーを返す（DB エラーを防ぐ）
+                if not request.user.customer_company:
+                    return Response(
+                        {
+                            'error': '協力会社情報が設定されていません',
+                            'detail': 'このアカウントには協力会社情報が紐付けられていません。'
+                                      '管理者（経理担当）にお問い合わせください。'
+                        },
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
                 save_kwargs['customer_company'] = request.user.customer_company
-                
+
                 # 受取企業（自社）を設定
                 receiving_company = Company.objects.first()
                 if receiving_company:

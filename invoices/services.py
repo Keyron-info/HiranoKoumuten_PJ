@@ -624,33 +624,17 @@ class MonthlyClosingService:
     
     @staticmethod
     def can_submit_invoice(invoice: Invoice) -> tuple[bool, str]:
-        """請求書が提出可能かチェック"""
-        invoice_settings = getattr(settings, 'INVOICE_SETTINGS', {})
-        deadline_day = invoice_settings.get('MONTHLY_DEADLINE_DAY', 25)
-        
-        today = timezone.now().date()
-        
-        # 請求日が設定されている場合
-        if invoice.invoice_date:
-            invoice_month = invoice.invoice_date.month
-            invoice_year = invoice.invoice_date.year
-            
-            # 現在の月と異なる場合
-            if (invoice_year, invoice_month) != (today.year, today.month):
-                # 前月の請求書で、翌月1日以降の場合
-                if today.day >= 1:
-                    # 前月の場合は提出不可
-                    last_month = today.replace(day=1) - timedelta(days=1)
-                    if (invoice_year, invoice_month) == (last_month.year, last_month.month):
-                        return False, f"前月分の請求書は翌月1日以降は提出できません"
-        
-        # 期間が設定されている場合
+        """請求書が提出可能かチェック（MonthlyInvoicePeriod の締め日ルールを使用）"""
+        # invoice_period が紐付いている場合はその期間で判定
         if invoice.invoice_period:
             if invoice.invoice_period.is_closed:
                 return False, f"{invoice.invoice_period.period_name}は締め済みです"
-            if invoice.invoice_period.is_past_deadline:
-                return False, f"{invoice.invoice_period.period_name}の締切（{invoice.invoice_period.deadline_date}）を過ぎています"
-        
+            # submission_deadline を使った判定（is_past_deadline は deadline_date 基準なので使わない）
+            can_submit, reason = invoice.invoice_period.can_submit_invoice()
+            if not can_submit:
+                return False, reason
+
+        # invoice_period 未設定でも提出を許可（期間管理が設定されていない場合）
         return True, ""
     
     @staticmethod

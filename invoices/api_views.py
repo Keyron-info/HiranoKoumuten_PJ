@@ -893,25 +893,37 @@ class InvoiceViewSet(viewsets.ModelViewSet):
         # 特例パスワードが提供された場合は検証してバイパス
         special_password = request.data.get('special_password')
         today = timezone.now().date()
-        
-        # 1. 提出期間チェック (毎月15日-25日)
-        is_period_valid = (15 <= today.day <= 25)
-        
-        # 2. 月次締め状況のチェック
+
+        # 請求書の対象年月を取得（invoice_date → issue_date → 作成日 の順でフォールバック）
+        invoice_date = invoice.invoice_date or invoice.issue_date or invoice.created_at.date()
+        year, month = invoice_date.year, invoice_date.month
+
+        # MonthlyInvoicePeriod を使って提出可否を判定
+        # 旧ロジックの「毎月15日〜25日」ハードコードを廃止し、正しい締め日ルールを使用
+        receiving_company = invoice.receiving_company or Company.objects.first()
+        period = None
+        if receiving_company:
+            period = MonthlyInvoicePeriod.objects.filter(
+                company=receiving_company,
+                year=year,
+                month=month
+            ).first()
+
+        is_period_valid = True
+        period_error_message = None
         is_month_closed = False
-        invoice_date = invoice.invoice_date
-        if invoice_date:
-            year, month = invoice_date.year, invoice_date.month
-            receiving_company = Company.objects.first()
-            if receiving_company:
-                period = MonthlyInvoicePeriod.objects.filter(
-                    company=receiving_company,
-                    year=year,
-                    month=month
-                ).first()
-                if period and period.is_closed:
-                    is_month_closed = True
-        
+
+        if period:
+            if period.is_closed:
+                is_month_closed = True
+            else:
+                # MonthlyInvoicePeriod の submission_start_date / submission_deadline で判定
+                can_submit, reason = period.can_submit_invoice(request.user)
+                if not can_submit:
+                    is_period_valid = False
+                    period_error_message = reason
+        # period が未設定の場合は提出を許可（管理者が期間を設定していない状態）
+
         # 特例パスワードバイパスのチェック
         is_bypassed = False
         if special_password:
@@ -935,15 +947,15 @@ class InvoiceViewSet(viewsets.ModelViewSet):
         if not request.user.is_super_admin and not is_bypassed:
             if not is_period_valid:
                 return Response({
-                    'error': '請求書の提出は毎月15日から25日の間のみ可能です',
-                    'detail': f'現在は{today.month}月{today.day}日です。期間外に提出するには特例パスワードが必要です。',
+                    'error': period_error_message or '現在は提出期間外です',
+                    'detail': '期間外に提出するには特例パスワードが必要です。',
                     'code': 'outside_submission_period',
                     'requires_special_password': True
                 }, status=status.HTTP_400_BAD_REQUEST)
-            
+
             if is_month_closed:
                 return Response({
-                    'error': f'{invoice_date.year}年{invoice_date.month}月分は既に締め切られています',
+                    'error': f'{year}年{month}月分は既に締め切られています',
                     'detail': '締め切られた期間の請求書は提出できません。特例パスワードをお持ちの場合は入力してください。',
                     'code': 'period_closed',
                     'requires_special_password': True

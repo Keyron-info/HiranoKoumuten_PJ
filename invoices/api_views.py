@@ -1591,7 +1591,33 @@ class InvoiceViewSet(viewsets.ModelViewSet):
 システムにログインして内容を確認してください。
             '''.strip()
         )
-        
+
+        # 承認済みユーザーへも差し戻し通知（部長・専務・社長・常務 等）
+        previously_approved_users = (
+            ApprovalHistory.objects
+            .filter(invoice=invoice, action='approved')
+            .select_related('user')
+            .values_list('user', flat=True)
+            .distinct()
+        )
+        for approver_id in previously_approved_users:
+            if approver_id and approver_id != (invoice.created_by.id if invoice.created_by else None):
+                try:
+                    approver = User.objects.get(id=approver_id)
+                    SystemNotification.objects.create(
+                        recipient=approver,
+                        notification_type='alert',
+                        priority='medium',
+                        title=f'【差し戻し通知】{invoice.invoice_number}',
+                        message=f'あなたが承認した請求書が差し戻されました。\n\n'
+                                f'協力会社: {invoice.customer_company.name if invoice.customer_company else ""}\n'
+                                f'差し戻し理由: {comment or "理由なし"}',
+                        action_url=f'/invoices/{invoice.id}',
+                        related_invoice=invoice
+                    )
+                except User.DoesNotExist:
+                    pass
+
         return Response({
             'message': '請求書を差し戻しました',
             'invoice': InvoiceSerializer(invoice).data
@@ -2462,22 +2488,39 @@ class DashboardViewSet(viewsets.GenericViewSet):
             next_month = (current_month + timedelta(days=32)).replace(day=1)
 
             if user.user_type == 'internal':
+                # 自社フィルター（company未設定の場合は全件）
+                company_filter = Q(receiving_company=user.company) if user.company else Q()
+
                 # 社内ユーザー向け統計
                 stats = {
                     'pending_invoices': Invoice.objects.filter(
+                        company_filter,
                         status='pending_approval'
                     ).count(),
-                    
+
                     'my_pending_approvals': self._count_my_pending(user),
-                    
+
                     'monthly_payment': Invoice.objects.filter(
+                        company_filter,
                         payment_due_date__gte=current_month,
                         payment_due_date__lt=next_month,
                         status__in=['approved', 'paid']
                     ).aggregate(total=Sum('total_amount'))['total'] or 0,
-                    
+
                     'partner_companies': CustomerCompany.objects.filter(
                         is_active=True
+                    ).count(),
+
+                    # 提出済み・承認待ち請求書の合計金額
+                    'submitted_total_amount': Invoice.objects.filter(
+                        company_filter,
+                        status__in=['submitted', 'pending_approval']
+                    ).aggregate(total=Sum('total_amount'))['total'] or 0,
+
+                    # 提出済み・承認待ちの件数
+                    'submitted_count': Invoice.objects.filter(
+                        company_filter,
+                        status__in=['submitted', 'pending_approval']
                     ).count(),
                 }
             else:
@@ -4374,8 +4417,21 @@ KEYRON BIM 運営チーム
                 'postal_code': registration.postal_code,
                 'address': registration.address,
                 'head_office_address': getattr(registration, 'head_office_address', '') or '',
+                # 振込先金融機関情報
+                'bank_name': getattr(registration, 'bank_name', '') or '',
+                'bank_branch': getattr(registration, 'bank_branch', '') or '',
+                'bank_account': getattr(registration, 'bank_account_number', '') or '',
             }
         )
+        # 既存会社の場合も銀行情報を更新（新規登録情報で上書き）
+        if not created and any([
+            getattr(registration, 'bank_name', ''),
+            getattr(registration, 'bank_account_number', ''),
+        ]):
+            customer_company.bank_name = getattr(registration, 'bank_name', '') or customer_company.bank_name
+            customer_company.bank_branch = getattr(registration, 'bank_branch', '') or customer_company.bank_branch
+            customer_company.bank_account = getattr(registration, 'bank_account_number', '') or customer_company.bank_account
+            customer_company.save()
         
         # ユーザー作成
         import secrets

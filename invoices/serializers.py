@@ -1232,6 +1232,8 @@ class UserRegistrationRequestSerializer(serializers.ModelSerializer):
             'postal_code', 'address',
             'representative_name', 'invoice_registration_number', 'head_office_address',
             'department', 'position', 'notes',
+            'bank_name', 'bank_branch', 'bank_account_type',
+            'bank_account_number', 'bank_account_holder',
             'status', 'status_display', 'submitted_at', 'reviewed_at',
             'reviewed_by', 'reviewed_by_name', 'rejection_reason',
             'created_user'

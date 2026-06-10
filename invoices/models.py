@@ -2927,7 +2927,20 @@ class UserRegistrationRequest(models.Model):
         verbose_name="審査者"
     )
     rejection_reason = models.TextField(blank=True, verbose_name="却下理由")
-    
+
+    # 振込先金融機関情報（登録申請時に収集）
+    bank_name = models.CharField(max_length=100, blank=True, verbose_name="銀行名")
+    bank_branch = models.CharField(max_length=100, blank=True, verbose_name="支店名")
+    bank_account_type = models.CharField(
+        max_length=10,
+        choices=[('ordinary', '普通'), ('current', '当座')],
+        default='ordinary',
+        blank=True,
+        verbose_name="口座種別"
+    )
+    bank_account_number = models.CharField(max_length=20, blank=True, verbose_name="口座番号")
+    bank_account_holder = models.CharField(max_length=100, blank=True, verbose_name="口座名義")
+
     # 作成されたユーザーへの参照
     created_user = models.OneToOneField(
         User,

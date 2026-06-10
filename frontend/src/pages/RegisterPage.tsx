@@ -21,6 +21,11 @@ const RegisterPage: React.FC = () => {
     department: '',
     position: '',
     notes: '',
+    bank_name: '',
+    bank_branch: '',
+    bank_account_type: 'ordinary',
+    bank_account_number: '',
+    bank_account_holder: '',
     agree_terms: false,
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -412,6 +417,73 @@ const RegisterPage: React.FC = () => {
                     rows={3}
                     className="w-full px-4 py-3 bg-slate-800/50 border border-slate-700 rounded-lg focus:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all text-white placeholder-slate-600"
                     placeholder="その他連絡事項があればご記入ください"
+                  />
+                </div>
+              </div>
+            </section>
+
+            {/* 振込先金融機関情報 */}
+            <section className="bg-slate-800/30 rounded-xl p-6 border border-slate-700">
+              <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+                <span className="w-7 h-7 bg-primary-600 rounded-full flex items-center justify-center text-xs font-bold">🏦</span>
+                振込先金融機関情報
+                <span className="text-xs text-slate-400 font-normal ml-1">（支払い処理に使用します）</span>
+              </h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-1">銀行名</label>
+                  <input
+                    type="text"
+                    name="bank_name"
+                    value={formData.bank_name || ''}
+                    onChange={handleChange}
+                    className="w-full px-4 py-3 bg-slate-800/50 border border-slate-700 rounded-lg focus:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all text-white placeholder-slate-600"
+                    placeholder="例: ○○銀行"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-1">支店名</label>
+                  <input
+                    type="text"
+                    name="bank_branch"
+                    value={formData.bank_branch || ''}
+                    onChange={handleChange}
+                    className="w-full px-4 py-3 bg-slate-800/50 border border-slate-700 rounded-lg focus:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all text-white placeholder-slate-600"
+                    placeholder="例: 本店"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-1">口座種別</label>
+                  <select
+                    name="bank_account_type"
+                    value={formData.bank_account_type || 'ordinary'}
+                    onChange={handleChange}
+                    className="w-full px-4 py-3 bg-slate-800/50 border border-slate-700 rounded-lg focus:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all text-white"
+                  >
+                    <option value="ordinary">普通</option>
+                    <option value="current">当座</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-1">口座番号</label>
+                  <input
+                    type="text"
+                    name="bank_account_number"
+                    value={formData.bank_account_number || ''}
+                    onChange={handleChange}
+                    className="w-full px-4 py-3 bg-slate-800/50 border border-slate-700 rounded-lg focus:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all text-white placeholder-slate-600"
+                    placeholder="例: 1234567"
+                  />
+                </div>
+                <div className="col-span-1 md:col-span-2">
+                  <label className="block text-sm font-medium text-slate-300 mb-1">口座名義（カタカナ）</label>
+                  <input
+                    type="text"
+                    name="bank_account_holder"
+                    value={formData.bank_account_holder || ''}
+                    onChange={handleChange}
+                    className="w-full px-4 py-3 bg-slate-800/50 border border-slate-700 rounded-lg focus:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all text-white placeholder-slate-600"
+                    placeholder="例: カブシキカイシャ〇〇"
                   />
                 </div>
               </div>

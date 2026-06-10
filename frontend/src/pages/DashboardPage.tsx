@@ -88,10 +88,11 @@ const DashboardPage: React.FC = () => {
       // 統計データを設定（内部ユーザー用）
       if (user?.user_type === 'internal') {
         setStats([
-          { label: '承認待ち', value: dashboardStats.pending_invoices || dashboardStats.my_pending_approvals || 0, icon: Clock, color: 'text-orange-600', bg: 'bg-orange-50', border: 'border-orange-100' },
+          { label: '承認待ち', value: dashboardStats.pending_invoices || 0, icon: Clock, color: 'text-orange-600', bg: 'bg-orange-50', border: 'border-orange-100' },
           { label: '自分の承認待ち', value: dashboardStats.my_pending_approvals || 0, icon: AlertCircle, color: 'text-rose-600', bg: 'bg-rose-50', border: 'border-rose-100' },
           { label: '協力会社数', value: dashboardStats.partner_companies || 0, icon: CheckCircle, color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-100' },
           { label: '今月の支払額', value: formatCurrency(dashboardStats.monthly_payment || 0), icon: CreditCard, color: 'text-primary-600', bg: 'bg-primary-50', border: 'border-primary-100' },
+          { label: `提出済み合計（${dashboardStats.submitted_count || 0}件）`, value: formatCurrency(dashboardStats.submitted_total_amount || 0), icon: CreditCard, color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-100' },
         ]);
         setPendingCount(dashboardStats.my_pending_approvals || 0);
       } else {

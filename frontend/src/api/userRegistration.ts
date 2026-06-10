@@ -44,6 +44,12 @@ export interface RegistrationFormData {
   department?: string;
   position?: string;
   notes?: string;
+  // 振込先金融機関情報
+  bank_name?: string;
+  bank_branch?: string;
+  bank_account_type?: string;
+  bank_account_number?: string;
+  bank_account_holder?: string;
   agree_terms: boolean;
 }
 
@@ -67,6 +73,12 @@ export const userRegistrationAPI = {
         department: data.department || '',
         position: data.position || '',
         notes: data.notes || '',
+        // 振込先金融機関情報
+        bank_name: data.bank_name || '',
+        bank_branch: data.bank_branch || '',
+        bank_account_type: data.bank_account_type || 'ordinary',
+        bank_account_number: data.bank_account_number || '',
+        bank_account_holder: data.bank_account_holder || '',
       }
     );
     return response.data;

@@ -296,6 +296,11 @@ class MonthlyInvoicePeriodSerializer(serializers.ModelSerializer):
     start_date = serializers.SerializerMethodField()
     end_date = serializers.SerializerMethodField()
 
+    # 提出受付状態（受付ルール: 当月26日〜月末）
+    submission_status = serializers.SerializerMethodField()
+    submission_start = serializers.SerializerMethodField()
+    submission_end = serializers.SerializerMethodField()
+
     # 統計情報
     total_invoices = serializers.SerializerMethodField()
     submitted_invoices = serializers.SerializerMethodField()
@@ -306,6 +311,7 @@ class MonthlyInvoicePeriodSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'company', 'company_name', 'year', 'month',
             'start_date', 'end_date',  # フロント用（自動計算フォールバック付き）
+            'submission_status', 'submission_start', 'submission_end',
             'deadline_date', 'is_closed', 'closed_by', 'closed_by_name',
             'closed_at', 'notes', 'period_name', 'is_past_deadline',
             'total_invoices', 'submitted_invoices', 'pending_invoices',
@@ -330,6 +336,35 @@ class MonthlyInvoicePeriodSerializer(serializers.ModelSerializer):
         if obj.period_end_date:
             return obj.period_end_date.isoformat()
         return date(obj.year, obj.month, 25).isoformat()
+
+    def get_submission_start(self, obj):
+        """提出開始日（当月26日）"""
+        from datetime import date
+        return date(obj.year, obj.month, 26).isoformat()
+
+    def get_submission_end(self, obj):
+        """提出期限（当月末日）"""
+        import calendar
+        from datetime import date
+        last_day = calendar.monthrange(obj.year, obj.month)[1]
+        return date(obj.year, obj.month, last_day).isoformat()
+
+    def get_submission_status(self, obj):
+        """提出受付状態: before(受付前) / open(受付中) / closed(締切超過・締め済み)"""
+        import calendar
+        from datetime import date
+        from django.utils import timezone
+
+        if obj.is_closed:
+            return 'closed'
+        today = timezone.now().date()
+        start = date(obj.year, obj.month, 26)
+        end = date(obj.year, obj.month, calendar.monthrange(obj.year, obj.month)[1])
+        if today < start:
+            return 'before'
+        if today > end:
+            return 'closed'
+        return 'open'
 
     def get_total_invoices(self, obj):
         """この期間の総請求書数"""
@@ -357,12 +392,21 @@ class MonthlyInvoicePeriodListSerializer(serializers.ModelSerializer):
         ]
     
     def get_status_display(self, obj):
+        # 受付ルール: 当月26日〜月末のみ提出受付
+        import calendar
+        from datetime import date
+        from django.utils import timezone
+
         if obj.is_closed:
             return '締め済み'
-        elif obj.is_past_deadline:
+        today = timezone.now().date()
+        start = date(obj.year, obj.month, 26)
+        end = date(obj.year, obj.month, calendar.monthrange(obj.year, obj.month)[1])
+        if today < start:
+            return '受付前'
+        if today > end:
             return '締切超過'
-        else:
-            return '受付中'
+        return '受付中'
 
 
 class CustomFieldSerializer(serializers.ModelSerializer):

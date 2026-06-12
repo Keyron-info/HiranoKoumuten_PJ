@@ -58,6 +58,10 @@ interface InvoicePeriod {
   deadline_date: string;
   is_active: boolean;
   is_closed: boolean;
+  // 提出受付状態（受付ルール: 当月26日〜月末）
+  submission_status?: 'before' | 'open' | 'closed';
+  submission_start?: string;
+  submission_end?: string;
 }
 
 const DashboardPage: React.FC = () => {
@@ -267,15 +271,27 @@ const DashboardPage: React.FC = () => {
                       <Calendar size={32} />
                     </div>
                     <div>
-                      <span className="inline-block px-3 py-1 bg-primary-500/50 rounded-full text-xs font-semibold mb-2 border border-primary-400/30">
-                        受付中
+                      <span className={`inline-block px-3 py-1 rounded-full text-xs font-semibold mb-2 border ${
+                        currentPeriod.submission_status === 'open'
+                          ? 'bg-primary-500/50 border-primary-400/30'
+                          : currentPeriod.submission_status === 'before'
+                            ? 'bg-yellow-500/40 border-yellow-300/40'
+                            : 'bg-gray-500/40 border-gray-300/40'
+                      }`}>
+                        {currentPeriod.submission_status === 'open'
+                          ? '提出受付中'
+                          : currentPeriod.submission_status === 'before'
+                            ? `提出受付前（作成は可能）`
+                            : '受付終了'}
                       </span>
                       <h3 className="text-2xl font-bold mb-2">
-                        {currentPeriod.year}年{currentPeriod.month}月分 請求書受付
+                        {currentPeriod.year}年{currentPeriod.month}月分 請求書
                       </h3>
                       <div className="flex flex-col sm:flex-row gap-2 sm:gap-6 text-primary-100">
-                        <p>期間: {new Date(currentPeriod.start_date).toLocaleDateString('ja-JP')} 〜 {new Date(currentPeriod.end_date).toLocaleDateString('ja-JP')}</p>
-                        <p>締切: <span className="font-bold text-white">{new Date(currentPeriod.deadline_date).toLocaleDateString('ja-JP')}</span></p>
+                        <p>対象期間: {new Date(currentPeriod.start_date).toLocaleDateString('ja-JP')} 〜 {new Date(currentPeriod.end_date).toLocaleDateString('ja-JP')}</p>
+                        <p>提出期間: <span className="font-bold text-white">
+                          {currentPeriod.submission_start ? new Date(currentPeriod.submission_start).toLocaleDateString('ja-JP') : '-'} 〜 {currentPeriod.submission_end ? new Date(currentPeriod.submission_end).toLocaleDateString('ja-JP') : '-'}
+                        </span></p>
                       </div>
                     </div>
                   </div>

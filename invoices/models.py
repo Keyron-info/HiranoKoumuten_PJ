@@ -1266,6 +1266,17 @@ class Invoice(models.Model):
         self.partner_acknowledged_at = timezone.now()
         self.partner_acknowledged_by = user
         self.is_returned = False
+
+        # 承認ステップを「経理確認」に直接設定（現場監督に戻さない）
+        # 経理ステップは特定ユーザーに紐付けないため current_approver は None
+        if self.approval_route:
+            accountant_step = self.approval_route.steps.filter(
+                approver_position='accountant'
+            ).order_by('-step_order').first()
+            if accountant_step:
+                self.current_approval_step = accountant_step
+                self.current_approver = None
+
         self.save()
         
         # 承認履歴に記録

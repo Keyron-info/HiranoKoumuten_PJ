@@ -28,6 +28,14 @@ class Command(BaseCommand):
 
         updates = 0
         for invoice in pending_invoices:
+            # 差し戻し→協力会社承認済みの請求書はスキップ
+            # （acknowledge_return が経理確認ステップに直接設定しているため、巻き戻してはいけない）
+            if invoice.partner_acknowledged_at is not None:
+                self.stdout.write(
+                    f'Invoice {invoice.invoice_number}: 差し戻し承認済みのためスキップ（経理確認段階を維持）'
+                )
+                continue
+
             # 承認済み履歴の数をカウント（却下などは除く）
             approved_count = invoice.approval_histories.filter(action='approved').count()
             

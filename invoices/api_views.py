@@ -2133,12 +2133,18 @@ class InvoiceViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
-        if request.user.user_type != 'customer' or request.user.customer_company != invoice.customer_company:
+        # 協力会社ユーザーで、かつ「同じ協力会社所属」または「請求書の作成者本人」なら承認可能
+        is_same_company = (
+            request.user.customer_company_id is not None
+            and request.user.customer_company_id == invoice.customer_company_id
+        )
+        is_creator = invoice.created_by_id == request.user.id
+        if request.user.user_type != 'customer' or not (is_same_company or is_creator):
             return Response(
                 {"error": "権限がありません"},
                 status=status.HTTP_403_FORBIDDEN
             )
-        
+
         try:
             # ステータスを経理承認待ちに直接変更
             invoice.acknowledge_return(request.user)

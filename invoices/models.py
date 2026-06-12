@@ -1251,9 +1251,14 @@ class Invoice(models.Model):
         """
         if self.status != 'returned':
             raise ValueError("この請求書は差し戻し状態ではありません")
-        
-        # 協力会社ユーザーかチェック
-        if user.user_type != 'customer' or user.customer_company != self.customer_company:
+
+        # 協力会社ユーザーで、同じ協力会社所属または作成者本人かチェック
+        is_same_company = (
+            user.customer_company_id is not None
+            and user.customer_company_id == self.customer_company_id
+        )
+        is_creator = self.created_by_id == user.id
+        if user.user_type != 'customer' or not (is_same_company or is_creator):
             raise ValueError("権限がありません")
         
         # ステータスを経理承認待ちに直接変更

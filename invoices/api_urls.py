@@ -51,6 +51,7 @@ from .api_views import (
     # 支払い表
     PaymentReportViewSet,
 )
+from .chatbot_views import ChatbotAskView
 
 router = DefaultRouter()
 router.register(r'customer-companies', CustomerCompanyViewSet, basename='customer-company')
@@ -110,7 +111,10 @@ urlpatterns = [
     path('auth/password-reset/confirm/', PasswordResetConfirmView.as_view(), name='password_reset_confirm'),
     # タスク2: 新規ユーザー登録申請
     path('users/register/', UserRegistrationRequestViewSet.as_view({'post': 'register'}), name='user-register'),
-    
+
+    # AIヘルプチャットボット
+    path('chatbot/ask/', ChatbotAskView.as_view(), name='chatbot-ask'),
+
     # Router URLs
     path('', include(router.urls)),
 ]

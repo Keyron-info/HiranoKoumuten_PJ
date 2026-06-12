@@ -1,9 +1,11 @@
 // src/components/HelpChatbot.tsx
-// 使い方ヘルプチャットボット（FAQ ルールベース）
+// 使い方ヘルプチャットボット
+// AI（Claude API）が一次回答。API未設定・エラー時はルールベースFAQにフォールバック。
 
 import React, { useState, useRef, useEffect } from 'react';
 import { MessageCircle, X, Send, RotateCcw } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import apiClient from '../api/client';
 
 interface ChatMessage {
   role: 'bot' | 'user';
@@ -102,6 +104,9 @@ const HelpChatbot: React.FC = () => {
   const { user } = useAuth();
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState('');
+  const [loading, setLoading] = useState(false);
+  // AIが利用不可と判明したらこのセッション中はFAQのみ使う
+  const aiUnavailableRef = useRef(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const visibleFaq = FAQ.filter(
@@ -110,7 +115,7 @@ const HelpChatbot: React.FC = () => {
 
   const initialMessage: ChatMessage = {
     role: 'bot',
-    text: 'こんにちは！使い方サポートです。\n下の質問をタップするか、キーワードを入力してください。',
+    text: 'こんにちは！使い方サポートAIです。\nシステムの使い方を自由に質問してください。下のよくある質問もご利用いただけます。',
     options: visibleFaq.slice(0, 6).map((f) => f.question),
   };
 
@@ -118,7 +123,7 @@ const HelpChatbot: React.FC = () => {
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, open]);
+  }, [messages, open, loading]);
 
   const findAnswer = (query: string): FaqEntry | null => {
     const q = query.toLowerCase();
@@ -134,27 +139,57 @@ const HelpChatbot: React.FC = () => {
     return best?.entry || null;
   };
 
-  const handleSend = (text?: string) => {
-    const query = (text ?? input).trim();
-    if (!query) return;
-
-    const userMsg: ChatMessage = { role: 'user', text: query };
+  // ルールベースFAQでの回答（AIフォールバック）
+  const answerWithFaq = (query: string): ChatMessage => {
     const match = findAnswer(query);
-
-    const botMsg: ChatMessage = match
-      ? {
-          role: 'bot',
-          text: match.answer,
-          options: ['他の質問を見る'],
-        }
+    return match
+      ? { role: 'bot', text: match.answer, options: ['他の質問を見る'] }
       : {
           role: 'bot',
           text: '申し訳ありません、その質問にはお答えできませんでした。\n下の質問から選ぶか、別のキーワードでお試しください。\n\n解決しない場合はKEYRON担当者までお問い合わせください。',
           options: visibleFaq.slice(0, 6).map((f) => f.question),
         };
+  };
 
-    setMessages((prev) => [...prev, userMsg, botMsg]);
+  const handleSend = async (text?: string) => {
+    const query = (text ?? input).trim();
+    if (!query || loading) return;
+
+    const userMsg: ChatMessage = { role: 'user', text: query };
+    setMessages((prev) => [...prev, userMsg]);
     setInput('');
+
+    // AI利用不可が確定している場合はFAQで即答
+    if (aiUnavailableRef.current) {
+      setMessages((prev) => [...prev, answerWithFaq(query)]);
+      return;
+    }
+
+    setLoading(true);
+    try {
+      // 直近の会話履歴をAPI形式に変換して送信
+      const history = messages
+        .filter((m) => !m.options || m.role === 'user')
+        .slice(-10)
+        .map((m) => ({ role: m.role === 'bot' ? 'assistant' : 'user', text: m.text }));
+
+      const res = await apiClient.post<{ answer: string }>('/chatbot/ask/', {
+        message: query,
+        history,
+      });
+      setMessages((prev) => [
+        ...prev,
+        { role: 'bot', text: res.data.answer, options: ['他の質問を見る'] },
+      ]);
+    } catch (err: any) {
+      // 503（API未設定/一時エラー）はFAQへフォールバック
+      if (err.response?.status === 503) {
+        aiUnavailableRef.current = true;
+      }
+      setMessages((prev) => [...prev, answerWithFaq(query)]);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleOption = (option: string) => {
@@ -244,6 +279,15 @@ const HelpChatbot: React.FC = () => {
                 )}
               </div>
             ))}
+            {loading && (
+              <div className="mr-auto max-w-[85%] rounded-2xl rounded-bl-md px-4 py-2.5 bg-white border border-gray-200 shadow-sm">
+                <div className="flex gap-1 items-center h-4">
+                  <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                  <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                  <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                </div>
+              </div>
+            )}
             <div ref={messagesEndRef} />
           </div>
 
@@ -262,7 +306,7 @@ const HelpChatbot: React.FC = () => {
               />
               <button
                 onClick={() => handleSend()}
-                disabled={!input.trim()}
+                disabled={!input.trim() || loading}
                 className="px-3 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-40 transition-colors"
                 aria-label="送信"
               >

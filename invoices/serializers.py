@@ -93,7 +93,7 @@ class UserSerializer(serializers.ModelSerializer):
             'user_type', 'user_type_display', 'position', 'position_display',
             'company', 'company_name', 'department',
             'customer_company', 'customer_company_name',
-            'phone', 'is_active_user', 'date_joined'
+            'phone', 'is_active', 'is_active_user', 'date_joined'
         ]
         read_only_fields = ['id', 'date_joined']
 

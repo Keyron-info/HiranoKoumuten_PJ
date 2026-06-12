@@ -26,9 +26,9 @@ class Command(BaseCommand):
         
         # 2. Force Create/Update Users (正しい役職マッピング)
         users_to_fix = [
-            {'email': 'nagamine@hira-ko.jp', 'role': 'department_manager', 'last': '長嶺', 'first': '貴典'},
-            {'email': 'maki@hira-ko.jp', 'role': 'senior_managing_director', 'last': '眞木', 'first': '正之'},
-            {'email': 'sakai@hira-ko.jp', 'role': 'president', 'last': '堺', 'first': '仁一郎'},
+            {'email': 'nagamine@hira-ko.jp', 'role': 'department_manager', 'last': '長峯', 'first': '真美'},
+            {'email': 'maki@hira-ko.jp', 'role': 'senior_managing_director', 'last': '眞木', 'first': '宜之'},
+            {'email': 'sakai@hira-ko.jp', 'role': 'president', 'last': '堺', 'first': '信一郎'},
             {'email': 'honjo@oita-kakiemon.jp', 'role': 'managing_director', 'last': '本城', 'first': '美代子'},
             {'email': 'takeda@hira-ko.jp', 'role': 'accountant', 'last': '竹田', 'first': '貴也'},
         ]

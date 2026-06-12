@@ -26,7 +26,7 @@ class Command(BaseCommand):
             # 決裁（役員）
             {
                 'last_name': '堺', 
-                'first_name': '仁一郎',
+                'first_name': '信一郎',
                 'last_name_kana': 'サカイ',
                 'first_name_kana': 'ジンイチロウ',
                 'email': 'sakai@hira-ko.jp',
@@ -36,7 +36,7 @@ class Command(BaseCommand):
             },
             {
                 'last_name': '眞木',
-                'first_name': '正之', 
+                'first_name': '宜之', 
                 'last_name_kana': 'マキ',
                 'first_name_kana': 'マサユキ',
                 'email': 'maki@hira-ko.jp',
@@ -99,8 +99,8 @@ class Command(BaseCommand):
                 'note': '申請・承認'
             },
             {
-                'last_name': '長嶺',
-                'first_name': '貴典',
+                'last_name': '長峯',
+                'first_name': '真美',
                 'last_name_kana': 'ナガミネ',
                 'first_name_kana': 'タカノリ',
                 'email': 'nagamine@hira-ko.jp',
@@ -110,7 +110,7 @@ class Command(BaseCommand):
             },
             {
                 'last_name': '稲吉',
-                'first_name': '智帆',
+                'first_name': '智紀',
                 'last_name_kana': 'イナヨシ',
                 'first_name_kana': 'トモホ',
                 'email': 'koumu3@hira-ko.jp',
@@ -120,7 +120,7 @@ class Command(BaseCommand):
             },
             {
                 'last_name': '友永',
-                'first_name': '貴美',
+                'first_name': '真夫',
                 'last_name_kana': 'トモナガ',
                 'first_name_kana': 'タカミ',
                 'email': 'tomonaga@hira-ko.jp',
@@ -130,7 +130,7 @@ class Command(BaseCommand):
             },
             {
                 'last_name': '佐土原',
-                'first_name': '煕',
+                'first_name': '圭',
                 'last_name_kana': 'サドハラ',
                 'first_name_kana': 'ケイ',
                 'email': 'sadohara@hira-ko.jp',
@@ -140,7 +140,7 @@ class Command(BaseCommand):
             },
             {
                 'last_name': '佐藤',
-                'first_name': '岳信',
+                'first_name': '岳志',
                 'last_name_kana': 'サトウ',
                 'first_name_kana': 'タケシ',
                 'email': 'takeshi-s@hira-ko.jp',
@@ -150,7 +150,7 @@ class Command(BaseCommand):
             },
             {
                 'last_name': '吉田',
-                'first_name': '尋也',
+                'first_name': '幸弘',
                 'last_name_kana': 'ヨシダ',
                 'first_name_kana': 'ヒロヤ',
                 'email': 'yoshida@hira-ko.jp',
@@ -159,8 +159,8 @@ class Command(BaseCommand):
                 'note': '現場監督'
             },
             {
-                'last_name': '相見',
-                'first_name': '忠博',
+                'last_name': '相良',
+                'first_name': '宏隆',
                 'last_name_kana': 'アイミ',
                 'first_name_kana': 'タダヒロ',
                 'email': 'koumu1@hira-ko.jp',
@@ -180,7 +180,7 @@ class Command(BaseCommand):
             },
             {
                 'last_name': '東',
-                'first_name': '重之啓',
+                'first_name': '龍之亮',
                 'last_name_kana': 'ヒガシ',
                 'first_name_kana': 'シゲユキノブ',
                 'email': 'higashi@hira-ko.jp',
@@ -190,7 +190,7 @@ class Command(BaseCommand):
             },
             {
                 'last_name': '佐藤',
-                'first_name': '基太郎',
+                'first_name': '雄太郎',
                 'last_name_kana': 'サトウ',
                 'first_name_kana': 'ユウタロウ',
                 'email': 'yutarous@hira-ko.jp',
@@ -199,8 +199,8 @@ class Command(BaseCommand):
                 'note': '現場監督'
             },
             {
-                'last_name': '染谷',
-                'first_name': '宏人',
+                'last_name': '染矢',
+                'first_name': '啓登',
                 'last_name_kana': 'ソメヤ',
                 'first_name_kana': 'ヒロト',
                 'email': 'someya@hira-ko.jp',
@@ -222,7 +222,7 @@ class Command(BaseCommand):
             # 営業
             {
                 'last_name': '都',
-                'first_name': '亭吾',
+                'first_name': '学志',
                 'last_name_kana': 'ミヤコ',
                 'first_name_kana': 'サトゴ',
                 'email': 'miyako@hira-ko.jp',

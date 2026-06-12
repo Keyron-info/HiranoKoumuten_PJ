@@ -1,6 +1,7 @@
 import React, { ReactNode } from 'react';
 import DeadlineNotificationBanner from '../DeadlineNotificationBanner';
 import Navbar from '../Navbar';
+import HelpChatbot from '../HelpChatbot';
 
 interface LayoutProps {
   children: ReactNode;
@@ -18,6 +19,9 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
       {/* メインコンテンツ */}
       <main>{children}</main>
+
+      {/* 使い方ヘルプチャットボット（全ページ共通） */}
+      <HelpChatbot />
     </div>
   );
 };

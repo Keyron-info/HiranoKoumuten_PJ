@@ -105,14 +105,20 @@ class ChatbotAskView(APIView):
             )
             return Response({'answer': answer})
 
-        except ImportError:
+        except ImportError as e:
+            import sys
+            print(f'[chatbot] ImportError: {e}', file=sys.stderr, flush=True)
             return Response(
                 {'error': 'AIチャットボットは現在利用できません', 'fallback': True},
                 status=status.HTTP_503_SERVICE_UNAVAILABLE
             )
         except Exception as e:
             # APIエラー時もフォールバック可能なことをフロントに伝える
-            print(f'[chatbot] Claude API error: {e}')
+            import sys
+            import traceback
+            print(f'[chatbot] Claude API error: {type(e).__name__}: {e}', file=sys.stderr, flush=True)
+            traceback.print_exc(file=sys.stderr)
+            sys.stderr.flush()
             return Response(
                 {'error': 'AIチャットボットが一時的に応答できません', 'fallback': True},
                 status=status.HTTP_503_SERVICE_UNAVAILABLE

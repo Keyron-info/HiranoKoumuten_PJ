@@ -952,7 +952,8 @@ class InvoiceViewSet(viewsets.ModelViewSet):
             if not is_period_valid:
                 return Response({
                     'error': period_error_message or '現在は提出期間外です',
-                    'detail': '期間外に提出するには特例パスワードが必要です。',
+                    'detail': f'請求書の受付は毎月26日〜月末です（本日は{today.month}月{today.day}日）。'
+                              '期間外に提出するには、平野工務店から発行された特例パスワードを入力してください。',
                     'code': 'outside_submission_period',
                     'requires_special_password': True
                 }, status=status.HTTP_400_BAD_REQUEST)

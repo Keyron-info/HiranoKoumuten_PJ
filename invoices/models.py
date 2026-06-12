@@ -1857,31 +1857,27 @@ class MonthlyInvoicePeriod(models.Model):
     
     @classmethod
     def create_for_month(cls, company, year, month):
-        """指定月の期間を自動生成（25日締め、翌月末必着ルール）"""
+        """指定月の期間を自動生成（25日締め、受付は当月26日〜末日）"""
         import calendar
         from datetime import date
-        
+
         # 前月の26日を計算
         if month == 1:
             prev_year, prev_month = year - 1, 12
         else:
             prev_year, prev_month = year, month - 1
         period_start = date(prev_year, prev_month, 26)
-        
+
         # 当月25日（締日）
         period_end = date(year, month, 25)
         deadline = period_end
-        
+
         # 当月26日（提出開始）
         submission_start = date(year, month, 26)
-        
-        # 翌月末日（提出期限）
-        if month == 12:
-            next_year, next_month = year + 1, 1
-        else:
-            next_year, next_month = year, month + 1
-        last_day = calendar.monthrange(next_year, next_month)[1]
-        submission_deadline = date(next_year, next_month, last_day)
+
+        # 当月末日（提出期限）
+        last_day = calendar.monthrange(year, month)[1]
+        submission_deadline = date(year, month, last_day)
         
         period, created = cls.objects.get_or_create(
             company=company,

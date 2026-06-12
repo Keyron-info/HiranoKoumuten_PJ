@@ -908,31 +908,25 @@ class InvoiceViewSet(viewsets.ModelViewSet):
         invoice_date = invoice.invoice_date or invoice.issue_date or invoice.created_at.date()
         year, month = invoice_date.year, invoice_date.month
 
-        # MonthlyInvoicePeriod を使って提出可否を判定
-        # 旧ロジックの「毎月15日〜25日」ハードコードを廃止し、正しい締め日ルールを使用
+        # 受付ルール: 毎月26日〜月末のみ提出可能。それ以外は特例パスワードが必要
+        is_period_valid = today.day >= 26
+        period_error_message = None
+        if not is_period_valid:
+            period_error_message = (
+                f'請求書の提出は毎月26日〜月末のみ受け付けています（本日は{today.month}月{today.day}日です）'
+            )
+
+        # 月次締め状況のチェック（締め済みの月は提出不可）
         receiving_company = invoice.receiving_company or Company.objects.first()
-        period = None
+        is_month_closed = False
         if receiving_company:
             period = MonthlyInvoicePeriod.objects.filter(
                 company=receiving_company,
                 year=year,
                 month=month
             ).first()
-
-        is_period_valid = True
-        period_error_message = None
-        is_month_closed = False
-
-        if period:
-            if period.is_closed:
+            if period and period.is_closed:
                 is_month_closed = True
-            else:
-                # MonthlyInvoicePeriod の submission_start_date / submission_deadline で判定
-                can_submit, reason = period.can_submit_invoice(request.user)
-                if not can_submit:
-                    is_period_valid = False
-                    period_error_message = reason
-        # period が未設定の場合は提出を許可（管理者が期間を設定していない状態）
 
         # 特例パスワードバイパスのチェック
         is_bypassed = False

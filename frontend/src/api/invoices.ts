@@ -46,6 +46,8 @@ export const invoiceAPI = {
     date_to?: string;
     min_amount?: number;
     max_amount?: number;
+    site?: number;
+    company?: number;
   }): Promise<PaginatedResponse<InvoiceListItem>> => {
     const response = await apiClient.get<PaginatedResponse<InvoiceListItem>>('/invoices/', {
       params,

@@ -1,15 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Filter, ChevronLeft, ChevronRight, Eye, Plus } from 'lucide-react';
+import { Search, Filter, ChevronLeft, ChevronRight, Eye, Plus, X } from 'lucide-react';
 import { invoiceAPI, constructionSiteAPI } from '../api/invoices';
+import { partnerCompanyAPI, PartnerCompany } from '../api/partnerCompany';
 import { InvoiceListItem, ConstructionSite } from '../types';
 import Layout from '../components/common/Layout';
 import { useAuth } from '../contexts/AuthContext';
 
-// ユニーク配列を作成するヘルパー関数
-const uniqueArray = <T,>(arr: T[]): T[] => {
-  return arr.filter((item, index) => arr.indexOf(item) === index);
-};
+// 検索入力のデバウンス時間（ms）
+const SEARCH_DEBOUNCE_MS = 400;
 
 const InvoiceListPage: React.FC = () => {
   const navigate = useNavigate();
@@ -18,13 +17,17 @@ const InvoiceListPage: React.FC = () => {
   const [invoices, setInvoices] = useState<InvoiceListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  // デバウンス済みの検索語（これが変わったときだけAPIを叩く）
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  // サーバーサイドフィルター（ID指定）
   const [projectFilter, setProjectFilter] = useState('all');
   const [companyFilter, setCompanyFilter] = useState('all');
   const [currentPage, setCurrentPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
 
   const [projects, setProjects] = useState<ConstructionSite[]>([]);
+  const [companies, setCompanies] = useState<PartnerCompany[]>([]);
 
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
@@ -32,12 +35,29 @@ const InvoiceListPage: React.FC = () => {
   const [maxAmount, setMaxAmount] = useState('');
 
   const itemsPerPage = 20;
+  const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // 検索入力のデバウンス（入力が止まって400ms後に自動検索）
+  useEffect(() => {
+    if (debounceTimer.current) clearTimeout(debounceTimer.current);
+    debounceTimer.current = setTimeout(() => {
+      setDebouncedSearch(searchQuery);
+      setCurrentPage(1);
+    }, SEARCH_DEBOUNCE_MS);
+    return () => {
+      if (debounceTimer.current) clearTimeout(debounceTimer.current);
+    };
+  }, [searchQuery]);
 
   useEffect(() => {
     fetchInvoices();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentPage, statusFilter, projectFilter, companyFilter, debouncedSearch, dateFrom, dateTo, minAmount, maxAmount]);
+
+  useEffect(() => {
     fetchFilters();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentPage, statusFilter, dateFrom, dateTo, minAmount, maxAmount]);
+  }, []);
 
   const fetchInvoices = async () => {
     try {
@@ -45,11 +65,13 @@ const InvoiceListPage: React.FC = () => {
       const response = await invoiceAPI.getInvoices({
         status: statusFilter === 'all' ? undefined : statusFilter,
         page: currentPage,
-        search: searchQuery || undefined,
+        search: debouncedSearch || undefined,
         date_from: dateFrom || undefined,
         date_to: dateTo || undefined,
         min_amount: minAmount ? parseInt(minAmount) : undefined,
         max_amount: maxAmount ? parseInt(maxAmount) : undefined,
+        site: projectFilter !== 'all' ? parseInt(projectFilter) : undefined,
+        company: companyFilter !== 'all' ? parseInt(companyFilter) : undefined,
       });
 
       setInvoices(response.results || []);
@@ -63,29 +85,43 @@ const InvoiceListPage: React.FC = () => {
   };
 
   const fetchFilters = async () => {
+    // 工事現場一覧
     try {
-      // 工事現場一覧
       const sites = await constructionSiteAPI.getSites();
       setProjects(Array.isArray(sites) ? sites : []);
     } catch (error) {
-      console.error('Failed to fetch filters:', error);
+      console.error('Failed to fetch sites:', error);
       setProjects([]);
     }
-  };
-
-  const handleSearch = () => {
-    setCurrentPage(1);
-    fetchInvoices();
+    // 協力会社一覧（社内ユーザーのみ。全件をAPIから取得）
+    if (user?.user_type === 'internal') {
+      try {
+        const list = await partnerCompanyAPI.getAll();
+        setCompanies(list.filter((c) => c.is_active));
+      } catch (error) {
+        console.error('Failed to fetch companies:', error);
+        setCompanies([]);
+      }
+    }
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
-      handleSearch();
+      // Enterで即時検索（デバウンスを待たない）
+      if (debounceTimer.current) clearTimeout(debounceTimer.current);
+      setDebouncedSearch(searchQuery);
+      setCurrentPage(1);
     }
   };
 
+  const hasActiveFilters =
+    searchQuery !== '' || statusFilter !== 'all' || projectFilter !== 'all' ||
+    companyFilter !== 'all' || dateFrom !== '' || dateTo !== '' ||
+    minAmount !== '' || maxAmount !== '';
+
   const clearFilters = () => {
     setSearchQuery('');
+    setDebouncedSearch('');
     setStatusFilter('all');
     setProjectFilter('all');
     setCompanyFilter('all');
@@ -121,20 +157,7 @@ const InvoiceListPage: React.FC = () => {
     }
   };
 
-  // フィルタリング（クライアント側）
-  const filteredInvoices = invoices.filter((invoice) => {
-    const matchesProject = projectFilter === 'all' ||
-      invoice.construction_site_name_display === projectFilter ||
-      invoice.project_name === projectFilter;
-    const matchesCompany = companyFilter === 'all' ||
-      invoice.customer_company_name === companyFilter;
-    return matchesProject && matchesCompany;
-  });
-
   const totalPages = Math.ceil(totalCount / itemsPerPage);
-
-  // ユニークな会社名を抽出
-  const uniqueCompanies = uniqueArray(invoices.map(inv => inv.customer_company_name));
 
   return (
     <Layout>
@@ -165,7 +188,7 @@ const InvoiceListPage: React.FC = () => {
 
           <div className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              {/* 検索 */}
+              {/* 検索（入力すると自動検索） */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">検索</label>
                 <div className="relative">
@@ -174,11 +197,21 @@ const InvoiceListPage: React.FC = () => {
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     onKeyPress={handleKeyPress}
-                    placeholder="請求書番号、会社名で検索"
-                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                    placeholder="番号・会社名・工事名・備考"
+                    className="w-full pl-10 pr-9 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                   />
                   <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                  {searchQuery && (
+                    <button
+                      onClick={() => setSearchQuery('')}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                      title="クリア"
+                    >
+                      <X size={16} />
+                    </button>
+                  )}
                 </div>
+                <p className="text-xs text-gray-400 mt-1">入力すると自動で検索されます</p>
               </div>
 
               {/* ステータス */}
@@ -203,39 +236,47 @@ const InvoiceListPage: React.FC = () => {
                 </select>
               </div>
 
-              {/* 工事現場 */}
+              {/* 工事現場（サーバーサイドフィルター） */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">工事現場</label>
                 <select
                   value={projectFilter}
-                  onChange={(e) => setProjectFilter(e.target.value)}
+                  onChange={(e) => {
+                    setProjectFilter(e.target.value);
+                    setCurrentPage(1);
+                  }}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                 >
                   <option value="all">すべて</option>
                   {projects.map((project) => (
-                    <option key={project.id} value={project.name}>
+                    <option key={project.id} value={String(project.id)}>
                       {project.name}
                     </option>
                   ))}
                 </select>
               </div>
 
-              {/* 協力会社 */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">協力会社</label>
-                <select
-                  value={companyFilter}
-                  onChange={(e) => setCompanyFilter(e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                >
-                  <option value="all">すべて</option>
-                  {uniqueCompanies.map((company) => (
-                    <option key={company} value={company}>
-                      {company}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              {/* 協力会社（社内ユーザーのみ・全件から選択） */}
+              {user?.user_type === 'internal' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">協力会社</label>
+                  <select
+                    value={companyFilter}
+                    onChange={(e) => {
+                      setCompanyFilter(e.target.value);
+                      setCurrentPage(1);
+                    }}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                  >
+                    <option value="all">すべて</option>
+                    {companies.map((company) => (
+                      <option key={company.id} value={String(company.id)}>
+                        {company.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
             </div>
 
             {/* 詳細検索 (日付・金額) */}
@@ -294,13 +335,19 @@ const InvoiceListPage: React.FC = () => {
           </div>
 
           <div className="mt-4 flex items-center justify-between text-sm text-gray-600">
-            <p>{filteredInvoices.length}件の請求書が見つかりました</p>
-            <button
-              onClick={clearFilters}
-              className="text-primary-600 hover:text-primary-700 font-medium"
-            >
-              フィルターをクリア
-            </button>
+            <p>
+              {totalCount}件の請求書が見つかりました
+              {hasActiveFilters && <span className="ml-2 text-primary-600 font-medium">（絞り込み中）</span>}
+            </p>
+            {hasActiveFilters && (
+              <button
+                onClick={clearFilters}
+                className="flex items-center gap-1 text-primary-600 hover:text-primary-700 font-medium"
+              >
+                <X size={14} />
+                フィルターをクリア
+              </button>
+            )}
           </div>
         </div>
 
@@ -326,7 +373,7 @@ const InvoiceListPage: React.FC = () => {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
-                    {filteredInvoices.length === 0 ? (
+                    {invoices.length === 0 ? (
                       <tr>
                         <td colSpan={7} className="py-12 text-center text-gray-500">
                           <p className="text-lg mb-2">請求書が見つかりませんでした</p>
@@ -334,7 +381,7 @@ const InvoiceListPage: React.FC = () => {
                         </td>
                       </tr>
                     ) : (
-                      filteredInvoices.map((invoice) => (
+                      invoices.map((invoice) => (
                         <tr
                           key={invoice.id}
                           className="hover:bg-gray-50 transition-colors cursor-pointer"

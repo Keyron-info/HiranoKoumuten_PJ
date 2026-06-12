@@ -671,14 +671,29 @@ class InvoiceViewSet(viewsets.ModelViewSet):
         if status_filter == 'my_approval':
             qs = qs.filter(current_approver=user)
         
-        # 検索
+        # 検索（請求書番号・管理番号・工事名・現場名・協力会社名・備考を横断検索）
         search = self.request.query_params.get('search')
         if search:
             qs = qs.filter(
                 Q(invoice_number__icontains=search) |
+                Q(unique_number__icontains=search) |
                 Q(project_name__icontains=search) |
-                Q(construction_site_name__icontains=search)
+                Q(construction_site_name__icontains=search) |
+                Q(construction_site__name__icontains=search) |
+                Q(customer_company__name__icontains=search) |
+                Q(customer_company__name_kana__icontains=search) |
+                Q(notes__icontains=search)
             )
+
+        # 工事現場フィルター（サーバーサイド）
+        site_id = self.request.query_params.get('site')
+        if site_id and site_id.isdigit():
+            qs = qs.filter(construction_site_id=int(site_id))
+
+        # 協力会社フィルター（サーバーサイド）
+        company_id = self.request.query_params.get('company')
+        if company_id and company_id.isdigit():
+            qs = qs.filter(customer_company_id=int(company_id))
 
         # ==========================================
         # 電子帳簿保存法対応検索フィルター

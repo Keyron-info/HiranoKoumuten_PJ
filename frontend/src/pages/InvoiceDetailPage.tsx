@@ -39,10 +39,19 @@ interface Correction {
   is_approved_by_partner: boolean;
 }
 
+interface CustomerCompanyBank {
+  bank_name: string;
+  bank_branch: string;
+  bank_account: string;
+  account_holder: string;
+  invoice_registration_number: string;
+}
+
 interface InvoiceDetail {
   id: number;
   invoice_number: string;
   customer_company_name: string;
+  customer_company_bank?: CustomerCompanyBank | null;
   receiving_company_name?: string;
   construction_site_name_display?: string;
   project_name?: string;
@@ -572,6 +581,46 @@ const InvoiceDetailPage: React.FC = () => {
                   </tfoot>
                 </table>
               </div>
+
+              {/* 振込先情報（請求元＝協力会社の口座） */}
+              {invoice.customer_company_bank &&
+                (invoice.customer_company_bank.bank_name ||
+                  invoice.customer_company_bank.bank_account) && (
+                  <div className="mt-6 border-t border-gray-200 pt-5">
+                    <h3 className="text-sm font-bold text-gray-700 mb-3">お振込先</h3>
+                    <div className="bg-gray-50 rounded-lg p-4 text-sm text-gray-800 space-y-1.5">
+                      <div className="flex">
+                        <span className="w-24 text-gray-500 shrink-0">金融機関</span>
+                        <span className="font-medium">
+                          {invoice.customer_company_bank.bank_name || '-'}
+                          {invoice.customer_company_bank.bank_branch
+                            ? `　${invoice.customer_company_bank.bank_branch}`
+                            : ''}
+                        </span>
+                      </div>
+                      <div className="flex">
+                        <span className="w-24 text-gray-500 shrink-0">口座番号</span>
+                        <span className="font-medium">
+                          {invoice.customer_company_bank.bank_account || '-'}
+                        </span>
+                      </div>
+                      <div className="flex">
+                        <span className="w-24 text-gray-500 shrink-0">口座名義</span>
+                        <span className="font-medium">
+                          {invoice.customer_company_bank.account_holder || '-'}
+                        </span>
+                      </div>
+                      {invoice.customer_company_bank.invoice_registration_number && (
+                        <div className="flex">
+                          <span className="w-24 text-gray-500 shrink-0">登録番号</span>
+                          <span className="font-medium">
+                            {invoice.customer_company_bank.invoice_registration_number}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
             </div>
 
             {/* コメント */}

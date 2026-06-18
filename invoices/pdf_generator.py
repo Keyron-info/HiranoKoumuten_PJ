@@ -349,19 +349,36 @@ def generate_invoice_pdf(invoice):
     story.append(Spacer(1, 8*mm))
     
     # ==========================================
-    # 7. 振込先情報
+    # 7. 振込先情報（請求元＝協力会社の口座）
     # ==========================================
-    if invoice.customer_company and hasattr(invoice.customer_company, 'bank_info') and invoice.customer_company.bank_info:
-        bank_style = ParagraphStyle(
-            'BankInfo',
-            fontName=font_gothic,
-            fontSize=9,
-            leading=12
-        )
-        bank_info_text = f"<b>お振込先:</b><br/>{invoice.customer_company.bank_info}"
-        bank_info = Paragraph(bank_info_text, bank_style)
-        story.append(bank_info)
-        story.append(Spacer(1, 5*mm))
+    cc = invoice.customer_company
+    if cc:
+        bank_name = getattr(cc, 'bank_name', '') or ''
+        bank_branch = getattr(cc, 'bank_branch', '') or ''
+        bank_account = getattr(cc, 'bank_account', '') or ''
+        # いずれかが登録されている場合のみ表示
+        if bank_name or bank_account:
+            bank_style = ParagraphStyle(
+                'BankInfo',
+                fontName=font_gothic,
+                fontSize=9,
+                leading=14
+            )
+            lines = ['<b>お振込先</b>']
+            bank_line = bank_name
+            if bank_branch:
+                bank_line = f"{bank_name}　{bank_branch}"
+            if bank_line:
+                lines.append(f"金融機関： {bank_line}")
+            if bank_account:
+                lines.append(f"口座番号： {bank_account}")
+            lines.append(f"口座名義： {cc.name}")
+            reg_no = getattr(cc, 'invoice_registration_number', '') or ''
+            if reg_no:
+                lines.append(f"登録番号： {reg_no}")
+            bank_info = Paragraph('<br/>'.join(lines), bank_style)
+            story.append(bank_info)
+            story.append(Spacer(1, 5*mm))
     
     # ==========================================
     # 8. 備考

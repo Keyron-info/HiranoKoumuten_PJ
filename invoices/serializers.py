@@ -863,6 +863,8 @@ class InvoiceDetailSerializer(serializers.ModelSerializer):
     """請求書詳細シリアライザー（拡張版）"""
     items = InvoiceItemSerializer(many=True, read_only=True)
     customer_company_name = serializers.CharField(source='customer_company.name', read_only=True)
+    # 請求元（協力会社）の振込先情報 — 一般的な請求書と同様に表示するため
+    customer_company_bank = serializers.SerializerMethodField()
     construction_site_name_display = serializers.SerializerMethodField()
     status_display = serializers.CharField(source='get_status_display', read_only=True)
     created_by_name = serializers.CharField(source='created_by.get_full_name', read_only=True)
@@ -893,7 +895,7 @@ class InvoiceDetailSerializer(serializers.ModelSerializer):
         model = Invoice
         fields = [
             'id', 'invoice_number', 'document_type', 'document_type_display',
-            'customer_company', 'customer_company_name',
+            'customer_company', 'customer_company_name', 'customer_company_bank',
             'construction_site', 'construction_site_name_display',
             'construction_type', 'construction_type_name', 'construction_type_other',
             'purchase_order', 'purchase_order_number', 'purchase_order_amount',
@@ -934,7 +936,21 @@ class InvoiceDetailSerializer(serializers.ModelSerializer):
         elif obj.construction_site:
             return obj.construction_site.name
         return ''
-    
+
+    def get_customer_company_bank(self, obj):
+        """請求元（協力会社）の振込先情報。未登録項目は空文字で返す。"""
+        company = obj.customer_company
+        if not company:
+            return None
+        return {
+            'bank_name': getattr(company, 'bank_name', '') or '',
+            'bank_branch': getattr(company, 'bank_branch', '') or '',
+            'bank_account': getattr(company, 'bank_account', '') or '',
+            # 口座名義は協力会社マスタに専用項目が無いため会社名を既定表示
+            'account_holder': getattr(company, 'name', '') or '',
+            'invoice_registration_number': getattr(company, 'invoice_registration_number', '') or '',
+        }
+
     def get_is_correction_allowed_now(self, obj):
         """現時点で訂正可能かどうか"""
         if not obj.correction_deadline:

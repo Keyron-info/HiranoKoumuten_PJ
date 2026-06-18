@@ -1,6 +1,7 @@
 # invoices/api_views.py
 
 from rest_framework import viewsets, status, permissions
+from rest_framework.exceptions import ValidationError as DRFValidationError
 from rest_framework.views import APIView
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -8,6 +9,7 @@ from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.renderers import BaseRenderer
 from django.shortcuts import get_object_or_404
 from django.db.models import Q, Sum, Count, F
+from django.db import IntegrityError
 from rest_framework import filters
 from django_filters.rest_framework import DjangoFilterBackend
 from django.core.mail import send_mail
@@ -782,15 +784,26 @@ class InvoiceViewSet(viewsets.ModelViewSet):
                 InvoiceSerializer(invoice).data,
                 status=status.HTTP_201_CREATED
             )
-        except Exception as e:
+        except DRFValidationError:
+            # シリアライザーの明示的バリデーションエラーはそのまま伝播（DRFが400で整形）
+            raise
+        except IntegrityError:
+            # DB 制約違反（必須項目の欠落など）。生の SQL エラーは外部に出さずログのみに残す。
             import traceback
-            print(traceback.format_exc())
+            print('[invoice create] IntegrityError:\n' + traceback.format_exc())
             return Response(
-                {
-                    'message': f'Server Error: {str(e)}',
-                    'error': str(e),
-                    'trace': traceback.format_exc()
-                },
+                {'error': '請求書を保存できませんでした。入力内容（協力会社情報・工事現場など）をご確認のうえ、'
+                          '解決しない場合は平野工務店の経理担当者にご連絡ください。'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        except Exception:
+            # 想定外エラー。詳細（トレースバック・SQL）はサーバーログのみに記録し、
+            # クライアントには内部情報を返さない（情報漏洩防止）。
+            import traceback
+            print('[invoice create] Unexpected error:\n' + traceback.format_exc())
+            return Response(
+                {'error': '請求書の作成中に予期しないエラーが発生しました。'
+                          'お手数ですが時間をおいて再度お試しください。'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
     

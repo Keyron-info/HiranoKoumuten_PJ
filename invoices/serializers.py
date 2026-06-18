@@ -521,34 +521,30 @@ class InvoiceCreateSerializer(serializers.ModelSerializer):
         # ユーザー情報の取得
         user = self.context['request'].user
         validated_data['created_by'] = user
-        
-        # 会社情報の自動設定
-        if user.user_type == 'customer':
-            # 協力会社ユーザーの場合
-            # customer_company が未設定なら ValueError（Viewset 側で事前チェック済みだが二重防衛）
-            if not user.customer_company:
-                raise serializers.ValidationError(
-                    {'error': '協力会社情報が設定されていません。管理者にお問い合わせください。'}
-                )
+
+        # --- customer_company の決定（user_type の値に依存せず堅牢に判定） ---
+        # 既に save_kwargs 等でセットされていればそれを優先。
+        # 無ければユーザーに紐づく協力会社を使う（種別が壊れていても customer_company_id があれば拾える）。
+        if not validated_data.get('customer_company') and getattr(user, 'customer_company_id', None):
             validated_data['customer_company'] = user.customer_company
-                
-            # 受取会社（平野工務店）の設定
-            # 現場に関連付けられた会社を使用するか、デフォルトの会社を使用
+
+        # --- receiving_company の決定（現場の会社 → 社内ユーザーの会社 → 既定会社） ---
+        if not validated_data.get('receiving_company'):
             construction_site = validated_data.get('construction_site')
-            if construction_site:
+            if construction_site and construction_site.company_id:
                 validated_data['receiving_company'] = construction_site.company
-            else:
-                # 現場がない場合（ありえないが安全策）、最初の会社を使用
-                validated_data['receiving_company'] = Company.objects.first()
-                
-        elif user.user_type == 'internal':
-            # 社内ユーザーの場合
-            if user.company:
+            elif getattr(user, 'company_id', None):
                 validated_data['receiving_company'] = user.company
-            
-            # 社内ユーザーが代理作成する場合はcustomer_companyが入力されているはず
-            # 入力がない場合はNULL（社内経費など）
-        
+            else:
+                validated_data['receiving_company'] = Company.objects.first()
+
+        # --- 最終ガード: customer_company が無いまま INSERT すると DB エラーになるため、
+        #     その前に必ず分かりやすいエラーを返す（生の DB エラーをユーザーに見せない） ---
+        if not validated_data.get('customer_company'):
+            raise serializers.ValidationError(
+                {'error': '協力会社情報が設定されていません。お手数ですが平野工務店の経理担当者にご連絡ください。'}
+            )
+
         # Invoice作成
         invoice = Invoice.objects.create(**validated_data)
         

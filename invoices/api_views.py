@@ -2479,29 +2479,49 @@ class DashboardViewSet(viewsets.GenericViewSet):
     """ダッシュボードAPI - ユーザー種別対応版"""
     permission_classes = [IsAuthenticated]
     
-    def _count_my_pending(self, user):
-        """自分の承認待ち件数（経理は全経理ステップをカウント）"""
-        try:
-            count = Invoice.objects.filter(
+    def _my_pending_queryset(self, user):
+        """自分の承認待ち請求書のクエリセット（経理は経理ステップも含む）"""
+        qs = Invoice.objects.filter(status='pending_approval', current_approver=user)
+        if getattr(user, 'position', '') == 'accountant':
+            accountant_qs = Invoice.objects.filter(
                 status='pending_approval',
-                current_approver=user
-            ).count()
-            
-            # 経理ユーザーの場合、current_approver=Noneで経理ステップの請求書もカウント
-            if getattr(user, 'position', '') == 'accountant':
-                accountant_count = Invoice.objects.filter(
-                    status='pending_approval',
-                    current_approval_step__approver_position='accountant',
-                ).exclude(
-                    current_approver=user  # 二重カウント防止
-                ).count()
-                count += accountant_count
-            
-            return count
-        except Exception as e:
+                current_approval_step__approver_position='accountant',
+            ).exclude(current_approver=user)
+            qs = qs | accountant_qs
+        return qs.distinct()
+
+    def _count_my_pending(self, user):
+        """自分の承認待ち件数（B：経理は経理ステップも含む）"""
+        try:
+            return self._my_pending_queryset(user).count()
+        except Exception:
             import traceback
             traceback.print_exc()
             return 0
+
+    def _my_pending_amount(self, user):
+        """自分の承認待ち合計金額（B）"""
+        try:
+            return self._my_pending_queryset(user).aggregate(
+                total=Sum('total_amount')
+            )['total'] or 0
+        except Exception:
+            import traceback
+            traceback.print_exc()
+            return 0
+
+    def _my_approved_stats(self, user):
+        """自分がこれまでに承認した請求書の件数・合計金額（A）"""
+        try:
+            approved_ids = ApprovalHistory.objects.filter(
+                user=user, action='approved'
+            ).values_list('invoice_id', flat=True).distinct()
+            qs = Invoice.objects.filter(id__in=list(approved_ids))
+            return qs.count(), (qs.aggregate(total=Sum('total_amount'))['total'] or 0)
+        except Exception:
+            import traceback
+            traceback.print_exc()
+            return 0, 0
     
     @action(detail=False, methods=['get'])
     def stats(self, request):
@@ -2540,18 +2560,24 @@ class DashboardViewSet(viewsets.GenericViewSet):
                         is_active=True
                     ).count(),
 
-                    # 提出済み・承認待ち請求書の合計金額
+                    # C: 全社の進行中（提出済み・承認待ち）合計金額・件数
                     'submitted_total_amount': Invoice.objects.filter(
                         company_filter,
                         status__in=['submitted', 'pending_approval']
                     ).aggregate(total=Sum('total_amount'))['total'] or 0,
-
-                    # 提出済み・承認待ちの件数
                     'submitted_count': Invoice.objects.filter(
                         company_filter,
                         status__in=['submitted', 'pending_approval']
                     ).count(),
+
+                    # B: 自分の承認待ち合計金額（件数は my_pending_approvals）
+                    'my_pending_amount': self._my_pending_amount(user),
                 }
+
+                # A: 自分が承認してきた累計（件数・金額）
+                approved_count, approved_total = self._my_approved_stats(user)
+                stats['my_approved_count'] = approved_count
+                stats['my_approved_total'] = approved_total
             else:
                 # 協力会社ユーザー向け統計
                 stats = {
@@ -3825,34 +3851,116 @@ class CSVExportViewSet(viewsets.ViewSet):
     """CSV出力ViewSet"""
     permission_classes = [IsAuthenticated, IsAccountantOrSuperAdmin]
     renderer_classes = [PassthroughRenderer]
-    
+
+    def _filtered_invoices(self, request):
+        """請求書一覧のフィルター済みクエリセットを返す（CSV/Excel/PDF共通）"""
+        status_filter = request.query_params.get('status')
+        year = request.query_params.get('year')
+        month = request.query_params.get('month')
+        site_id = request.query_params.get('site')
+        company_id = request.query_params.get('company')
+
+        queryset = Invoice.objects.select_related(
+            'customer_company', 'construction_site', 'construction_type', 'created_by'
+        )
+        if status_filter and status_filter != 'all':
+            queryset = queryset.filter(status=status_filter)
+        if year:
+            queryset = queryset.filter(invoice_date__year=int(year))
+        if month:
+            queryset = queryset.filter(invoice_date__month=int(month))
+        if site_id and str(site_id).isdigit():
+            queryset = queryset.filter(construction_site_id=int(site_id))
+        if company_id and str(company_id).isdigit():
+            queryset = queryset.filter(customer_company_id=int(company_id))
+        return queryset.order_by('-invoice_date', '-created_at')
+
+    @action(detail=False, methods=['get'])
+    def invoices_excel(self, request):
+        """請求書一覧をExcel(.xlsx)で出力（経理のみ）"""
+        try:
+            from openpyxl import Workbook
+            from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+        except ImportError:
+            return Response({'error': 'Excel出力機能が利用できません（サーバー設定）'}, status=503)
+
+        queryset = self._filtered_invoices(request)
+        wb = Workbook()
+        ws = wb.active
+        ws.title = '請求書一覧'
+
+        headers = ['請求書番号', '協力会社', '工事現場', '工種', '請求日',
+                   '小計', '消費税', '合計金額', '協力会費', '差引支払額',
+                   'ステータス', '作成日', '作成者']
+        ws.append(headers)
+        header_fill = PatternFill('solid', fgColor='2F5496')
+        header_font = Font(color='FFFFFF', bold=True)
+        thin = Side(style='thin', color='D0D0D0')
+        border = Border(left=thin, right=thin, top=thin, bottom=thin)
+        for col, _ in enumerate(headers, 1):
+            c = ws.cell(row=1, column=col)
+            c.fill = header_fill
+            c.font = header_font
+            c.alignment = Alignment(horizontal='center', vertical='center')
+            c.border = border
+
+        for inv in queryset:
+            safety = inv.safety_cooperation_fee or 0
+            net = (inv.total_amount or 0) - safety
+            ws.append([
+                inv.invoice_number,
+                inv.customer_company.name if inv.customer_company else '',
+                inv.construction_site.name if inv.construction_site else (inv.construction_site_name or ''),
+                inv.construction_type.name if inv.construction_type else (inv.construction_type_other or ''),
+                inv.invoice_date.strftime('%Y/%m/%d') if inv.invoice_date else '',
+                int(inv.subtotal or 0), int(inv.tax_amount or 0), int(inv.total_amount or 0),
+                int(safety), int(net),
+                inv.get_status_display(),
+                inv.created_at.strftime('%Y/%m/%d %H:%M') if inv.created_at else '',
+                inv.created_by.get_full_name() if inv.created_by else '',
+            ])
+
+        # 列幅と数値書式
+        widths = [16, 22, 22, 14, 12, 12, 10, 13, 10, 13, 12, 17, 14]
+        for i, w in enumerate(widths, 1):
+            ws.column_dimensions[chr(64 + i) if i <= 26 else 'A'].width = w
+        for row in ws.iter_rows(min_row=2, min_col=6, max_col=10):
+            for cell in row:
+                cell.number_format = '#,##0'
+                cell.border = border
+
+        import io
+        buf = io.BytesIO()
+        wb.save(buf)
+        buf.seek(0)
+        filename = f'invoices_{timezone.now().strftime("%Y%m%d")}.xlsx'
+        resp = HttpResponse(
+            buf.getvalue(),
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+        resp['Content-Disposition'] = f'attachment; filename="{filename}"'
+        return resp
+
+    @action(detail=False, methods=['get'])
+    def invoices_pdf(self, request):
+        """請求書一覧をPDFで出力（経理のみ）"""
+        try:
+            from .pdf_generator import generate_invoice_list_pdf
+        except ImportError:
+            return Response({'error': 'PDF出力機能が利用できません'}, status=503)
+
+        queryset = self._filtered_invoices(request)
+        pdf_buffer = generate_invoice_list_pdf(queryset)
+        filename = f'invoices_{timezone.now().strftime("%Y%m%d")}.pdf'
+        resp = HttpResponse(pdf_buffer.getvalue(), content_type='application/pdf')
+        resp['Content-Disposition'] = f'attachment; filename="{filename}"'
+        return resp
+
     @action(detail=False, methods=['get'])
     def invoices(self, request):
         """請求書一覧CSV"""
         try:
-            # フィルター
-            status_filter = request.query_params.get('status')
-            year = request.query_params.get('year')
-            month = request.query_params.get('month')
-            site_id = request.query_params.get('site')
-            company_id = request.query_params.get('company')
-            
-            queryset = Invoice.objects.select_related(
-                'customer_company', 'construction_site', 'construction_type', 'created_by'
-            )
-            
-            if status_filter:
-                queryset = queryset.filter(status=status_filter)
-            if year:
-                queryset = queryset.filter(invoice_date__year=int(year))
-            if month:
-                queryset = queryset.filter(invoice_date__month=int(month))
-            if site_id:
-                queryset = queryset.filter(construction_site_id=site_id)
-            if company_id:
-                queryset = queryset.filter(customer_company_id=company_id)
-            
-            queryset = queryset.order_by('-invoice_date', '-created_at')
+            queryset = self._filtered_invoices(request)
             
             # 監査ログ（エラーでも続行）
             try:

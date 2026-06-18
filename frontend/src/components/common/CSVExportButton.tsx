@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Download, FileSpreadsheet, ChevronDown } from 'lucide-react';
+import apiClient from '../../api/client';
 
 interface CSVExportButtonProps {
   year?: number;
@@ -15,99 +16,64 @@ const CSVExportButton: React.FC<CSVExportButtonProps> = ({
   const [isOpen, setIsOpen] = useState(false);
   const [exporting, setExporting] = useState(false);
 
-  // ベースURLを取得（ポート8001のバックエンドサーバー）
-  const getBaseUrl = () => {
-    // 環境変数がある場合はそれを使用、なければ開発環境のデフォルト
-    const envUrl = process.env.REACT_APP_API_URL;
-    if (envUrl) {
-      // /api を除去（後で追加するため）
-      return envUrl.replace(/\/api\/?$/, '');
-    }
-    return 'http://localhost:8001';
-  };
-
-  // CSVエクスポートURL生成
-  const getExportUrl = (type: 'invoices' | 'monthly' | 'company' | 'site') => {
-    const baseUrl = getBaseUrl();
-    const query = new URLSearchParams({ year: year.toString() });
-    if (month) query.append('month', month.toString());
-    
+  // CSVエクスポートの相対パス（apiClientのbaseURL配下）
+  const getExportPath = (type: 'invoices' | 'monthly' | 'company' | 'site') => {
     switch (type) {
+      case 'monthly': return '/csv-export/monthly_summary/';
+      case 'company': return '/csv-export/company_summary/';
+      case 'site': return '/csv-export/site_summary/';
       case 'invoices':
-        return `${baseUrl}/api/csv-export/invoices/?${query.toString()}`;
-      case 'monthly':
-        return `${baseUrl}/api/csv-export/monthly_summary/?${query.toString()}`;
-      case 'company':
-        return `${baseUrl}/api/csv-export/company_summary/?${query.toString()}`;
-      case 'site':
-        return `${baseUrl}/api/csv-export/site_summary/?${query.toString()}`;
-      default:
-        return `${baseUrl}/api/csv-export/invoices/?${query.toString()}`;
+      default: return '/csv-export/invoices/';
     }
   };
 
   const handleExport = async (type: 'invoices' | 'monthly' | 'company' | 'site') => {
     setExporting(true);
-    
-    const url = getExportUrl(type);
-    const token = localStorage.getItem('access_token');
-    
+
     try {
-      const response = await fetch(url, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Accept': '*/*',
-        }
+      // apiClient経由（トークン自動付与＋401時の自動リフレッシュ）でダウンロード
+      const params: Record<string, string | number> = { year };
+      if (month) params.month = month;
+      const response = await apiClient.get(getExportPath(type), {
+        params,
+        responseType: 'blob',
       });
-      
-      // レスポンスのContent-Typeをチェック
-      const contentType = response.headers.get('Content-Type') || '';
-      
-      if (!response.ok) {
-        // エラーレスポンスの場合
-        if (contentType.includes('application/json')) {
-          const errorData = await response.json();
-          throw new Error(errorData.error || errorData.detail || 'ダウンロードに失敗しました');
-        } else {
-          throw new Error(`HTTPエラー: ${response.status}`);
-        }
+
+      const blob = response.data as Blob;
+      // エラーがJSON(blob)で返ってきた場合
+      if (blob.type && blob.type.includes('application/json')) {
+        const text = await blob.text();
+        let msg = 'ダウンロードに失敗しました';
+        try { msg = JSON.parse(text).error || msg; } catch { /* noop */ }
+        throw new Error(msg);
       }
-      
-      // CSVかどうかを確認
-      if (!contentType.includes('text/csv') && !contentType.includes('application/octet-stream')) {
-        console.warn('Unexpected content type:', contentType);
-      }
-      
-      // Blobとして取得
-      const blob = await response.blob();
-      
-      // ファイルサイズチェック
       if (blob.size === 0) {
         throw new Error('データがありません');
       }
-      
-      // ダウンロードURLを作成
-      const downloadUrl = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = downloadUrl;
-      
-      // ファイル名を設定
+
       const filename = {
         invoices: `請求書一覧_${year}年${month ? month + '月' : ''}.csv`,
         monthly: `月別集計_${year}年${month ? month + '月' : ''}.csv`,
         company: `業者別集計_${year}年${month ? month + '月' : ''}.csv`,
         site: `現場別集計_${year}年${month ? month + '月' : ''}.csv`,
       }[type];
-      
+
+      const downloadUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = downloadUrl;
       link.setAttribute('download', filename);
       document.body.appendChild(link);
       link.click();
       link.remove();
       window.URL.revokeObjectURL(downloadUrl);
-      
+
     } catch (error: any) {
       console.error('CSV export error:', error);
-      alert(error.message || 'CSVのダウンロードに失敗しました');
+      if (error?.response?.status === 403) {
+        alert('エクスポートは経理担当のみ利用できます。');
+      } else {
+        alert(error?.message || 'CSVのダウンロードに失敗しました');
+      }
     } finally {
       setExporting(false);
       setIsOpen(false);

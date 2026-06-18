@@ -5,6 +5,7 @@ import { invoiceAPI, constructionSiteAPI } from '../api/invoices';
 import { partnerCompanyAPI, PartnerCompany } from '../api/partnerCompany';
 import { InvoiceListItem, ConstructionSite } from '../types';
 import Layout from '../components/common/Layout';
+import InvoiceExportMenu from '../components/common/InvoiceExportMenu';
 import { useAuth } from '../contexts/AuthContext';
 
 // 検索入力のデバウンス時間（ms）
@@ -36,6 +37,11 @@ const InvoiceListPage: React.FC = () => {
 
   const itemsPerPage = 20;
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // エクスポートは経理・管理者のみ
+  const isAccountant =
+    user?.user_type === 'internal' &&
+    ['accountant', 'admin'].includes(user?.position || '');
 
   // 検索入力のデバウンス（入力が止まって400ms後に自動検索）
   useEffect(() => {
@@ -168,15 +174,27 @@ const InvoiceListPage: React.FC = () => {
             <h1 className="text-3xl font-bold text-gray-900 mb-2">請求書一覧</h1>
             <p className="text-gray-600">全ての請求書を管理</p>
           </div>
-          {user?.user_type === 'customer' && (
-            <button
-              onClick={() => navigate('/invoices/create')}
-              className="flex items-center space-x-2 px-6 py-3 bg-gradient-to-r from-primary-500 to-primary-600 text-white rounded-lg font-medium hover:from-primary-600 hover:to-primary-700 transition-all shadow-lg hover:shadow-xl"
-            >
-              <Plus size={20} />
-              <span>新規作成</span>
-            </button>
-          )}
+          <div className="flex items-center gap-3">
+            {/* エクスポート: 経理・管理者のみ */}
+            {isAccountant && (
+              <InvoiceExportMenu
+                params={{
+                  status: statusFilter !== 'all' ? statusFilter : undefined,
+                  site: projectFilter !== 'all' ? parseInt(projectFilter) : undefined,
+                  company: companyFilter !== 'all' ? parseInt(companyFilter) : undefined,
+                }}
+              />
+            )}
+            {user?.user_type === 'customer' && (
+              <button
+                onClick={() => navigate('/invoices/create')}
+                className="flex items-center space-x-2 px-6 py-3 bg-gradient-to-r from-primary-500 to-primary-600 text-white rounded-lg font-medium hover:from-primary-600 hover:to-primary-700 transition-all shadow-lg hover:shadow-xl"
+              >
+                <Plus size={20} />
+                <span>新規作成</span>
+              </button>
+            )}
+          </div>
         </div>
 
         {/* フィルター */}

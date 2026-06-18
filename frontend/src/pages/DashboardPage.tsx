@@ -89,15 +89,51 @@ const DashboardPage: React.FC = () => {
       // ダッシュボード統計を取得
       const dashboardStats = await invoiceAPI.getDashboardStats() as any;
 
-      // 統計データを設定（内部ユーザー用）
+      // 統計データを設定（内部ユーザー用・役職別）
       if (user?.user_type === 'internal') {
-        setStats([
-          { label: '承認待ち', value: dashboardStats.pending_invoices || 0, icon: Clock, color: 'text-orange-600', bg: 'bg-orange-50', border: 'border-orange-100' },
-          { label: '自分の承認待ち', value: dashboardStats.my_pending_approvals || 0, icon: AlertCircle, color: 'text-rose-600', bg: 'bg-rose-50', border: 'border-rose-100' },
-          { label: '協力会社数', value: dashboardStats.partner_companies || 0, icon: CheckCircle, color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-100' },
-          { label: '今月の支払額', value: formatCurrency(dashboardStats.monthly_payment || 0), icon: CreditCard, color: 'text-primary-600', bg: 'bg-primary-50', border: 'border-primary-100' },
-          { label: `提出済み合計（${dashboardStats.submitted_count || 0}件）`, value: formatCurrency(dashboardStats.submitted_total_amount || 0), icon: CreditCard, color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-100' },
-        ]);
+        const pos = user.position || '';
+        const isSupervisor = pos === 'site_supervisor';
+        const isExec = ['president', 'senior_managing_director', 'managing_director', 'director'].includes(pos);
+        const isAccountant = ['accountant', 'admin'].includes(pos);
+
+        const internalCards: StatItem[] = [];
+
+        // B: 自分の承認待ち（全役職共通・金額／件数はラベル）
+        internalCards.push({
+          label: `承認待ち（自分）${dashboardStats.my_pending_approvals || 0}件`,
+          value: formatCurrency(dashboardStats.my_pending_amount || 0),
+          icon: Clock, color: 'text-orange-600', bg: 'bg-orange-50', border: 'border-orange-100',
+        });
+
+        if (isSupervisor) {
+          // A: 承認済み累計（自分）— 現場監督のみ
+          internalCards.push({
+            label: `承認済み累計（自分）${dashboardStats.my_approved_count || 0}件`,
+            value: formatCurrency(dashboardStats.my_approved_total || 0),
+            icon: CheckCircle, color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-100',
+          });
+        } else {
+          // C: 進行中合計（全社）— 役員・経理
+          internalCards.push({
+            label: `進行中合計（全社）${dashboardStats.submitted_count || 0}件`,
+            value: formatCurrency(dashboardStats.submitted_total_amount || 0),
+            icon: CreditCard, color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-100',
+          });
+        }
+
+        // 役員・経理には全社の参考カードも追加
+        if (isExec || isAccountant) {
+          internalCards.push({
+            label: '協力会社数', value: dashboardStats.partner_companies || 0,
+            icon: CheckCircle, color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-100',
+          });
+          internalCards.push({
+            label: '今月の支払額', value: formatCurrency(dashboardStats.monthly_payment || 0),
+            icon: CreditCard, color: 'text-primary-600', bg: 'bg-primary-50', border: 'border-primary-100',
+          });
+        }
+
+        setStats(internalCards);
         setPendingCount(dashboardStats.my_pending_approvals || 0);
       } else {
         // 協力会社用

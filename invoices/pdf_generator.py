@@ -479,3 +479,76 @@ def generate_invoice_pdf_simple(invoice):
     doc.build(story)
     buffer.seek(0)
     return buffer
+
+
+def generate_invoice_list_pdf(invoices):
+    """
+    請求書一覧を表形式のPDFで出力する（経理向け帳票）。
+    invoices: Invoice のクエリセットまたはリスト。
+    返り値: PDFバイナリを含む BytesIO。
+    """
+    font_gothic, font_mincho = register_japanese_fonts()
+
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buffer, pagesize=A4,
+        topMargin=15 * mm, bottomMargin=15 * mm,
+        leftMargin=12 * mm, rightMargin=12 * mm,
+    )
+    story = []
+
+    title_style = ParagraphStyle(
+        'ListTitle', fontName=font_gothic, fontSize=14, leading=18, alignment=TA_LEFT
+    )
+    meta_style = ParagraphStyle(
+        'ListMeta', fontName=font_gothic, fontSize=9, leading=12, textColor=colors.grey
+    )
+    story.append(Paragraph('請求書一覧', title_style))
+    story.append(Paragraph(
+        f'出力日時: {datetime.now().strftime("%Y/%m/%d %H:%M")}　件数: {len(invoices)}件',
+        meta_style
+    ))
+    story.append(Spacer(1, 4 * mm))
+
+    # テーブルヘッダー
+    header = ['請求書番号', '協力会社', '工事現場', '請求日', '合計金額', 'ステータス']
+    data = [header]
+    total_sum = 0
+    for inv in invoices:
+        amount = int(inv.total_amount or 0)
+        total_sum += amount
+        data.append([
+            inv.invoice_number or '',
+            (inv.customer_company.name if inv.customer_company else '')[:18],
+            (inv.construction_site.name if inv.construction_site
+             else (inv.construction_site_name or ''))[:16],
+            inv.invoice_date.strftime('%Y/%m/%d') if inv.invoice_date else '',
+            f'¥{amount:,}',
+            inv.get_status_display(),
+        ])
+    # 合計行
+    data.append(['', '', '', '合計', f'¥{total_sum:,}', ''])
+
+    col_widths = [32 * mm, 38 * mm, 34 * mm, 24 * mm, 30 * mm, 22 * mm]
+    table = Table(data, colWidths=col_widths, repeatRows=1)
+    table.setStyle(TableStyle([
+        ('FONTNAME', (0, 0), (-1, -1), font_gothic),
+        ('FONTSIZE', (0, 0), (-1, -1), 8),
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#2F5496')),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+        ('ALIGN', (4, 0), (4, -1), 'RIGHT'),
+        ('ALIGN', (0, 0), (3, -1), 'LEFT'),
+        ('ALIGN', (5, 0), (5, -1), 'CENTER'),
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('GRID', (0, 0), (-1, -1), 0.4, colors.HexColor('#D0D0D0')),
+        ('ROWBACKGROUNDS', (0, 1), (-1, -2), [colors.white, colors.HexColor('#F5F7FA')]),
+        ('BACKGROUND', (0, -1), (-1, -1), colors.HexColor('#E8EEF7')),
+        ('FONTSIZE', (0, -1), (-1, -1), 9),
+        ('TOPPADDING', (0, 0), (-1, -1), 3),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
+    ]))
+    story.append(table)
+
+    doc.build(story)
+    buffer.seek(0)
+    return buffer

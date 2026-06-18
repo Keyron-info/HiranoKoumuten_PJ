@@ -20,3 +20,5 @@ dj-database-url==2.1.0
 
 # FORCE BUILD: 2026-02-03_V3
 anthropic>=0.40.0
+
+openpyxl>=3.1.0

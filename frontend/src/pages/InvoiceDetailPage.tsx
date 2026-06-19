@@ -80,13 +80,6 @@ interface InvoiceDetail {
   current_approver_name?: string;
   current_approver_email?: string;
   construction_site_supervisor_id?: number;
-  customer_company_bank?: {
-    bank_name?: string;
-    bank_branch?: string;
-    bank_account?: string;
-    account_holder?: string;
-    invoice_registration_number?: string;
-  };
 }
 
 const InvoiceDetailPage: React.FC = () => {

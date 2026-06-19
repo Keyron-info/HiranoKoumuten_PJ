@@ -49,15 +49,12 @@ const SiteManagementPage: React.FC = () => {
         }
     };
 
-    // 🆕 現場監督（社内ユーザー）一覧取得
+    // 担当者候補（社内ユーザー全員）を取得
     const fetchSupervisors = async () => {
         try {
-            // 社内ユーザーかつ現場監督または管理者などを取得
-            // 現場監督(site_supervisor)でフィルタリング
             const allUsers = await usersAPI.listAll({
                 is_active: 'true',
                 user_type: 'internal',
-                position: 'site_supervisor'  // 🆕 Filter
             });
             setSupervisors(allUsers);
         } catch (error) {

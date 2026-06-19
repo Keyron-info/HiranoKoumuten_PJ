@@ -564,7 +564,7 @@ class ConstructionSite(models.Model):
         blank=True,
         related_name='supervised_sites',
         verbose_name="現場監督",
-        limit_choices_to={'position': 'site_supervisor', 'user_type': 'internal'}
+        limit_choices_to={'user_type': 'internal'}
     )
     
     # 🆕 工事期間

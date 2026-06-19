@@ -1831,8 +1831,9 @@ class MonthlyInvoicePeriod(models.Model):
         # Batch Approval Logic: "submitted" -> "pending_approval"
         # Invoice IS defined before MonthlyInvoicePeriod in this file, so we can use it directly.
         
-        # Find all submitted invoices for this period's company
+        # この期間に紐づく提出済み請求書のみ対象（他月の請求書を巻き込まない）
         invoices = Invoice.objects.filter(
+            invoice_period=self,
             receiving_company=self.company,
             status='submitted'
         )

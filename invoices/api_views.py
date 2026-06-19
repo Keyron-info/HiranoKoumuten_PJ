@@ -474,17 +474,20 @@ class ConstructionSiteViewSet(viewsets.ModelViewSet):
             'supervisor_name': site.supervisor.get_full_name() if site.supervisor else None,
             'company_name': site.company.name
         })
+
+    @action(detail=True, methods=['post'], permission_classes=[IsInternalUser])
+    def complete(self, request, pk=None):
+        """現場完成マーク"""
         site = self.get_object()
-        
+
         if site.is_completed:
             return Response(
                 {'error': 'この現場は既に完成状態です'},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        
+
         site.mark_as_completed(request.user)
-        
-        # アクセスログ記録
+
         AccessLog.log(
             user=request.user,
             action='update',
@@ -492,12 +495,12 @@ class ConstructionSiteViewSet(viewsets.ModelViewSet):
             resource_id=site.id,
             details={'action': 'mark_complete'}
         )
-        
+
         return Response({
             'message': f'{site.name}を完成状態にしました',
             'site': ConstructionSiteDetailSerializer(site).data
         })
-    
+
     @action(detail=True, methods=['get'])
     def budget_summary(self, request, pk=None):
         """3.2 予算消化状況"""
@@ -1525,16 +1528,17 @@ class InvoiceViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_403_FORBIDDEN
             )
         
-        # ステータス更新
+        # ステータス更新（ステップは履歴記録後にクリア）
+        step_before = invoice.current_approval_step
         invoice.status = 'rejected'
         invoice.current_approval_step = None
         invoice.current_approver = None
         invoice.save()
-        
+
         # 承認履歴追加
         ApprovalHistory.objects.create(
             invoice=invoice,
-            approval_step=invoice.current_approval_step,
+            approval_step=step_before,
             user=user,
             action='rejected',
             comment=comment or '却下されました'
@@ -1584,16 +1588,17 @@ class InvoiceViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_403_FORBIDDEN
             )
         
-        # ステータス更新
+        # ステータス更新（ステップは履歴記録後にクリア）
+        step_before = invoice.current_approval_step
         invoice.status = 'returned'
         invoice.current_approval_step = None
         invoice.current_approver = None
         invoice.save()
-        
+
         # 承認履歴追加
         ApprovalHistory.objects.create(
             invoice=invoice,
-            approval_step=invoice.current_approval_step,
+            approval_step=step_before,
             user=user,
             action='returned',
             comment=comment or '差し戻されました'
@@ -2990,7 +2995,7 @@ class MonthlyInvoicePeriodViewSet(viewsets.ModelViewSet):
                 {
                     'id': company.id,
                     'name': company.name,
-                    'contact_email': company.contact_email
+                    'contact_email': company.email
                 }
                 for company in unsubmitted
             ]

@@ -689,18 +689,8 @@ const InvoiceDetailPage: React.FC = () => {
               }
 
               // 現在の承認者かチェック
-              const isCurrentApprover = Number(user?.id) === invoice.current_approver;
+              const isCurrentApprover = user?.id != null && Number(user.id) === invoice.current_approver;
 
-              // DEBUG: 承認者ID不一致の調査
-              if (user?.email?.includes('tanaka')) {
-                console.log('DEBUG CHECK:', {
-                  userId: user?.id,
-                  userIdType: typeof user?.id,
-                  invoiceApprover: invoice.current_approver,
-                  invoiceApproverType: typeof invoice.current_approver,
-                  isMatch: isCurrentApprover
-                });
-              }
 
               // 経理の場合：最終ステップ（step_order=5）のみ承認可能
               // ※ current_approval_step.step_orderはバックエンドから返される想定
@@ -781,29 +771,6 @@ const InvoiceDetailPage: React.FC = () => {
               </div>
             ) : null}
 
-            {/* DEBUG INFO (Temporary) */}
-            <div className="bg-gray-800 text-white p-4 rounded-lg text-xs font-mono mb-4">
-              <p className="font-bold border-b border-gray-600 mb-2">DEBUG INFO:</p>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-gray-400">Logged-in User (ID: {user?.id})</p>
-                  <p>Name: {user?.last_name} {user?.first_name}</p>
-                  <p>Email: {user?.email}</p>
-                </div>
-                <div>
-                  <p className="text-gray-400">Current Approver (ID: {invoice.current_approver})</p>
-                  <p>Name: {invoice.current_approver_name}</p>
-                  {/* Note: Email is not usually in invoice serializer, relying on name/ID */}
-                </div>
-              </div>
-              <p className="mt-2 pt-2 border-t border-gray-600">
-                Match: {Number(user?.id) === invoice.current_approver ?
-                  <span className="text-green-400 font-bold">YES</span> :
-                  <span className="text-red-400 font-bold">NO</span>
-                }
-              </p>
-              <p>Status: {invoice.status}</p>
-            </div>
 
             {/* 承認履歴 */}
             <div className="bg-white rounded-xl shadow-sm p-6">

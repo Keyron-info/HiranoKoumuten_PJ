@@ -89,7 +89,7 @@ const SearchableSelect: React.FC<SearchableSelectProps> = ({
             </div>
 
             {isOpen && !disabled && (
-                <div className="absolute z-50 mt-1 w-full bg-white shadow-lg max-h-60 rounded-md py-1 text-base ring-1 ring-black ring-opacity-5 overflow-auto focus:outline-none sm:text-sm">
+                <div className="absolute z-50 mt-1 w-full bg-white shadow-lg max-h-60 rounded-md py-1 text-base ring-1 ring-black ring-opacity-5 overflow-y-scroll focus:outline-none sm:text-sm" style={{ WebkitOverflowScrolling: 'touch' }}>
                     <div className="sticky top-0 z-10 bg-white px-2 py-2 border-b border-gray-100">
                         <div className="relative">
                             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">

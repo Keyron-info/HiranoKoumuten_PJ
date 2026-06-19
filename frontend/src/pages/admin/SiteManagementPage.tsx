@@ -213,9 +213,9 @@ const SiteManagementPage: React.FC = () => {
                                         />
                                     </div>
 
-                                    {/* 🆕 現場監督選択 */}
+                                    {/* 🆕 現場所長選択 */}
                                     <div>
-                                        <label className="block text-sm font-medium text-gray-700">現場監督</label>
+                                        <label className="block text-sm font-medium text-gray-700">現場所長</label>
                                         <select
                                             value={formData.supervisor}
                                             onChange={(e) => setFormData({ ...formData, supervisor: e.target.value })}

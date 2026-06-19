@@ -79,6 +79,14 @@ interface InvoiceDetail {
   current_approver?: number;
   current_approver_name?: string;
   current_approver_email?: string;
+  construction_site_supervisor_id?: number;
+  customer_company_bank?: {
+    bank_name?: string;
+    bank_branch?: string;
+    bank_account?: string;
+    account_holder?: string;
+    invoice_registration_number?: string;
+  };
 }
 
 const InvoiceDetailPage: React.FC = () => {
@@ -162,6 +170,36 @@ const InvoiceDetailPage: React.FC = () => {
       fetchInvoice();
     } catch (error: any) {
       alert(error.response?.data?.error || '承認処理に失敗しました');
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  const handlePartnerConfirm = async () => {
+    if (!id) return;
+    if (!window.confirm('社内承認が完了した請求書の内容を確認しました。経理確認へ進めてよろしいですか？')) return;
+    try {
+      setProcessing(true);
+      await invoiceAPI.partnerConfirm(id);
+      alert('確認しました。経理確認へ進みます。');
+      fetchInvoice();
+    } catch (error: any) {
+      alert(error.response?.data?.error || '処理に失敗しました');
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  const handleSupervisorResubmit = async () => {
+    if (!id) return;
+    if (!window.confirm('修正内容で部長承認へ再提出します。よろしいですか？')) return;
+    try {
+      setProcessing(true);
+      await invoiceAPI.supervisorResubmit(id);
+      alert('再提出しました。部長承認へ進みます。');
+      fetchInvoice();
+    } catch (error: any) {
+      alert(error.response?.data?.error || '再提出に失敗しました');
     } finally {
       setProcessing(false);
     }
@@ -361,16 +399,19 @@ const InvoiceDetailPage: React.FC = () => {
     ? `${formatDate(invoice.billing_period_start)} - ${formatDate(invoice.billing_period_end)}`
     : '-';
 
-  // 承認フロー定義（正しい順序：現場監督 → 部長 → 専務 → 社長 → 常務 → 経理）
+  // 承認フロー定義
   const approvalSteps = [
     { step: '提出', role: 'partner', status: 'completed' },
-    { step: '現場監督承認', role: 'site_supervisor', status: 'pending' },
+    { step: '現場所長承認', role: 'site_supervisor', status: 'pending' },
     { step: '部長承認', role: 'department_manager', status: 'waiting' },
     { step: '専務承認', role: 'senior_managing_director', status: 'waiting' },
     { step: '社長承認', role: 'president', status: 'waiting' },
     { step: '常務承認', role: 'managing_director', status: 'waiting' },
+    { step: '協力会社確認', role: 'partner_confirmation', status: 'waiting' },
     { step: '経理確認', role: 'accountant', status: 'waiting' },
   ];
+
+  const isAwaitingPartnerConfirmation = invoice.status === 'awaiting_partner_confirmation';
 
   return (
     <Layout>
@@ -427,12 +468,14 @@ const InvoiceDetailPage: React.FC = () => {
           <div className="flex items-start justify-between">
             <div>
               <h1 className="text-3xl font-bold text-gray-900 mb-2">{invoice.invoice_number}</h1>
-              <span className={`inline-block px-4 py-2 rounded-lg text-sm font-medium border ${invoice.status === 'pending_approval' ? 'bg-primary-100 text-primary-700 border-primary-200' :
+              <span className={`inline-block px-4 py-2 rounded-lg text-sm font-medium border ${
+                invoice.status === 'pending_approval' ? 'bg-primary-100 text-primary-700 border-primary-200' :
+                invoice.status === 'awaiting_partner_confirmation' ? 'bg-yellow-100 text-yellow-700 border-yellow-200' :
                 invoice.status === 'approved' ? 'bg-green-100 text-green-700 border-green-200' :
-                  invoice.status === 'returned' ? 'bg-red-100 text-red-700 border-red-200' :
-                    'bg-gray-100 text-gray-700 border-gray-200'
+                invoice.status === 'returned' ? 'bg-red-100 text-red-700 border-red-200' :
+                'bg-gray-100 text-gray-700 border-gray-200'
                 }`}>
-                {invoice.status_display}
+                {invoice.status === 'awaiting_partner_confirmation' ? '協力会社確認待ち' : invoice.status_display}
               </span>
             </div>
             <button
@@ -655,6 +698,43 @@ const InvoiceDetailPage: React.FC = () => {
                 >
                   <CheckCircle size={24} />
                   <span>{processing ? '処理中...' : '提出する'}</span>
+                </button>
+              </div>
+            ) : isPartnerUser && isAwaitingPartnerConfirmation ? (
+              // 協力会社ユーザー & 協力会社確認待ち: 確認ボタン
+              <div className="bg-white rounded-xl shadow-sm p-6">
+                <h2 className="text-xl font-bold text-gray-900 mb-4">内容確認</h2>
+                <p className="text-sm text-gray-600 mb-5">
+                  社内承認が完了しました。請求書の内容をご確認のうえ、「確認する」ボタンを押してください。確認後、経理担当へ送付されます。
+                </p>
+                <button
+                  onClick={handlePartnerConfirm}
+                  disabled={processing}
+                  className="w-full bg-gradient-to-r from-green-500 to-green-600 text-white py-4 rounded-lg font-bold text-lg hover:from-green-600 hover:to-green-700 transition-all shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 flex items-center justify-center space-x-2 disabled:opacity-50"
+                >
+                  <CheckCircle size={24} />
+                  <span>{processing ? '処理中...' : '内容を確認する'}</span>
+                </button>
+              </div>
+            ) : isInternalUser && isReturned && (() => {
+              // 現場所長が差し戻しを再提出できるかチェック
+              return invoice.construction_site_supervisor_id != null &&
+                user?.id != null &&
+                Number(user.id) === invoice.construction_site_supervisor_id;
+            })() ? (
+              // 現場所長 & 差し戻し: 再提出ボタン
+              <div className="bg-white rounded-xl shadow-sm p-6">
+                <h2 className="text-xl font-bold text-gray-900 mb-4">差し戻し対応</h2>
+                <p className="text-sm text-gray-600 mb-5">
+                  差し戻し内容をご確認のうえ、修正が完了したら「部長承認へ再提出」を押してください。
+                </p>
+                <button
+                  onClick={handleSupervisorResubmit}
+                  disabled={processing}
+                  className="w-full bg-gradient-to-r from-blue-500 to-blue-600 text-white py-4 rounded-lg font-bold text-lg hover:from-blue-600 hover:to-blue-700 transition-all shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 flex items-center justify-center space-x-2 disabled:opacity-50"
+                >
+                  <CheckCircle size={24} />
+                  <span>{processing ? '処理中...' : '部長承認へ再提出'}</span>
                 </button>
               </div>
             ) : isPartnerUser && isReturned ? (

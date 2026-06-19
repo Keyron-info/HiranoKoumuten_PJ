@@ -619,15 +619,16 @@ class InvoiceSerializer(serializers.ModelSerializer):
     comments = InvoiceCommentSerializer(many=True, read_only=True)
     approval_histories = ApprovalHistorySerializer(many=True, read_only=True)
     approval_route_detail = ApprovalRouteSerializer(source='approval_route', read_only=True)
-    # Phase 2追加
     template_name = serializers.CharField(source='template.name', read_only=True, allow_null=True)
     period_name = serializers.CharField(source='invoice_period.period_name', read_only=True, allow_null=True)
     custom_values = CustomFieldValueSerializer(many=True, read_only=True)
-    
+    construction_site_supervisor_id = serializers.SerializerMethodField()
+    customer_company_bank = serializers.SerializerMethodField()
+
     class Meta:
         model = Invoice
         fields = [
-            'id', 'invoice_number', 
+            'id', 'invoice_number',
             'customer_company', 'customer_company_name',
             'construction_site', 'construction_site_name_display',
             'project_name', 'invoice_date', 'payment_due_date',
@@ -637,12 +638,16 @@ class InvoiceSerializer(serializers.ModelSerializer):
             'approval_route', 'approval_route_detail',
             'current_approval_step', 'current_step_name',
             'current_approver', 'current_approver_name', 'current_approver_email',
+            'construction_site_supervisor_id',
             'created_by', 'created_by_name',
             'created_at', 'updated_at',
             'comments', 'approval_histories',
             'template', 'template_name',
             'invoice_period', 'period_name',
             'custom_values',
+            'is_returned', 'return_reason', 'return_note',
+            'partner_acknowledged_at',
+            'customer_company_bank',
         ]
         read_only_fields = [
             'id', 'invoice_number', 'subtotal', 'tax_amount', 'total_amount',
@@ -650,12 +655,28 @@ class InvoiceSerializer(serializers.ModelSerializer):
         ]
     
     def get_construction_site_name_display(self, obj):
-        """工事現場名を取得"""
         if obj.construction_site_name:
             return obj.construction_site_name
         elif obj.construction_site:
             return obj.construction_site.name
         return ''
+
+    def get_construction_site_supervisor_id(self, obj):
+        if obj.construction_site and obj.construction_site.supervisor_id:
+            return obj.construction_site.supervisor_id
+        return None
+
+    def get_customer_company_bank(self, obj):
+        cc = obj.customer_company
+        if not cc:
+            return None
+        return {
+            'bank_name': getattr(cc, 'bank_name', None),
+            'bank_branch': getattr(cc, 'bank_branch', None),
+            'bank_account': getattr(cc, 'bank_account', None),
+            'account_holder': getattr(cc, 'account_holder', None),
+            'invoice_registration_number': getattr(cc, 'invoice_registration_number', None),
+        }
 
 
 # ==========================================

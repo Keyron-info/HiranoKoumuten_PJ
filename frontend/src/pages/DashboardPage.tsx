@@ -106,7 +106,7 @@ const DashboardPage: React.FC = () => {
         });
 
         if (isSupervisor) {
-          // A: 承認済み累計（自分）— 現場監督のみ
+          // A: 承認済み累計（自分）— 現場所長のみ
           internalCards.push({
             label: `承認済み累計（自分）${dashboardStats.my_approved_count || 0}件`,
             value: formatCurrency(dashboardStats.my_approved_total || 0),

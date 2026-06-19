@@ -999,7 +999,7 @@ class InvoiceViewSet(viewsets.ModelViewSet):
         
         # 厳格な承認フローの構築 (現場監督 -> 部長 -> 専務 -> 社長 -> 常務 -> 経理)
         step_definitions = [
-            (1, '現場監督承認', 'site_supervisor'),
+            (1, '現場所長承認', 'site_supervisor'),
             (2, '部長承認', 'department_manager'),
             (3, '専務承認', 'senior_managing_director'),
             (4, '社長承認', 'president'),
@@ -1392,82 +1392,85 @@ class InvoiceViewSet(viewsets.ModelViewSet):
         ).first()
         
         if next_step:
-            # 次のステップがある場合
-            invoice.current_approval_step = next_step
-            
-            # 次の承認者を設定
-            if next_step.approver_position == 'accountant':
-                # 経理ステップ: 経理なら誰でも承認可能なのでcurrent_approverはNone
+            # 常務承認の次は経理の前に協力会社確認を挟む
+            if (current_step.approver_position == 'managing_director'
+                    and next_step.approver_position == 'accountant'):
+                # 協力会社確認待ちステータスへ（経理ステップは事前にセット）
+                invoice.status = 'awaiting_partner_confirmation'
+                invoice.current_approval_step = next_step
                 invoice.current_approver = None
-            elif next_step.approver_user:
-                invoice.current_approver = next_step.approver_user
-            else:
-                # 役職から承認者を検索（最新のアクティブユーザーを優先）
-                next_approver = User.objects.filter(
-                    user_type='internal',
-                    company=invoice.receiving_company,
-                    position=next_step.approver_position,
-                    is_active=True
-                ).order_by('-id').first()
-                
-                if next_approver:
-                    invoice.current_approver = next_approver
-                else:
-                    return Response(
-                        {'error': f'次の承認者（{next_step.get_approver_position_display()}）が見つかりません'},
-                        status=status.HTTP_400_BAD_REQUEST
-                    )
-            
-            invoice.save()
-            
-            # 次の承認者に通知（経理の場合は全経理に通知）
-            if next_step.approver_position == 'accountant':
-                accountants = User.objects.filter(
-                    user_type='internal',
-                    company=invoice.receiving_company,
-                    position='accountant',
+                invoice.save()
+
+                # 協力会社に確認依頼通知
+                partner_users = User.objects.filter(
+                    customer_company=invoice.customer_company,
+                    user_type='customer',
                     is_active=True
                 )
-                for acc in accountants:
+                for partner in partner_users:
                     self._send_notification_email(
-                        recipient=acc,
-                        subject=f'【請求書承認依頼】{invoice.invoice_number}',
+                        recipient=partner,
+                        subject=f'【内容確認のお願い】{invoice.invoice_number}',
                         message=f'''
-{acc.get_full_name()} 様
+{partner.get_full_name()} 様
 
-請求書の経理確認依頼が届いています。
+社内承認が完了しました。請求書の内容をご確認のうえ、承認をお願いします。
 
 請求書番号: {invoice.invoice_number}
-協力会社: {invoice.customer_company.name}
-工事現場: {invoice.construction_site.name}
+工事現場: {invoice.construction_site.name if invoice.construction_site else ""}
 金額: ¥{invoice.total_amount:,}
 
-前承認者: {user.get_full_name()} ({user.get_position_display()})
-
-システムにログインして確認してください。
+システムにログインして「確認」ボタンを押してください。
                         '''.strip()
                     )
-            elif invoice.current_approver:
-                self._send_notification_email(
-                    recipient=invoice.current_approver,
-                    subject=f'【請求書承認依頼】{invoice.invoice_number}',
-                    message=f'''
-{invoice.current_approver.get_full_name()} 様
+                message = '社内承認が完了しました。協力会社の確認待ちです。'
+            else:
+                # 通常の次ステップへ
+                invoice.current_approval_step = next_step
 
-請求書の承認依頼が届いています。
+                if next_step.approver_position == 'accountant':
+                    invoice.current_approver = None
+                elif next_step.approver_user:
+                    invoice.current_approver = next_step.approver_user
+                else:
+                    next_approver = User.objects.filter(
+                        user_type='internal',
+                        company=invoice.receiving_company,
+                        position=next_step.approver_position,
+                        is_active=True
+                    ).order_by('-id').first()
 
-請求書番号: {invoice.invoice_number}
-協力会社: {invoice.customer_company.name}
-工事現場: {invoice.construction_site.name}
-金額: ¥{invoice.total_amount:,}
+                    if next_approver:
+                        invoice.current_approver = next_approver
+                    else:
+                        return Response(
+                            {'error': f'次の承認者（{next_step.approver_position}）が見つかりません'},
+                            status=status.HTTP_400_BAD_REQUEST
+                        )
 
-前承認者: {user.get_full_name()} ({user.get_position_display()})
+                invoice.save()
 
-システムにログインして確認してください。
-                '''.strip()
-                )
-            
-            message = f'{next_step.step_name}に進みました'
+                if next_step.approver_position == 'accountant':
+                    accountants = User.objects.filter(
+                        user_type='internal',
+                        company=invoice.receiving_company,
+                        position='accountant',
+                        is_active=True
+                    )
+                    for acc in accountants:
+                        self._send_notification_email(
+                            recipient=acc,
+                            subject=f'【請求書承認依頼】{invoice.invoice_number}',
+                            message=f'{acc.get_full_name()} 様\n\n経理確認依頼が届いています。\n請求書番号: {invoice.invoice_number}\n金額: ¥{invoice.total_amount:,}'
+                        )
+                elif invoice.current_approver:
+                    self._send_notification_email(
+                        recipient=invoice.current_approver,
+                        subject=f'【請求書承認依頼】{invoice.invoice_number}',
+                        message=f'{invoice.current_approver.get_full_name()} 様\n\n承認依頼が届いています。\n請求書番号: {invoice.invoice_number}\n金額: ¥{invoice.total_amount:,}\n前承認者: {user.get_full_name()}'
+                    )
+
+                message = f'{next_step.step_name}に進みました'
         else:
             # 全ての承認ステップが完了
             invoice.status = 'approved'
@@ -2194,6 +2197,94 @@ class InvoiceViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
     
+    @action(detail=True, methods=['post'])
+    def partner_confirm(self, request, pk=None):
+        """
+        協力会社確認待ち → 経理確認へ進める
+        常務承認後に協力会社が内容を確認するステップ
+        """
+        invoice = self.get_object()
+
+        is_same_company = (
+            request.user.customer_company_id is not None
+            and request.user.customer_company_id == invoice.customer_company_id
+        )
+        is_creator = invoice.created_by_id == request.user.id
+        if request.user.user_type != 'customer' or not (is_same_company or is_creator):
+            return Response({"error": "権限がありません"}, status=status.HTTP_403_FORBIDDEN)
+
+        try:
+            invoice.partner_confirm_before_accountant(request.user)
+            return Response({
+                "message": "確認しました。経理確認へ進みます。",
+                "invoice": InvoiceSerializer(invoice).data
+            })
+        except ValueError as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=True, methods=['post'], permission_classes=[IsInternalUser])
+    def supervisor_resubmit(self, request, pk=None):
+        """
+        差し戻し状態の請求書を現場所長が修正・再提出する
+        協力会社へ戻さず、部長承認から再開する
+        """
+        invoice = self.get_object()
+        comment = request.data.get('comment', '')
+
+        try:
+            invoice.supervisor_resubmit(request.user, comment)
+            return Response({
+                "message": "再提出しました。部長承認へ進みます。",
+                "invoice": InvoiceSerializer(invoice).data
+            })
+        except ValueError as e:
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])
+    def upload_attachment(self, request, pk=None):
+        """請求書へのPDF添付ファイルアップロード"""
+        invoice = self.get_object()
+
+        # 作成者または同じ協力会社のみアップロード可
+        is_owner = invoice.created_by_id == request.user.id
+        is_same_company = (
+            request.user.user_type == 'customer'
+            and request.user.customer_company_id == invoice.customer_company_id
+        )
+        is_internal = request.user.user_type == 'internal'
+        if not (is_owner or is_same_company or is_internal):
+            return Response({"error": "権限がありません"}, status=status.HTTP_403_FORBIDDEN)
+
+        uploaded_file = request.FILES.get('file')
+        if not uploaded_file:
+            return Response({"error": "ファイルが指定されていません"}, status=status.HTTP_400_BAD_REQUEST)
+
+        allowed_types = ['application/pdf', 'image/jpeg', 'image/png']
+        if uploaded_file.content_type not in allowed_types:
+            return Response({"error": "PDF・JPEG・PNG のみアップロード可能です"}, status=status.HTTP_400_BAD_REQUEST)
+
+        if uploaded_file.size > 10 * 1024 * 1024:  # 10MB
+            return Response({"error": "ファイルサイズは10MB以下にしてください"}, status=status.HTTP_400_BAD_REQUEST)
+
+        from .models import FileAttachment
+        attachment = FileAttachment.objects.create(
+            invoice=invoice,
+            file_name=uploaded_file.name,
+            file_path=uploaded_file,
+            file_type='pdf' if 'pdf' in uploaded_file.content_type else 'image',
+            file_size=uploaded_file.size,
+            mime_type=uploaded_file.content_type,
+            uploaded_by=request.user
+        )
+        return Response({
+            "message": "添付ファイルをアップロードしました",
+            "attachment": {
+                "id": attachment.id,
+                "file_name": attachment.file_name,
+                "file_type": attachment.file_type,
+            }
+        }, status=status.HTTP_201_CREATED)
+
     @action(detail=False, methods=['get'])
     def my_pending_approvals(self, request):
         """自分の承認待ち一覧（改善版）"""

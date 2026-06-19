@@ -28,6 +28,7 @@ const InvoiceCreatePage: React.FC = () => {
   const [frequentItems, setFrequentItems] = useState<{ description: string; count: number }[]>([]);
   const [showLastInputBanner, setShowLastInputBanner] = useState(false);
   const [sitePassword, setSitePassword] = useState('');
+  const [attachmentFile, setAttachmentFile] = useState<File | null>(null);
 
   const [formData, setFormData] = useState<InvoiceCreateForm>({
     construction_site: '',
@@ -278,11 +279,6 @@ const InvoiceCreatePage: React.FC = () => {
       return;
     }
 
-    if (!formData.payment_due_date) {
-      alert('支払予定日を入力してください');
-      return;
-    }
-
     const hasEmptyDescription = formData.items.some(item => !item.description.trim());
     if (hasEmptyDescription) {
       alert('全ての明細に品名を入力してください');
@@ -300,6 +296,18 @@ const InvoiceCreatePage: React.FC = () => {
         purchase_order: selectedPurchaseOrder || null,
       };
       const invoice = await invoiceAPI.createInvoice(submitData as any);
+
+      // PDF添付ファイルがある場合はアップロード
+      if (attachmentFile) {
+        try {
+          const formPayload = new FormData();
+          formPayload.append('file', attachmentFile);
+          await invoiceAPI.uploadAttachment(invoice.id, formPayload);
+        } catch {
+          // アップロード失敗は警告のみ、請求書作成は成功とする
+          alert('請求書は作成しましたが、添付ファイルのアップロードに失敗しました。詳細画面から再度お試しください。');
+        }
+      }
 
       // 成功時の処理: 下書きとして保存されたので、詳細画面へ遷移して提出を促す
       alert('請求書を下書きとして保存しました。内容を確認し、提出ボタンを押して完了させてください。');
@@ -599,7 +607,7 @@ const InvoiceCreatePage: React.FC = () => {
                         )}
                         {selectedSite.supervisor_name && (
                           <p className="text-sm text-primary-700 mt-1">
-                            👤 現場監督: <span className="font-medium">{selectedSite.supervisor_name}</span>
+                            👤 現場所長: <span className="font-medium">{selectedSite.supervisor_name}</span>
                           </p>
                         )}
                         {selectedSite.supervisor_name && documentType === 'invoice' && (
@@ -652,19 +660,6 @@ const InvoiceCreatePage: React.FC = () => {
                 />
               </div>
 
-              {/* 支払予定日 */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  支払予定日 <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="date"
-                  required
-                  value={formData.payment_due_date}
-                  onChange={(e) => setFormData({ ...formData, payment_due_date: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
-                />
-              </div>
             </div>
 
             {/* 備考 */}
@@ -831,6 +826,27 @@ const InvoiceCreatePage: React.FC = () => {
                 </div>
               </div>
             </div>
+          </div>
+
+          {/* PDF添付 */}
+          <div className="bg-white p-6 rounded-lg shadow">
+            <h2 className="text-lg font-semibold text-gray-900 mb-3">添付ファイル（任意）</h2>
+            <p className="text-sm text-gray-500 mb-3">PDF・JPEG・PNG（最大10MB）を添付できます。</p>
+            <input
+              type="file"
+              accept=".pdf,.jpg,.jpeg,.png"
+              onChange={(e) => setAttachmentFile(e.target.files?.[0] ?? null)}
+              className="block w-full text-sm text-gray-700 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-primary-50 file:text-primary-700 hover:file:bg-primary-100 cursor-pointer"
+            />
+            {attachmentFile && (
+              <div className="mt-2 flex items-center gap-2 text-sm text-green-700">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                {attachmentFile.name} ({(attachmentFile.size / 1024).toFixed(0)} KB)
+                <button type="button" onClick={() => setAttachmentFile(null)} className="ml-2 text-gray-400 hover:text-gray-600">×</button>
+              </div>
+            )}
           </div>
 
           {/* アクションボタン */}

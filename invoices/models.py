@@ -347,7 +347,7 @@ class User(AbstractUser):
     
     # 🆕 更新: 役職に承認フロー用の役職を追加
     POSITION_CHOICES = [
-        ('site_supervisor', '現場監督'),
+        ('site_supervisor', '現場所長'),
         ('department_manager', '部長'),
         ('managing_director', '常務取締役'),
         ('senior_managing_director', '専務取締役'),
@@ -805,7 +805,8 @@ class Invoice(models.Model):
         ('draft', '下書き'),
         ('submitted', '提出済み'),
         ('pending_approval', '承認待ち'),
-        ('pending_batch_approval', '一斉承認待ち'),  # 🆕 31日必着分の一時保存
+        ('pending_batch_approval', '一斉承認待ち'),
+        ('awaiting_partner_confirmation', '協力会社確認待ち'),
         ('approved', '承認済み'),
         ('rejected', '却下'),
         ('returned', '差し戻し'),
@@ -1292,6 +1293,89 @@ class Invoice(models.Model):
         
         return self
     
+    def partner_confirm_before_accountant(self, user):
+        """
+        常務承認後、協力会社が内容を確認して経理へ進める
+        status: awaiting_partner_confirmation → pending_approval (accountant step)
+        """
+        if self.status != 'awaiting_partner_confirmation':
+            raise ValueError("協力会社確認待ち状態の請求書のみ確認できます")
+
+        is_same_company = (
+            user.customer_company_id is not None
+            and user.customer_company_id == self.customer_company_id
+        )
+        is_creator = self.created_by_id == user.id
+        if user.user_type != 'customer' or not (is_same_company or is_creator):
+            raise ValueError("権限がありません")
+
+        self.status = 'pending_approval'
+        self.save()
+
+        ApprovalHistory.objects.create(
+            invoice=self,
+            user=user,
+            action='approved',
+            comment='協力会社が内容を確認しました。経理確認へ進みます。'
+        )
+
+        self._notify_accounting_team("協力会社の確認が完了しました")
+        return self
+
+    def supervisor_resubmit(self, user, comment=''):
+        """
+        差し戻し状態の請求書を現場所長が修正・再提出する。
+        パートナーに戻さず、部長(step2)から承認フローを再開する。
+        """
+        if self.status != 'returned':
+            raise ValueError("差し戻し状態の請求書のみ再提出できます")
+
+        if not (self.construction_site and self.construction_site.supervisor == user):
+            raise ValueError("この請求書の担当現場所長のみ再提出できます")
+
+        if not self.approval_route:
+            raise ValueError("承認ルートが設定されていません")
+
+        # 部長ステップ（step_order=2）から再開
+        dept_step = self.approval_route.steps.filter(
+            approver_position='department_manager'
+        ).first()
+        if not dept_step:
+            raise ValueError("部長承認ステップが見つかりません")
+
+        dept_approver = User.objects.filter(
+            user_type='internal',
+            company=self.receiving_company,
+            position='department_manager',
+            is_active=True
+        ).order_by('-id').first()
+
+        self.status = 'pending_approval'
+        self.is_returned = False
+        self.current_approval_step = dept_step
+        self.current_approver = dept_approver
+        self.save()
+
+        ApprovalHistory.objects.create(
+            invoice=self,
+            approval_step=dept_step,
+            user=user,
+            action='approved',
+            comment=comment or '現場所長が修正し、部長承認へ再提出しました'
+        )
+
+        if dept_approver:
+            SystemNotification.objects.create(
+                recipient=dept_approver,
+                notification_type='approval',
+                priority='high',
+                title=f'【承認依頼】{self.invoice_number}',
+                message=f'現場所長による修正後の請求書が届いています。\n請求書番号: {self.invoice_number}',
+                action_url=f'/invoices/{self.id}',
+                related_invoice=self
+            )
+        return self
+
     def _notify_accounting_team(self, message):
         """経理担当者へ通知"""
         accounting_users = User.objects.filter(

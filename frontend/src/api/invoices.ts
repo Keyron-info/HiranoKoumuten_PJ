@@ -67,6 +67,26 @@ export const invoiceAPI = {
     return response.data;
   },
 
+  // PDF添付ファイルアップロード
+  uploadAttachment: async (id: string | number, formData: FormData): Promise<{ message: string; attachment: { id: number; file_name: string; file_type: string } }> => {
+    const response = await apiClient.post(`/invoices/${id}/upload_attachment/`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data;
+  },
+
+  // 協力会社確認（常務承認後）
+  partnerConfirm: async (id: string | number): Promise<{ message: string }> => {
+    const response = await apiClient.post(`/invoices/${id}/partner_confirm/`);
+    return response.data;
+  },
+
+  // 現場所長による差し戻し再提出
+  supervisorResubmit: async (id: string | number, comment?: string): Promise<{ message: string }> => {
+    const response = await apiClient.post(`/invoices/${id}/supervisor_resubmit/`, { comment: comment || '' });
+    return response.data;
+  },
+
   // 請求書更新
   updateInvoice: async (id: string, data: Partial<InvoiceCreateForm>): Promise<Invoice> => {
     const response = await apiClient.patch<Invoice>(`/invoices/${id}/`, data);

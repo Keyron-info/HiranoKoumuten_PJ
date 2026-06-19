@@ -159,7 +159,7 @@ const UserManagementPage: React.FC = () => {
         { value: 'director', label: '取締役' },
         { value: 'department_manager', label: '部長' },
         { value: 'supervisor', label: '課長' },
-        { value: 'site_supervisor', label: '現場監督' },
+        { value: 'site_supervisor', label: '現場所長' },
         { value: 'staff', label: '一般社員' },
     ];
 

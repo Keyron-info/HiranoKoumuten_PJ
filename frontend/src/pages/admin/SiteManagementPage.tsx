@@ -102,10 +102,11 @@ const SiteManagementPage: React.FC = () => {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         try {
-            // APIに送信するデータ
+            // APIに送信するデータ（DateFieldは空文字でなくnullで送信）
             const submitData = {
                 ...formData,
-                supervisor: formData.supervisor ? Number(formData.supervisor) : null
+                supervisor: formData.supervisor ? Number(formData.supervisor) : null,
+                special_access_expiry: formData.special_access_expiry || null,
             };
 
             if (editingSite) {

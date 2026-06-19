@@ -74,8 +74,8 @@ const InvoiceListPage: React.FC = () => {
         search: debouncedSearch || undefined,
         date_from: dateFrom || undefined,
         date_to: dateTo || undefined,
-        min_amount: minAmount ? parseInt(minAmount) : undefined,
-        max_amount: maxAmount ? parseInt(maxAmount) : undefined,
+        min_amount: minAmount !== '' ? parseInt(minAmount) : undefined,
+        max_amount: maxAmount !== '' ? parseInt(maxAmount) : undefined,
         site: projectFilter !== 'all' ? parseInt(projectFilter) : undefined,
         company: companyFilter !== 'all' ? parseInt(companyFilter) : undefined,
       });

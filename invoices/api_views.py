@@ -420,6 +420,7 @@ class ConstructionSiteViewSet(viewsets.ModelViewSet):
     queryset = ConstructionSite.objects.filter(is_active=True)
     serializer_class = ConstructionSiteSerializer
     permission_classes = [IsAuthenticated]
+    pagination_class = None  # 現場管理は全件取得（ページネーション無効）
     
     def get_serializer_class(self):
         if self.action == 'retrieve':

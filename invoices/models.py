@@ -2989,36 +2989,47 @@ class UserRegistrationRequest(models.Model):
     ]
     
     # 基本情報
-    company_name = models.CharField(max_length=200, verbose_name="会社名")
-    company_name_kana = models.CharField(max_length=200, verbose_name="会社名（ふりがな）", blank=True)
-    full_name = models.CharField(max_length=100, verbose_name="氏名")
-    email = models.EmailField(unique=True, verbose_name="メールアドレス")
+    company_name = models.CharField(max_length=200, verbose_name="業者名")
+    company_name_kana = models.CharField(max_length=200, verbose_name="業者名ふりがな", blank=True)
+    full_name = models.CharField(max_length=100, verbose_name="氏名", blank=True)
+    email = models.EmailField(unique=True, verbose_name="メインメールアドレス")
+    invoice_email = models.EmailField(blank=True, verbose_name="請求書等送付先メールアドレス")
     phone_number = models.CharField(max_length=20, verbose_name="電話番号")
     fax_number = models.CharField(max_length=20, verbose_name="FAX番号", blank=True)
     postal_code = models.CharField(max_length=10, verbose_name="郵便番号")
-    address = models.TextField(verbose_name="住所")
-    
+    address = models.TextField(verbose_name="住所", blank=True)
+    head_office_address = models.TextField(verbose_name="本社の住所", blank=True)
+    branch_office_address = models.TextField(verbose_name="営業所の住所", blank=True)
+
     # 会社詳細情報
     representative_name = models.CharField(max_length=100, verbose_name="代表者名", blank=True)
     invoice_registration_number = models.CharField(
         max_length=20, verbose_name="インボイス番号", blank=True,
         help_text="T+13桁の番号（例: T1234567890123）"
     )
-    head_office_address = models.TextField(verbose_name="本社住所", blank=True)
-    
-    # 任意項目
-    department = models.CharField(max_length=100, blank=True, verbose_name="部署")
+
+    # 担当者情報
+    department = models.CharField(max_length=100, blank=True, verbose_name="部署名")
+    contact_department = models.CharField(max_length=100, blank=True, verbose_name="担当部署名")
+    contact_position = models.CharField(max_length=100, blank=True, verbose_name="担当役職名")
+    contact_person = models.CharField(max_length=100, blank=True, verbose_name="担当者")
+    accounting_contact = models.CharField(max_length=100, blank=True, verbose_name="経理担当者")
+
+    # メイン工種
+    main_construction_type = models.CharField(max_length=50, blank=True, verbose_name="メイン工種")
+
+    # 旧フィールド（後方互換）
     position = models.CharField(max_length=100, blank=True, verbose_name="役職")
     notes = models.TextField(blank=True, verbose_name="備考")
-    
+
     # 承認管理
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='PENDING', verbose_name="ステータス")
     submitted_at = models.DateTimeField(auto_now_add=True, verbose_name="申請日時")
     reviewed_at = models.DateTimeField(null=True, blank=True, verbose_name="審査日時")
     reviewed_by = models.ForeignKey(
-        User, 
-        on_delete=models.SET_NULL, 
-        null=True, 
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
         blank=True,
         related_name='reviewed_registrations',
         verbose_name="審査者"
@@ -3037,6 +3048,7 @@ class UserRegistrationRequest(models.Model):
     )
     bank_account_number = models.CharField(max_length=20, blank=True, verbose_name="口座番号")
     bank_account_holder = models.CharField(max_length=100, blank=True, verbose_name="口座名義")
+    bank_account_holder_kana = models.CharField(max_length=100, blank=True, verbose_name="口座名義フリガナ")
 
     # 作成されたユーザーへの参照
     created_user = models.OneToOneField(

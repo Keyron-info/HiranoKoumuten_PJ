@@ -1,31 +1,64 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { User, Mail, Phone, MapPin, Briefcase, FileText, Check, AlertCircle, ArrowLeft } from 'lucide-react';
+import { User, Mail, Phone, MapPin, Briefcase, FileText, Check, AlertCircle, ArrowLeft, Building2 } from 'lucide-react';
 import { userRegistrationAPI, RegistrationFormData } from '../api/userRegistration';
+
+const CONSTRUCTION_TYPES = [
+  '直接仮設工事', '土工事', '杭工事', '鉄筋工事', 'コンクリート工事',
+  '型枠工事', '鉄骨工事', '防水工事', '石タイル工事', 'ALC工事',
+  '屋根樋工事', '左官工事', '金属工事', '金属製建具工事', '木製建具工事',
+  '硝子工事', '塗装工事', '木工事', '軽鉄工事', '被覆工事',
+  '内装工事', '外装工事', '什器工事', '家具工事', '暖房器具工事',
+  'ユニット工事', '雑工事', '電気設備工事', '給排水衛生設備工事',
+  '空調換気設備工事', 'EV工事', '機械設備工事', 'その他設備工事',
+  '外構工事', '解体工事', 'その他工事',
+];
+
+const REQUIRED = <span className="text-rose-400">*</span>;
+
+const inputClass = (error?: string) =>
+  `w-full px-4 py-3 bg-slate-800/50 border rounded-lg focus:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all text-white placeholder-slate-600 ${
+    error ? 'border-rose-500/50' : 'border-slate-700'
+  }`;
+
+const labelClass = 'block text-sm font-medium text-slate-300 mb-1';
+
+const SectionHeading: React.FC<{ icon: React.ReactNode; title: string }> = ({ icon, title }) => (
+  <h2 className="text-base font-bold text-slate-200 border-b border-slate-700 pb-2 mb-5 flex items-center gap-2">
+    <span className="text-primary-400">{icon}</span>
+    {title}
+  </h2>
+);
+
+const FieldNote: React.FC<{ text: string }> = ({ text }) => (
+  <p className="mt-1 text-xs text-slate-500">{text}</p>
+);
 
 const RegisterPage: React.FC = () => {
   const navigate = useNavigate();
   const [formData, setFormData] = useState<RegistrationFormData>({
     company_name: '',
     company_name_kana: '',
-    full_name: '',
+    department: '',
+    postal_code: '',
+    head_office_address: '',
+    branch_office_address: '',
     email: '',
-    confirm_email: '',
+    invoice_email: '',
     phone_number: '',
     fax_number: '',
-    postal_code: '',
-    address: '',
-    representative_name: '',
-    invoice_registration_number: '',
-    head_office_address: '',
-    department: '',
-    position: '',
-    notes: '',
+    contact_department: '',
+    contact_position: '',
+    contact_person: '',
+    accounting_contact: '',
+    main_construction_type: '',
     bank_name: '',
     bank_branch: '',
     bank_account_type: 'ordinary',
     bank_account_number: '',
     bank_account_holder: '',
+    bank_account_holder_kana: '',
+    invoice_registration_number: '',
     agree_terms: false,
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -34,89 +67,50 @@ const RegisterPage: React.FC = () => {
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target;
-    // @ts-ignore - TS doesn't strictly check input types here for checked property
     const checked = (e.target as HTMLInputElement).checked;
-
-    setFormData(prev => ({
-      ...prev,
-      [name]: type === 'checkbox' ? checked : value
-    }));
-
-    // エラークリア
-    if (errors[name]) {
-      setErrors(prev => ({ ...prev, [name]: '' }));
-    }
+    setFormData(prev => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
+    if (errors[name]) setErrors(prev => ({ ...prev, [name]: '' }));
   };
 
   const validateForm = (): boolean => {
-    const newErrors: Record<string, string> = {};
+    const e: Record<string, string> = {};
+    if (!formData.company_name.trim()) e.company_name = '業者名を入力してください';
+    if (!formData.postal_code.trim()) e.postal_code = '郵便番号を入力してください';
+    if (!formData.head_office_address.trim()) e.head_office_address = '本社の住所を入力してください';
+    if (!formData.email.trim()) e.email = 'メールアドレスを入力してください';
+    if (!formData.phone_number.trim()) e.phone_number = '電話番号を入力してください';
+    if (!formData.main_construction_type) e.main_construction_type = 'メイン工種を選択してください';
+    if (!formData.bank_name.trim()) e.bank_name = '銀行名を入力してください';
+    if (!formData.bank_branch.trim()) e.bank_branch = '支店名を入力してください';
+    if (!formData.bank_account_number.trim()) e.bank_account_number = '口座番号を入力してください';
+    if (!formData.bank_account_holder.trim()) e.bank_account_holder = '口座名義を入力してください';
+    if (!formData.bank_account_holder_kana.trim()) e.bank_account_holder_kana = '口座名義フリガナを入力してください';
+    if (!formData.agree_terms) e.agree_terms = '利用規約に同意してください';
 
-    // 必須チェック
-    if (!formData.company_name.trim()) newErrors.company_name = '会社名を入力してください';
-    if (!formData.full_name.trim()) newErrors.full_name = '氏名を入力してください';
-    if (!formData.email.trim()) newErrors.email = 'メールアドレスを入力してください';
-    if (!formData.confirm_email.trim()) newErrors.confirm_email = 'メールアドレス（確認）を入力してください';
-    if (!formData.phone_number.trim()) newErrors.phone_number = '電話番号を入力してください';
-    if (!formData.postal_code.trim()) newErrors.postal_code = '郵便番号を入力してください';
-    if (!formData.address.trim()) newErrors.address = '住所を入力してください';
-    if (!formData.agree_terms) newErrors.agree_terms = '利用規約に同意してください';
+    const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (formData.email && !emailRe.test(formData.email)) e.email = '正しいメールアドレス形式で入力してください';
 
-    // メール一致チェック
-    if (formData.email && formData.confirm_email && formData.email !== formData.confirm_email) {
-      newErrors.confirm_email = 'メールアドレスが一致しません';
+    const postalRe = /^\d{3}-?\d{4}$/;
+    if (formData.postal_code && !postalRe.test(formData.postal_code)) {
+      e.postal_code = '正しい郵便番号形式で入力してください（例: 123-4567）';
     }
 
-    // メール形式チェック
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (formData.email && !emailRegex.test(formData.email)) {
-      newErrors.email = '正しいメールアドレス形式で入力してください';
-    }
-
-    // 電話番号形式チェック
-    const phoneRegex = /^0\d{1,4}-?\d{1,4}-?\d{4}$/;
-    if (formData.phone_number && !phoneRegex.test(formData.phone_number)) {
-      newErrors.phone_number = '正しい電話番号形式で入力してください';
-    }
-
-    // 郵便番号形式チェック
-    const postalRegex = /^\d{3}-?\d{4}$/;
-    if (formData.postal_code && !postalRegex.test(formData.postal_code)) {
-      newErrors.postal_code = '正しい郵便番号形式で入力してください（例: 123-4567）';
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    setErrors(e);
+    return Object.keys(e).length === 0;
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!validateForm()) {
-      window.scrollTo(0, 0);
-      return;
-    }
-
+  const handleSubmit = async (ev: React.FormEvent) => {
+    ev.preventDefault();
+    if (!validateForm()) { window.scrollTo(0, 0); return; }
     setIsSubmitting(true);
-
     try {
       await userRegistrationAPI.register(formData);
       setSuccess(true);
-      setTimeout(() => {
-        navigate('/login'); // 通常はログイン画面へ、または完了画面があればそちらへ
-      }, 3000);
+      setTimeout(() => navigate('/login'), 3000);
     } catch (error: any) {
-      if (error.response?.data) {
-        const errorData = error.response.data;
-        if (typeof errorData === 'object') {
-          setErrors(errorData);
-        } else if (typeof errorData === 'string') {
-          alert(errorData);
-        } else {
-          alert('登録申請に失敗しました');
-        }
-      } else {
-        alert('エラーが発生しました');
-      }
+      const data = error.response?.data;
+      if (data && typeof data === 'object') setErrors(data);
+      else alert('登録申請に失敗しました');
       window.scrollTo(0, 0);
     } finally {
       setIsSubmitting(false);
@@ -160,337 +154,207 @@ const RegisterPage: React.FC = () => {
         <div className="bg-white/10 backdrop-blur-md shadow-2xl rounded-2xl overflow-hidden border border-white/10">
           <div className="bg-slate-900/50 px-8 py-6 border-b border-slate-700/50">
             <h1 className="text-2xl font-bold text-white flex items-center gap-3">
-              <User className="text-primary-500" />
-              新規ユーザー登録
+              <Building2 className="text-primary-500" />
+              新規業者登録申請
             </h1>
             <p className="text-slate-400 mt-2 text-sm">
-              必要な情報を入力してアカウント申請を行ってください。
+              必要な情報を入力してください。<span className="text-rose-400">*</span> は必須項目です。
             </p>
           </div>
 
           <form onSubmit={handleSubmit} className="p-8 space-y-8">
             {/* エラーサマリー */}
             {Object.keys(errors).length > 0 && (
-              <div className="p-4 bg-rose-500/10 border border-rose-500/20 rounded-lg flex items-start gap-2 text-rose-400 text-sm mb-6">
+              <div className="p-4 bg-rose-500/10 border border-rose-500/20 rounded-lg flex items-start gap-2 text-rose-400 text-sm">
                 <AlertCircle size={18} className="mt-0.5 flex-shrink-0" />
                 <div>
                   <p className="font-bold mb-1">入力内容を確認してください</p>
                   <ul className="list-disc list-inside space-y-0.5 opacity-90">
-                    {Object.values(errors).slice(0, 3).map((err, idx) => (
-                      <li key={idx}>{err}</li>
-                    ))}
-                    {Object.values(errors).length > 3 && <li>その他 {Object.values(errors).length - 3} 件のエラー</li>}
+                    {Object.values(errors).slice(0, 5).map((err, i) => <li key={i}>{err}</li>)}
+                    {Object.values(errors).length > 5 && <li>その他 {Object.values(errors).length - 5} 件</li>}
                   </ul>
                 </div>
               </div>
             )}
 
-            {/* 基本情報セクション */}
+            {/* ① 業者情報 */}
             <section>
-              <h2 className="text-lg font-bold text-slate-200 border-b border-slate-700 pb-2 mb-6 flex items-center gap-2">
-                <Briefcase size={20} className="text-primary-500" />
-                基本情報
-              </h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* 会社名 */}
-                <div className="col-span-1">
-                  <FormInput
-                    label="会社名（業者名）"
-                    id="company_name"
-                    value={formData.company_name}
-                    onChange={handleChange}
-                    placeholder="例: 株式会社サンプル建設"
-                    required
-                    error={errors.company_name}
-                  />
+              <SectionHeading icon={<Briefcase size={18} />} title="業者情報" />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <div>
+                  <label className={labelClass}>業者名 {REQUIRED}</label>
+                  <input name="company_name" value={formData.company_name} onChange={handleChange}
+                    className={inputClass(errors.company_name)} placeholder="例: 株式会社〇〇建設" autoComplete="off" />
+                  {errors.company_name && <p className="mt-1 text-xs text-rose-400">{errors.company_name}</p>}
                 </div>
-
-                {/* 会社名ふりがな */}
-                <div className="col-span-1">
-                  <FormInput
-                    label="会社名（ふりがな）"
-                    id="company_name_kana"
-                    value={formData.company_name_kana}
-                    onChange={handleChange}
-                    placeholder="例: かぶしきがいしゃさんぷるけんせつ"
-                  />
+                <div>
+                  <label className={labelClass}>業者名ふりがな</label>
+                  <input name="company_name_kana" value={formData.company_name_kana} onChange={handleChange}
+                    className={inputClass()} placeholder="例: かぶしきがいしゃ〇〇けんせつ" autoComplete="off" />
                 </div>
-
-                {/* 代表者名 */}
-                <div className="col-span-1">
-                  <FormInput
-                    label="代表者名"
-                    id="representative_name"
-                    value={formData.representative_name}
-                    onChange={handleChange}
-                    placeholder="例: 平野 一郎"
-                    icon={<User size={18} className="text-slate-500" />}
-                  />
+                <div>
+                  <label className={labelClass}>部署名</label>
+                  <input name="department" value={formData.department} onChange={handleChange}
+                    className={inputClass()} placeholder="回答がない場合は「なし」とご入力ください" autoComplete="off" />
+                  <FieldNote text="回答がない場合は「なし」とご入力ください" />
                 </div>
-
-                {/* インボイス番号 */}
-                <div className="col-span-1">
-                  <FormInput
-                    label="インボイス番号"
-                    id="invoice_registration_number"
-                    value={formData.invoice_registration_number}
-                    onChange={handleChange}
-                    placeholder="例: T1234567890123"
-                    icon={<FileText size={18} className="text-slate-500" />}
-                  />
-                </div>
-
-                {/* 担当者名 */}
-                <div className="col-span-1 md:col-span-2">
-                  <FormInput
-                    label="担当者名"
-                    id="full_name"
-                    value={formData.full_name}
-                    onChange={handleChange}
-                    placeholder="例: 山田 太郎"
-                    required
-                    error={errors.full_name}
-                    icon={<User size={18} className="text-slate-500" />}
-                  />
-                </div>
-
-                {/* メールアドレス */}
-                <div className="col-span-1">
-                  <FormInput
-                    label="メールアドレス"
-                    id="email"
-                    type="email"
-                    value={formData.email}
-                    onChange={handleChange}
-                    placeholder="example@company.co.jp"
-                    required
-                    error={errors.email}
-                    icon={<Mail size={18} className="text-slate-500" />}
-                  />
-                </div>
-
-                {/* メールアドレス（確認） */}
-                <div className="col-span-1">
-                  <FormInput
-                    label="メールアドレス（確認）"
-                    id="confirm_email"
-                    type="email"
-                    value={formData.confirm_email}
-                    onChange={handleChange}
-                    placeholder="example@company.co.jp"
-                    required
-                    error={errors.confirm_email}
-                    icon={<Mail size={18} className="text-slate-500" />}
-                  />
+                <div>
+                  <label className={labelClass}>メイン工種 {REQUIRED}</label>
+                  <select name="main_construction_type" value={formData.main_construction_type} onChange={handleChange}
+                    className={inputClass(errors.main_construction_type)}>
+                    <option value="">選択してください</option>
+                    {CONSTRUCTION_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                  </select>
+                  {errors.main_construction_type && <p className="mt-1 text-xs text-rose-400">{errors.main_construction_type}</p>}
                 </div>
               </div>
             </section>
 
-            {/* 連絡先情報セクション */}
+            {/* ② 所在地 */}
             <section>
-              <h2 className="text-lg font-bold text-slate-200 border-b border-slate-700 pb-2 mb-6 flex items-center gap-2">
-                <MapPin size={20} className="text-primary-500" />
-                連絡先情報
-              </h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* 電話番号 */}
-                <div className="col-span-1">
-                  <FormInput
-                    label="電話番号"
-                    id="phone_number"
-                    type="tel"
-                    value={formData.phone_number}
-                    onChange={handleChange}
-                    placeholder="090-1234-5678"
-                    required
-                    error={errors.phone_number}
-                    icon={<Phone size={18} className="text-slate-500" />}
-                  />
+              <SectionHeading icon={<MapPin size={18} />} title="所在地" />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <div>
+                  <label className={labelClass}>郵便番号 {REQUIRED}</label>
+                  <input name="postal_code" value={formData.postal_code} onChange={handleChange}
+                    className={inputClass(errors.postal_code)} placeholder="例: 123-4567" autoComplete="off" />
+                  <FieldNote text="ハイフンありで入力してください" />
+                  {errors.postal_code && <p className="mt-1 text-xs text-rose-400">{errors.postal_code}</p>}
                 </div>
-
-                {/* FAX番号 */}
-                <div className="col-span-1">
-                  <FormInput
-                    label="FAX番号"
-                    id="fax_number"
-                    type="tel"
-                    value={formData.fax_number}
-                    onChange={handleChange}
-                    placeholder="03-1234-5678"
-                    icon={<Phone size={18} className="text-slate-500" />}
-                  />
+                <div className="md:col-span-1" />
+                <div className="md:col-span-2">
+                  <label className={labelClass}>本社の住所 {REQUIRED}</label>
+                  <textarea name="head_office_address" value={formData.head_office_address} onChange={handleChange}
+                    rows={2} className={inputClass(errors.head_office_address)}
+                    placeholder="例: 東京都〇〇区〇〇1-2-3" />
+                  <FieldNote text="ハイフンありで入力してください" />
+                  {errors.head_office_address && <p className="mt-1 text-xs text-rose-400">{errors.head_office_address}</p>}
                 </div>
-
-                {/* 郵便番号 */}
-                <div className="col-span-1">
-                  <FormInput
-                    label="郵便番号"
-                    id="postal_code"
-                    value={formData.postal_code}
-                    onChange={handleChange}
-                    placeholder="123-4567"
-                    required
-                    error={errors.postal_code}
-                  />
-                </div>
-
-                {/* 空白 */}
-                <div className="col-span-1" />
-
-                {/* 住所 */}
-                <div className="col-span-1 md:col-span-2">
-                  <label htmlFor="address" className="block text-sm font-medium text-slate-300 mb-1">
-                    住所 <span className="text-rose-400">*</span>
-                  </label>
-                  <textarea
-                    id="address"
-                    name="address"
-                    value={formData.address}
-                    onChange={handleChange}
-                    rows={2}
-                    className={`w-full px-4 py-3 bg-slate-800/50 border rounded-lg focus:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all text-white placeholder-slate-600 ${errors.address ? 'border-rose-500/50 ring-rose-500/20' : 'border-slate-700'
-                      }`}
-                    placeholder="都道府県、市区町村、番地、建物名など"
-                  />
-                  {errors.address && (
-                    <p className="mt-1 text-xs text-rose-400">{errors.address}</p>
-                  )}
-                </div>
-
-                {/* 本社住所 */}
-                <div className="col-span-1 md:col-span-2">
-                  <label htmlFor="head_office_address" className="block text-sm font-medium text-slate-300 mb-1">
-                    本社住所（上記と異なる場合）
-                  </label>
-                  <textarea
-                    id="head_office_address"
-                    name="head_office_address"
-                    value={formData.head_office_address}
-                    onChange={handleChange}
-                    rows={2}
-                    className="w-full px-4 py-3 bg-slate-800/50 border border-slate-700 rounded-lg focus:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all text-white placeholder-slate-600"
-                    placeholder="本社が事務所と異なる場合にご記入ください"
-                  />
+                <div className="md:col-span-2">
+                  <label className={labelClass}>営業所の住所</label>
+                  <textarea name="branch_office_address" value={formData.branch_office_address} onChange={handleChange}
+                    rows={2} className={inputClass()} placeholder="回答がない場合は「なし」とご入力ください" />
+                  <FieldNote text="回答がない場合は「なし」とご入力ください" />
                 </div>
               </div>
             </section>
 
-            {/* その他情報セクション */}
+            {/* ③ 連絡先 */}
             <section>
-              <h2 className="text-lg font-bold text-slate-200 border-b border-slate-700 pb-2 mb-6 flex items-center gap-2">
-                <FileText size={20} className="text-primary-500" />
-                その他
-              </h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* 部署 */}
-                <div className="col-span-1">
-                  <FormInput
-                    label="部署"
-                    id="department"
-                    value={formData.department || ''}
-                    onChange={handleChange}
-                    placeholder="例: 営業部"
-                  />
+              <SectionHeading icon={<Mail size={18} />} title="連絡先" />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <div>
+                  <label className={labelClass}>メインメールアドレス {REQUIRED}</label>
+                  <input type="email" name="email" value={formData.email} onChange={handleChange}
+                    className={inputClass(errors.email)} placeholder="例: info@example.co.jp" autoComplete="off" />
+                  {errors.email && <p className="mt-1 text-xs text-rose-400">{errors.email}</p>}
                 </div>
-
-                {/* 役職 */}
-                <div className="col-span-1">
-                  <FormInput
-                    label="役職"
-                    id="position"
-                    value={formData.position || ''}
-                    onChange={handleChange}
-                    placeholder="例: 課長"
-                  />
+                <div>
+                  <label className={labelClass}>請求書等送付先メールアドレス</label>
+                  <input type="email" name="invoice_email" value={formData.invoice_email} onChange={handleChange}
+                    className={inputClass()} placeholder="メインと同じ場合は「同上」" autoComplete="off" />
+                  <FieldNote text="メインメールアドレスと同じ場合は「同上」とご入力ください" />
                 </div>
-
-                {/* 備考 */}
-                <div className="col-span-1 md:col-span-2">
-                  <label htmlFor="notes" className="block text-sm font-medium text-slate-300 mb-1">
-                    備考
-                  </label>
-                  <textarea
-                    id="notes"
-                    name="notes"
-                    value={formData.notes || ''}
-                    onChange={handleChange}
-                    rows={3}
-                    className="w-full px-4 py-3 bg-slate-800/50 border border-slate-700 rounded-lg focus:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all text-white placeholder-slate-600"
-                    placeholder="その他連絡事項があればご記入ください"
-                  />
+                <div>
+                  <label className={labelClass}>電話番号 {REQUIRED}</label>
+                  <input type="tel" name="phone_number" value={formData.phone_number} onChange={handleChange}
+                    className={inputClass(errors.phone_number)} placeholder="例: 03-1234-5678" autoComplete="off" />
+                  <FieldNote text="ハイフンありで入力してください" />
+                  {errors.phone_number && <p className="mt-1 text-xs text-rose-400">{errors.phone_number}</p>}
+                </div>
+                <div>
+                  <label className={labelClass}>FAX番号</label>
+                  <input type="tel" name="fax_number" value={formData.fax_number} onChange={handleChange}
+                    className={inputClass()} placeholder="例: 03-1234-5679" autoComplete="off" />
+                  <FieldNote text="ハイフンありで入力してください" />
                 </div>
               </div>
             </section>
 
-            {/* 振込先金融機関情報 */}
+            {/* ④ 担当者情報 */}
+            <section>
+              <SectionHeading icon={<User size={18} />} title="担当者情報" />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <div>
+                  <label className={labelClass}>担当部署名</label>
+                  <input name="contact_department" value={formData.contact_department} onChange={handleChange}
+                    className={inputClass()} placeholder="回答がない場合は「なし」" autoComplete="off" />
+                  <FieldNote text="回答がない場合は「なし」とご入力ください" />
+                </div>
+                <div>
+                  <label className={labelClass}>担当役職名</label>
+                  <input name="contact_position" value={formData.contact_position} onChange={handleChange}
+                    className={inputClass()} placeholder="回答がない場合は「なし」" autoComplete="off" />
+                  <FieldNote text="回答がない場合は「なし」とご入力ください" />
+                </div>
+                <div>
+                  <label className={labelClass}>担当者（営業担当者等）</label>
+                  <input name="contact_person" value={formData.contact_person} onChange={handleChange}
+                    className={inputClass()} placeholder="回答がない場合は「なし」" autoComplete="off" />
+                  <FieldNote text="回答がない場合は「なし」とご入力ください" />
+                </div>
+                <div>
+                  <label className={labelClass}>経理担当者</label>
+                  <input name="accounting_contact" value={formData.accounting_contact} onChange={handleChange}
+                    className={inputClass()} placeholder="回答がない場合は「なし」" autoComplete="off" />
+                  <FieldNote text="回答がない場合は「なし」とご入力ください" />
+                </div>
+              </div>
+            </section>
+
+            {/* ⑤ 振込先金融機関情報 */}
             <section className="bg-slate-800/30 rounded-xl p-6 border border-slate-700">
-              <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                <span className="w-7 h-7 bg-primary-600 rounded-full flex items-center justify-center text-xs font-bold">🏦</span>
-                振込先金融機関情報
-                <span className="text-xs text-slate-400 font-normal ml-1">（支払い処理に使用します）</span>
-              </h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <SectionHeading icon={<span>🏦</span>} title="振込先金融機関情報" />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-1">銀行名 <span className="text-red-400">*</span></label>
-                  <input
-                    type="text"
-                    name="bank_name"
-                    value={formData.bank_name || ''}
-                    onChange={handleChange}
-                    required
-                    className="w-full px-4 py-3 bg-slate-800/50 border border-slate-700 rounded-lg focus:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all text-white placeholder-slate-600"
-                    placeholder="例: ○○銀行"
-                  />
+                  <label className={labelClass}>振込先　金融機関名 {REQUIRED}</label>
+                  <input name="bank_name" value={formData.bank_name} onChange={handleChange}
+                    className={inputClass(errors.bank_name)} placeholder="例: ○○銀行" autoComplete="off" />
+                  {errors.bank_name && <p className="mt-1 text-xs text-rose-400">{errors.bank_name}</p>}
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-1">支店名 <span className="text-red-400">*</span></label>
-                  <input
-                    type="text"
-                    name="bank_branch"
-                    value={formData.bank_branch || ''}
-                    onChange={handleChange}
-                    required
-                    className="w-full px-4 py-3 bg-slate-800/50 border border-slate-700 rounded-lg focus:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all text-white placeholder-slate-600"
-                    placeholder="例: 本店"
-                  />
+                  <label className={labelClass}>振込先　支店名 {REQUIRED}</label>
+                  <input name="bank_branch" value={formData.bank_branch} onChange={handleChange}
+                    className={inputClass(errors.bank_branch)} placeholder="例: 本店" autoComplete="off" />
+                  {errors.bank_branch && <p className="mt-1 text-xs text-rose-400">{errors.bank_branch}</p>}
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-1">口座種別 <span className="text-red-400">*</span></label>
-                  <select
-                    name="bank_account_type"
-                    value={formData.bank_account_type || 'ordinary'}
-                    onChange={handleChange}
-                    required
-                    className="w-full px-4 py-3 bg-slate-800/50 border border-slate-700 rounded-lg focus:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all text-white"
-                  >
+                  <label className={labelClass}>振込先　預金種目 {REQUIRED}</label>
+                  <select name="bank_account_type" value={formData.bank_account_type} onChange={handleChange}
+                    className={inputClass()}>
                     <option value="ordinary">普通</option>
                     <option value="current">当座</option>
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-1">口座番号 <span className="text-red-400">*</span></label>
-                  <input
-                    type="text"
-                    name="bank_account_number"
-                    value={formData.bank_account_number || ''}
-                    onChange={handleChange}
-                    required
-                    className="w-full px-4 py-3 bg-slate-800/50 border border-slate-700 rounded-lg focus:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all text-white placeholder-slate-600"
-                    placeholder="例: 1234567"
-                  />
+                  <label className={labelClass}>振込先　口座番号 {REQUIRED}</label>
+                  <input name="bank_account_number" value={formData.bank_account_number} onChange={handleChange}
+                    className={inputClass(errors.bank_account_number)} placeholder="例: 1234567" autoComplete="off" />
+                  {errors.bank_account_number && <p className="mt-1 text-xs text-rose-400">{errors.bank_account_number}</p>}
                 </div>
-                <div className="col-span-1 md:col-span-2">
-                  <label className="block text-sm font-medium text-slate-300 mb-1">口座名義（カタカナ） <span className="text-red-400">*</span></label>
-                  <input
-                    type="text"
-                    name="bank_account_holder"
-                    value={formData.bank_account_holder || ''}
-                    onChange={handleChange}
-                    required
-                    className="w-full px-4 py-3 bg-slate-800/50 border border-slate-700 rounded-lg focus:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all text-white placeholder-slate-600"
-                    placeholder="例: カブシキカイシャ〇〇"
-                  />
+                <div>
+                  <label className={labelClass}>振込先　口座名義 {REQUIRED}</label>
+                  <input name="bank_account_holder" value={formData.bank_account_holder} onChange={handleChange}
+                    className={inputClass(errors.bank_account_holder)} placeholder="例: カブシキカイシャ〇〇" autoComplete="off" />
+                  {errors.bank_account_holder && <p className="mt-1 text-xs text-rose-400">{errors.bank_account_holder}</p>}
                 </div>
+                <div>
+                  <label className={labelClass}>振込先　口座名義フリガナ {REQUIRED}</label>
+                  <input name="bank_account_holder_kana" value={formData.bank_account_holder_kana} onChange={handleChange}
+                    className={inputClass(errors.bank_account_holder_kana)} placeholder="例: カブシキカイシャ〇〇" autoComplete="off" />
+                  {errors.bank_account_holder_kana && <p className="mt-1 text-xs text-rose-400">{errors.bank_account_holder_kana}</p>}
+                </div>
+              </div>
+            </section>
+
+            {/* ⑥ その他 */}
+            <section>
+              <SectionHeading icon={<FileText size={18} />} title="その他" />
+              <div>
+                <label className={labelClass}>適格請求書発行事業者登録番号（インボイス番号）</label>
+                <input name="invoice_registration_number" value={formData.invoice_registration_number} onChange={handleChange}
+                  className={inputClass()} placeholder="例: T1234567890123　回答がない場合は「なし」" autoComplete="off" />
+                <FieldNote text="回答がない場合は「なし」とご入力ください" />
               </div>
             </section>
 
@@ -498,56 +362,39 @@ const RegisterPage: React.FC = () => {
             <div className="bg-slate-800/30 rounded-lg p-5 border border-slate-700">
               <div className="flex items-start">
                 <div className="flex h-5 items-center">
-                  <input
-                    id="agree_terms"
-                    name="agree_terms"
-                    type="checkbox"
-                    checked={formData.agree_terms}
-                    onChange={handleChange}
-                    className="h-5 w-5 rounded border-slate-600 text-primary-500 focus:ring-primary-500 bg-slate-700"
-                  />
+                  <input id="agree_terms" name="agree_terms" type="checkbox"
+                    checked={formData.agree_terms} onChange={handleChange}
+                    className="h-5 w-5 rounded border-slate-600 text-primary-500 focus:ring-primary-500 bg-slate-700" />
                 </div>
                 <div className="ml-3 text-sm">
                   <label htmlFor="agree_terms" className="font-medium text-slate-200 select-none cursor-pointer">
-                    利用規約に同意します <span className="text-rose-400">*</span>
+                    利用規約に同意します {REQUIRED}
                   </label>
                   <p className="text-slate-400 mt-1">
-                    <a href="/terms" target="_blank" className="text-primary-400 hover:text-primary-300 hover:underline font-medium">
-                      利用規約
-                    </a>
+                    <a href="/terms" target="_blank" className="text-primary-400 hover:text-primary-300 hover:underline font-medium">利用規約</a>
                     と
-                    <a href="/privacy" target="_blank" className="text-primary-400 hover:text-primary-300 hover:underline font-medium ml-1">
-                      プライバシーポリシー
-                    </a>
+                    <a href="/privacy" target="_blank" className="text-primary-400 hover:text-primary-300 hover:underline font-medium ml-1">プライバシーポリシー</a>
                     を確認しました。
                   </p>
-                  {errors.agree_terms && (
-                    <p className="mt-2 text-xs text-rose-400 font-bold">{errors.agree_terms}</p>
-                  )}
+                  {errors.agree_terms && <p className="mt-2 text-xs text-rose-400 font-bold">{errors.agree_terms}</p>}
                 </div>
               </div>
             </div>
 
             {/* 送信ボタン */}
             <div className="pt-4">
-              <button
-                type="submit"
-                disabled={isSubmitting}
-                className="w-full px-6 py-4 bg-gradient-to-r from-primary-600 to-primary-500 text-white rounded-xl font-bold text-lg hover:from-primary-500 hover:to-primary-400 transition-all shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none flex items-center justify-center gap-2"
-              >
+              <button type="submit" disabled={isSubmitting}
+                className="w-full px-6 py-4 bg-gradient-to-r from-primary-600 to-primary-500 text-white rounded-xl font-bold text-lg hover:from-primary-500 hover:to-primary-400 transition-all shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none flex items-center justify-center gap-2">
                 {isSubmitting ? (
                   <>
                     <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                     </svg>
                     送信中...
                   </>
                 ) : (
-                  <>
-                    <FileText size={20} />
-                    登録申請を送信
-                  </>
+                  <><FileText size={20} />登録申請を送信</>
                 )}
               </button>
               <p className="text-center text-xs text-slate-500 mt-4">
@@ -557,51 +404,6 @@ const RegisterPage: React.FC = () => {
           </form>
         </div>
       </div>
-    </div>
-  );
-};
-
-// 入力コンポーネント (Dark Theme)
-interface FormInputProps {
-  label: string;
-  id: string;
-  type?: string;
-  value: string;
-  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  placeholder?: string;
-  required?: boolean;
-  error?: string;
-  icon?: React.ReactNode;
-}
-
-const FormInput: React.FC<FormInputProps> = ({
-  label, id, type = 'text', value, onChange, placeholder, required = false, error, icon
-}) => {
-  return (
-    <div>
-      <label htmlFor={id} className="block text-sm font-medium text-slate-300 mb-1">
-        {label} {required && <span className="text-rose-400">*</span>}
-      </label>
-      <div className="relative group">
-        {icon && (
-          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-500 group-focus-within:text-primary-400 transition-colors">
-            {icon}
-          </div>
-        )}
-        <input
-          type={type}
-          id={id}
-          name={id}
-          value={value}
-          onChange={onChange}
-          className={`w-full ${icon ? 'pl-10' : 'px-4'} pr-4 py-3 bg-slate-800/50 border rounded-lg focus:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all text-white placeholder-slate-600 ${error ? 'border-rose-500/50 ring-rose-500/20' : 'border-slate-700'
-            }`}
-          placeholder={placeholder}
-        />
-      </div>
-      {error && (
-        <p className="mt-1 text-xs text-rose-400">{error}</p>
-      )}
     </div>
   );
 };

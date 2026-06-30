@@ -1301,21 +1301,26 @@ class UserRegistrationRequestSerializer(serializers.ModelSerializer):
     status_display = serializers.CharField(source='get_status_display', read_only=True)
     reviewed_by_name = serializers.CharField(source='reviewed_by.get_full_name', read_only=True, allow_null=True)
 
+    # 振込先は必須
     bank_name = serializers.CharField(required=True, allow_blank=False)
     bank_branch = serializers.CharField(required=True, allow_blank=False)
     bank_account_number = serializers.CharField(required=True, allow_blank=False)
     bank_account_holder = serializers.CharField(required=True, allow_blank=False)
+    bank_account_holder_kana = serializers.CharField(required=True, allow_blank=False)
 
     class Meta:
         model = UserRegistrationRequest
         fields = [
             'id', 'company_name', 'company_name_kana', 'full_name',
-            'email', 'phone_number', 'fax_number',
-            'postal_code', 'address',
-            'representative_name', 'invoice_registration_number', 'head_office_address',
-            'department', 'position', 'notes',
+            'email', 'invoice_email', 'phone_number', 'fax_number',
+            'postal_code', 'address', 'head_office_address', 'branch_office_address',
+            'representative_name', 'invoice_registration_number',
+            'department', 'contact_department', 'contact_position',
+            'contact_person', 'accounting_contact',
+            'main_construction_type',
+            'position', 'notes',
             'bank_name', 'bank_branch', 'bank_account_type',
-            'bank_account_number', 'bank_account_holder',
+            'bank_account_number', 'bank_account_holder', 'bank_account_holder_kana',
             'status', 'status_display', 'submitted_at', 'reviewed_at',
             'reviewed_by', 'reviewed_by_name', 'rejection_reason',
             'created_user'

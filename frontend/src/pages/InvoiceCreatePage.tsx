@@ -468,6 +468,7 @@ const InvoiceCreatePage: React.FC = () => {
                 <input
                   type="text"
                   required
+                  autoComplete="off"
                   value={formData.project_name}
                   onChange={(e) => setFormData({ ...formData, project_name: e.target.value })}
                   placeholder="例: ○○様邸外壁塗装工事"
@@ -723,6 +724,7 @@ const InvoiceCreatePage: React.FC = () => {
                             onChange={(e) => handleItemChange(index, 'description', e.target.value)}
                             list={`frequent-items-${index}`}
                             required
+                            autoComplete="off"
                             className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-primary-500"
                           />
                           {/* よく使う項目のデータリスト */}

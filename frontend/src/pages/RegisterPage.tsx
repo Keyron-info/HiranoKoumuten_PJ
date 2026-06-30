@@ -431,33 +431,36 @@ const RegisterPage: React.FC = () => {
               </h2>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-1">銀行名</label>
+                  <label className="block text-sm font-medium text-slate-300 mb-1">銀行名 <span className="text-red-400">*</span></label>
                   <input
                     type="text"
                     name="bank_name"
                     value={formData.bank_name || ''}
                     onChange={handleChange}
+                    required
                     className="w-full px-4 py-3 bg-slate-800/50 border border-slate-700 rounded-lg focus:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all text-white placeholder-slate-600"
                     placeholder="例: ○○銀行"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-1">支店名</label>
+                  <label className="block text-sm font-medium text-slate-300 mb-1">支店名 <span className="text-red-400">*</span></label>
                   <input
                     type="text"
                     name="bank_branch"
                     value={formData.bank_branch || ''}
                     onChange={handleChange}
+                    required
                     className="w-full px-4 py-3 bg-slate-800/50 border border-slate-700 rounded-lg focus:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all text-white placeholder-slate-600"
                     placeholder="例: 本店"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-1">口座種別</label>
+                  <label className="block text-sm font-medium text-slate-300 mb-1">口座種別 <span className="text-red-400">*</span></label>
                   <select
                     name="bank_account_type"
                     value={formData.bank_account_type || 'ordinary'}
                     onChange={handleChange}
+                    required
                     className="w-full px-4 py-3 bg-slate-800/50 border border-slate-700 rounded-lg focus:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all text-white"
                   >
                     <option value="ordinary">普通</option>
@@ -465,23 +468,25 @@ const RegisterPage: React.FC = () => {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-1">口座番号</label>
+                  <label className="block text-sm font-medium text-slate-300 mb-1">口座番号 <span className="text-red-400">*</span></label>
                   <input
                     type="text"
                     name="bank_account_number"
                     value={formData.bank_account_number || ''}
                     onChange={handleChange}
+                    required
                     className="w-full px-4 py-3 bg-slate-800/50 border border-slate-700 rounded-lg focus:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all text-white placeholder-slate-600"
                     placeholder="例: 1234567"
                   />
                 </div>
                 <div className="col-span-1 md:col-span-2">
-                  <label className="block text-sm font-medium text-slate-300 mb-1">口座名義（カタカナ）</label>
+                  <label className="block text-sm font-medium text-slate-300 mb-1">口座名義（カタカナ） <span className="text-red-400">*</span></label>
                   <input
                     type="text"
                     name="bank_account_holder"
                     value={formData.bank_account_holder || ''}
                     onChange={handleChange}
+                    required
                     className="w-full px-4 py-3 bg-slate-800/50 border border-slate-700 rounded-lg focus:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all text-white placeholder-slate-600"
                     placeholder="例: カブシキカイシャ〇〇"
                   />

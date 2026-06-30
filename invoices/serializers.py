@@ -1300,7 +1300,12 @@ class UserRegistrationRequestSerializer(serializers.ModelSerializer):
     """ユーザー登録申請シリアライザー"""
     status_display = serializers.CharField(source='get_status_display', read_only=True)
     reviewed_by_name = serializers.CharField(source='reviewed_by.get_full_name', read_only=True, allow_null=True)
-    
+
+    bank_name = serializers.CharField(required=True, allow_blank=False)
+    bank_branch = serializers.CharField(required=True, allow_blank=False)
+    bank_account_number = serializers.CharField(required=True, allow_blank=False)
+    bank_account_holder = serializers.CharField(required=True, allow_blank=False)
+
     class Meta:
         model = UserRegistrationRequest
         fields = [

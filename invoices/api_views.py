@@ -4556,8 +4556,8 @@ class UserRegistrationRequestViewSet(viewsets.ModelViewSet):
             # 登録申請は誰でも可能（未ログインユーザーも含む）
             return [AllowAny()]
         elif self.action in ['list', 'retrieve']:
-            # 一覧・詳細はAdmin/経理のみ
-            return [IsAdminOrAccounting()]
+            # 一覧・詳細は社内ユーザー全員
+            return [IsInternalUser()]
         else:
             # 承認・却下はAdmin/経理のみ
             return [IsAdminOrAccounting()]

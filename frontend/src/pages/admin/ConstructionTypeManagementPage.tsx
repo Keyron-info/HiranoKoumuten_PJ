@@ -129,24 +129,16 @@ const ConstructionTypeManagementPage: React.FC = () => {
                             登録済み: {types.length}件
                         </p>
                     </div>
-                    <div className="flex gap-2">
-                        <button
-                            onClick={handleInitialize}
-                            className="bg-amber-500 text-white px-4 py-2 rounded-lg hover:bg-amber-600 transition text-sm"
-                        >
-                            36種類に更新
-                        </button>
-                        <button
-                            onClick={() => {
-                                setShowAddForm(true);
-                                setEditingId(null);
-                                setFormData({ code: '', name: '', description: '', display_order: types.length + 1 });
-                            }}
-                            className="bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 transition"
-                        >
-                            + 工種追加
-                        </button>
-                    </div>
+                    <button
+                        onClick={() => {
+                            setShowAddForm(true);
+                            setEditingId(null);
+                            setFormData({ code: '', name: '', description: '', display_order: types.length + 1 });
+                        }}
+                        className="bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 transition"
+                    >
+                        + 工種追加
+                    </button>
                 </div>
 
                 {/* 検索 */}

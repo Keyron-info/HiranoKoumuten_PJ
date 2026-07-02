@@ -3173,37 +3173,62 @@ class ConstructionTypeViewSet(viewsets.ModelViewSet):
     
     @action(detail=False, methods=['post'], permission_classes=[IsSuperAdmin])
     def initialize(self, request):
-        """工種マスタの初期化（15種類を登録）"""
+        """工種マスタの初期化（36種類を登録）"""
         initial_types = [
-            ('exterior_wall', '外壁', 1),
-            ('interior', '内装', 2),
-            ('electrical', '電気', 3),
-            ('plumbing', '給排水', 4),
-            ('air_conditioning', '空調', 5),
-            ('foundation', '基礎', 6),
-            ('structural', '躯体', 7),
-            ('roofing', '屋根', 8),
-            ('waterproofing', '防水', 9),
-            ('painting', '塗装', 10),
-            ('flooring', '床', 11),
-            ('carpentry', '大工', 12),
-            ('landscaping', '外構', 13),
-            ('demolition', '解体', 14),
-            ('temporary', '仮設', 15),
+            ('direct_temporary',  '直接仮設工事',       1),
+            ('earthwork',         '土工事',             2),
+            ('pile',              '杭工事',             3),
+            ('reinforcement',     '鉄筋工事',           4),
+            ('concrete',          'コンクリート工事',    5),
+            ('formwork',          '型枠工事',           6),
+            ('steel_structure',   '鉄骨工事',           7),
+            ('waterproofing',     '防水工事',           8),
+            ('stone_tile',        '石タイル工事',        9),
+            ('alc',               'ALC工事',           10),
+            ('roofing',           '屋根樋工事',         11),
+            ('plastering',        '左官工事',           12),
+            ('metal',             '金属工事',           13),
+            ('metal_fittings',    '金属製建具工事',      14),
+            ('wood_fittings',     '木製建具工事',        15),
+            ('glass',             '硝子工事',           16),
+            ('painting',          '塗装工事',           17),
+            ('carpentry',         '木工事',             18),
+            ('light_steel',       '軽鉄工事',           19),
+            ('insulation',        '被覆工事',           20),
+            ('interior',          '内装工事',           21),
+            ('exterior',          '外装工事',           22),
+            ('fixtures',          '什器工事',           23),
+            ('furniture',         '家具工事',           24),
+            ('heating',           '暖房器具工事',        25),
+            ('unit',              'ユニット工事',        26),
+            ('miscellaneous',     '雑工事',             27),
+            ('electrical',        '電気設備工事',        28),
+            ('plumbing',          '給排水衛生設備工事',  29),
+            ('hvac',              '空調換気設備工事',    30),
+            ('elevator',          'EV工事',             31),
+            ('mechanical',        '機械設備工事',        32),
+            ('other_equipment',   'その他設備工事',      33),
+            ('landscaping',       '外構工事',           34),
+            ('demolition',        '解体工事',           35),
+            ('other',             'その他工事',         36),
         ]
-        
+
+        new_codes = {code for code, _, _ in initial_types}
+        ConstructionType.objects.exclude(code__in=new_codes).update(is_active=False)
+
         created_count = 0
         for code, name, order in initial_types:
-            _, created = ConstructionType.objects.get_or_create(
-                code=code,
-                defaults={'name': name, 'display_order': order}
-            )
+            obj, created = ConstructionType.objects.get_or_create(code=code)
+            obj.name = name
+            obj.display_order = order
+            obj.is_active = True
+            obj.save()
             if created:
                 created_count += 1
-        
+
         return Response({
-            'message': f'{created_count}件の工種を登録しました',
-            'total': ConstructionType.objects.count()
+            'message': f'{created_count}件の工種を新規登録しました（合計{len(initial_types)}種）',
+            'total': ConstructionType.objects.filter(is_active=True).count()
         })
 
 

@@ -36,6 +36,17 @@ const ConstructionTypeManagementPage: React.FC = () => {
         }
     };
 
+    const handleInitialize = async () => {
+        if (!window.confirm('工種マスタを36種類の正式リストに更新します。\n古い工種（外壁・基礎・躯体など）は無効化されます。\nよろしいですか？')) return;
+        try {
+            const result = await constructionTypeAPI.initialize();
+            alert(result.message);
+            fetchTypes();
+        } catch (error: any) {
+            alert('更新エラー: ' + (error.response?.data?.detail || error.message));
+        }
+    };
+
     const handleAdd = async (e: React.FormEvent) => {
         e.preventDefault();
         try {
@@ -118,16 +129,24 @@ const ConstructionTypeManagementPage: React.FC = () => {
                             登録済み: {types.length}件
                         </p>
                     </div>
-                    <button
-                        onClick={() => {
-                            setShowAddForm(true);
-                            setEditingId(null);
-                            setFormData({ code: '', name: '', description: '', display_order: types.length + 1 });
-                        }}
-                        className="bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 transition"
-                    >
-                        + 工種追加
-                    </button>
+                    <div className="flex gap-2">
+                        <button
+                            onClick={handleInitialize}
+                            className="bg-amber-500 text-white px-4 py-2 rounded-lg hover:bg-amber-600 transition text-sm"
+                        >
+                            36種類に更新
+                        </button>
+                        <button
+                            onClick={() => {
+                                setShowAddForm(true);
+                                setEditingId(null);
+                                setFormData({ code: '', name: '', description: '', display_order: types.length + 1 });
+                            }}
+                            className="bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 transition"
+                        >
+                            + 工種追加
+                        </button>
+                    </div>
                 </div>
 
                 {/* 検索 */}

@@ -21,8 +21,10 @@ const RegistrationRequestsPage: React.FC = () => {
     try {
       const data = await userRegistrationAPI.getRequests();
       setRequests(data);
-    } catch (error) {
-      alert('登録申請の取得に失敗しました');
+    } catch (error: any) {
+      const status = error?.response?.status;
+      const detail = error?.response?.data?.detail || error?.message || '';
+      alert(`登録申請の取得に失敗しました (${status || 'エラー'}): ${detail}`);
     } finally {
       setLoading(false);
     }
